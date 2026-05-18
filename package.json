@@ -1,0 +1,19 @@
+{
+  "name": "centisport",
+  "version": "0.1.0",
+  "description": "Sports Money collector MVP for Polymarket exports",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/index.js",
+    "scan:once": "SCAN_ONCE=true node src/index.js",
+    "migrate": "node src/migrate.js",
+    "playwright:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1",
+    "playwright": "^1.49.1"
+  },
+  "devDependencies": {}
+}
