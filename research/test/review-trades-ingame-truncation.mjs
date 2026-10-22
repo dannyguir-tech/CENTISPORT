@@ -3,7 +3,7 @@
 // zero-valued trade features (not null) for a market that had heavy pre-game flow.
 // SYNTHETIC mock data only. Run: node research/test/review-trades-ingame-truncation.mjs
 // Exit 1 = bug reproduced, 0 = fixed.
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +14,18 @@ import { buildDataset } from '../build-dataset.js';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const COLLECT = path.join(HERE, '..', 'collect.js');
 const HOUR = 3600;
+
+// Async spawn: the mock server lives in this process, so spawnSync would deadlock it.
+function runNode(args, env) {
+  return new Promise((resolve, reject) => {
+    const c = spawn(process.execPath, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    c.stdout.on('data', (d) => (stdout += d));
+    c.stderr.on('data', (d) => (stderr += d));
+    c.on('error', reject);
+    c.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+}
 
 const fixture = buildFixture({ nEvents: 3, seed: 11 });
 const entry = fixture.entries.find((e) => e.meta.kind === 'ok' && e.meta.type === 'moneyline' && e.meta.eventIndex === 1);
@@ -35,8 +47,8 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-trunc-'));
 try {
   const slugs = path.join(dir, 'slugs.txt');
   fs.writeFileSync(slugs, `${entry.event.slug}\n`);
-  const r = spawnSync(process.execPath, [COLLECT, '--data-dir', dir, '--strategy', 'event-slugs', '--event-slugs', slugs, '--trades',
-    '--rps', '500', '--concurrency', '8', '--retry-base-ms', '5', '--quiet'], { env: { ...process.env, ...srv.env }, encoding: 'utf8' });
+  const r = await runNode([COLLECT, '--data-dir', dir, '--strategy', 'event-slugs', '--event-slugs', slugs, '--trades',
+    '--rps', '500', '--concurrency', '8', '--retry-base-ms', '5', '--quiet'], srv.env);
   if (r.status !== 0) throw new Error(`collect failed: ${r.stderr}`);
 
   const rec = fs.readFileSync(path.join(dir, 'markets.jsonl'), 'utf8').trim().split('\n').map(JSON.parse).find((m) => m.conditionId === cid);

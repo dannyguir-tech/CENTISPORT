@@ -1,0 +1,275 @@
+{
+ "5m": {
+  "halfSpreadByFoldedBand": [
+   {
+    "band": "0-0.05",
+    "n": 2045,
+    "median": 0.0042,
+    "mean": 0.0036
+   },
+   {
+    "band": "0.05-0.1",
+    "n": 1604,
+    "median": 0.005,
+    "mean": 0.0052
+   },
+   {
+    "band": "0.1-0.2",
+    "n": 2893,
+    "median": 0.0049,
+    "mean": 0.0049
+   },
+   {
+    "band": "0.2-0.3",
+    "n": 3089,
+    "median": 0.0046,
+    "mean": 0.0042
+   },
+   {
+    "band": "0.3-0.4",
+    "n": 3514,
+    "median": 0.004,
+    "mean": 0.0034
+   },
+   {
+    "band": "0.4-0.5",
+    "n": 3438,
+    "median": 0.0045,
+    "mean": 0.0042
+   }
+  ],
+  "halfSpreadByPhase": {
+   "early": {
+    "n": 6911,
+    "median": 0.0045,
+    "mean": 0.004
+   },
+   "mid": {
+    "n": 7864,
+    "median": 0.0048,
+    "mean": 0.0042
+   },
+   "late": {
+    "n": 1808,
+    "median": 0.0042,
+    "mean": 0.0047
+   }
+  },
+  "buySlipVsFreshSnapshot": [
+   {
+    "band": "0-0.05",
+    "n": 8812,
+    "median": 0.005,
+    "mean": 0.0433
+   },
+   {
+    "band": "0.05-0.1",
+    "n": 14011,
+    "median": 0.035,
+    "mean": 0.047
+   },
+   {
+    "band": "0.1-0.2",
+    "n": 27815,
+    "median": 0.035,
+    "mean": 0.0347
+   },
+   {
+    "band": "0.2-0.3",
+    "n": 32897,
+    "median": 0.035,
+    "mean": 0.0314
+   },
+   {
+    "band": "0.3-0.4",
+    "n": 37334,
+    "median": 0.035,
+    "mean": 0.033
+   },
+   {
+    "band": "0.4-0.5",
+    "n": 46884,
+    "median": 0.035,
+    "mean": 0.0358
+   }
+  ]
+ },
+ "15m": {
+  "halfSpreadByFoldedBand": [
+   {
+    "band": "0-0.05",
+    "n": 2551,
+    "median": 0.0024,
+    "mean": 0.0025
+   },
+   {
+    "band": "0.05-0.1",
+    "n": 2473,
+    "median": 0.0039,
+    "mean": 0.0033
+   },
+   {
+    "band": "0.1-0.2",
+    "n": 4392,
+    "median": 0.005,
+    "mean": 0.0038
+   },
+   {
+    "band": "0.2-0.3",
+    "n": 4924,
+    "median": 0.005,
+    "mean": 0.004
+   },
+   {
+    "band": "0.3-0.4",
+    "n": 5191,
+    "median": 0.0049,
+    "mean": 0.0038
+   },
+   {
+    "band": "0.4-0.5",
+    "n": 5605,
+    "median": 0.0049,
+    "mean": 0.0033
+   }
+  ],
+  "halfSpreadByPhase": {
+   "early": {
+    "n": 8594,
+    "median": 0.005,
+    "mean": 0.0037
+   },
+   "mid": {
+    "n": 11320,
+    "median": 0.0047,
+    "mean": 0.0035
+   },
+   "late": {
+    "n": 5222,
+    "median": 0.0033,
+    "mean": 0.0035
+   }
+  },
+  "buySlipVsFreshSnapshot": [
+   {
+    "band": "0-0.05",
+    "n": 6619,
+    "median": 0.005,
+    "mean": 0.0035
+   },
+   {
+    "band": "0.05-0.1",
+    "n": 7037,
+    "median": 0.015,
+    "mean": 0.0101
+   },
+   {
+    "band": "0.1-0.2",
+    "n": 17940,
+    "median": 0.025,
+    "mean": 0.0382
+   },
+   {
+    "band": "0.2-0.3",
+    "n": 22059,
+    "median": 0.0236,
+    "mean": 0.0201
+   },
+   {
+    "band": "0.3-0.4",
+    "n": 26146,
+    "median": 0.015,
+    "mean": 0.0239
+   },
+   {
+    "band": "0.4-0.5",
+    "n": 25626,
+    "median": 0.025,
+    "mean": 0.0305
+   }
+  ]
+ },
+ "live": {
+  "fetchedAt": "2026-10-22T10:22:51.650Z",
+  "5m": {
+   "inplayTokens": 0,
+   "inplay": [],
+   "futureTokens": 140,
+   "futureMedianSpread": 0.01,
+   "futureMedianAskDepth1cUSD": 386.6
+  },
+  "15m": {
+   "inplayTokens": 0,
+   "inplay": [],
+   "futureTokens": 46,
+   "futureMedianSpread": 0.01,
+   "futureMedianAskDepth1cUSD": 1339.9
+  },
+  "1h": {
+   "inplayTokens": 2,
+   "inplay": [
+    {
+     "outcome": "Up",
+     "bid": 0.72,
+     "ask": 0.73,
+     "spread": 0.01,
+     "askDepth1cUSD": 344.3
+    },
+    {
+     "outcome": "Down",
+     "bid": 0.27,
+     "ask": 0.28,
+     "spread": 0.01,
+     "askDepth1cUSD": 252.2
+    }
+   ],
+   "futureTokens": 96,
+   "futureMedianSpread": 0.02,
+   "futureMedianAskDepth1cUSD": 110.9
+  },
+  "4h": {
+   "inplayTokens": 2,
+   "inplay": [
+    {
+     "outcome": "Up",
+     "bid": 0.2,
+     "ask": 0.21,
+     "spread": 0.01,
+     "askDepth1cUSD": 127.9
+    },
+    {
+     "outcome": "Down",
+     "bid": 0.79,
+     "ask": 0.8,
+     "spread": 0.01,
+     "askDepth1cUSD": 2965.5
+    }
+   ],
+   "futureTokens": 12,
+   "futureMedianSpread": 0.04,
+   "futureMedianAskDepth1cUSD": 11
+  },
+  "1d": {
+   "inplayTokens": 2,
+   "inplay": [
+    {
+     "outcome": "Up",
+     "bid": 0.026,
+     "ask": 0.03,
+     "spread": 0.004,
+     "askDepth1cUSD": 256.2
+    },
+    {
+     "outcome": "Down",
+     "bid": 0.97,
+     "ask": 0.974,
+     "spread": 0.004,
+     "askDepth1cUSD": 316.1
+    }
+   ],
+   "futureTokens": 2,
+   "futureMedianSpread": 0.01,
+   "futureMedianAskDepth1cUSD": 262.4
+  }
+ }
+}
