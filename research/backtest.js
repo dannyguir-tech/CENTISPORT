@@ -9,6 +9,7 @@ import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { benjaminiHochberg, clusterBootstrapSums, mean, normalCdf, normalQuantile, wilson } from './lib/stats.js';
 import { BASE_HYPOTHESES, TRADE_FIELDS, buildHypotheses } from './hypotheses.js';
+import { readProvenance } from './build-dataset.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HOUR = 3600;
@@ -96,6 +97,18 @@ export async function loadDataset(file) {
     rows.push(prepareRow(x));
   }
   return { rows, read, drops };
+}
+
+// Provenance recorded by build-dataset.js in <dataset>.summary.json (from collect-runs.jsonl);
+// falls back to reading collect-runs.jsonl beside the dataset.
+export function loadProvenance(dataFile) {
+  const dir = path.dirname(dataFile);
+  const summaryFile = path.join(dir, `${path.basename(dataFile, '.jsonl')}.summary.json`);
+  let s = null;
+  try { s = JSON.parse(fs.readFileSync(summaryFile, 'utf8')); } catch { s = null; }
+  if (s && s.provenance && typeof s.provenance.status === 'string') return { ...s.provenance, from: summaryFile };
+  const dataDir = s && typeof s.dataDir === 'string' ? s.dataDir : dir;
+  return { ...readProvenance(dataDir), from: path.join(dataDir, 'collect-runs.jsonl') };
 }
 
 // ---------- folds & walk-forward ----------
@@ -400,10 +413,19 @@ export async function runBacktest(opts = {}) {
 
   const data = summarizeData(dataFile, rows, read, drops, folds);
   const survivors = tested.filter((r) => r.verdict.survives);
+  const provenance = loadProvenance(dataFile);
+  const labelLooksSynthetic = SYNTHETIC_RE.test(o.sourceLabel);
   const report = {
     tool: 'research/backtest.js',
     generatedAt: new Date().toISOString(),
-    source: { label: o.sourceLabel, looksSynthetic: SYNTHETIC_RE.test(o.sourceLabel), note: 'Label supplied by the caller via --source-label; the backtester cannot verify it.' },
+    source: {
+      label: o.sourceLabel,
+      // Either signal makes the run synthetic; a "real" label never overrides synthetic provenance.
+      looksSynthetic: labelLooksSynthetic || provenance.status === 'synthetic',
+      labelLooksSynthetic,
+      provenance,
+      note: 'The label comes from --source-label. Provenance comes from collect-runs.jsonl (API bases used by collect.js, or the synthetic generator) via the dataset summary.',
+    },
     verdict: null,
     config: {
       data: dataFile, fee: o.fee, spread: o.spread, stressSpread: o.stressSpread, sensitivitySpreads: o.sensitivitySpreads,
@@ -443,7 +465,14 @@ const CAVEATS = Object.freeze([
 function buildWarnings(rep, o) {
   const w = [];
   const tested = rep.hypotheses.filter((r) => r.status === 'tested');
-  if (rep.source.looksSynthetic) w.push('Data source is labelled synthetic/mock: results validate the tooling only.');
+  const pv = rep.source.provenance;
+  if (rep.source.looksSynthetic) w.push('Data source is synthetic/mock: results validate the tooling only.');
+  if (pv.status === 'synthetic' && !rep.source.labelLooksSynthetic) {
+    w.push(`--source-label "${rep.source.label}" does not say synthetic, but the data's provenance does (${pv.reasons.join('; ')}). The report is labelled SYNTHETIC regardless.`);
+  }
+  if (pv.status === 'unknown' && !rep.source.looksSynthetic) {
+    w.push(`Provenance unverified: ${pv.reasons.join('; ')}. Nothing here can be called real-market evidence until the data dir's collect-runs.jsonl shows collect.js runs against the default Polymarket API bases.`);
+  }
   if (tested.length && 1 / (o.boot + 1) > o.fdr / tested.length) {
     w.push(`With --boot ${o.boot} the smallest attainable p (${fmtP(1 / (o.boot + 1))}) exceeds the first BH threshold (${fmtP(o.fdr / tested.length)}), so nothing can pass. Use --boot >= ${Math.ceil(tested.length / o.fdr)}.`);
   }
@@ -476,11 +505,17 @@ function buildVerdict(rep, survivors, o) {
   } else if (sanityFailed) {
     text = '**Results are not trustworthy.** The sanity baseline (buy every outcome) came out profitable after costs, which should be impossible on correctly built data. Find the leakage or label problem before reading anything else.';
   } else if (!survivors.length) {
-    text = `**No hypothesis survived.** ${tested.length} hypotheses were tested out-of-sample after costs (${costs}); none passed all of: n >= ${o.minN}, Benjamini-Hochberg significance at q = ${o.fdr}, a 95% cluster-bootstrap CI for ROI entirely above 0, and positive ROI at a ${o.stressSpread} spread. On this data there is no evidence of a repeatable edge. That is a legitimate result, not a tooling failure.`;
+    // "No evidence" is only as strong as the sample: state the smallest edge that could have shown up.
+    const mdes = tested.filter((r) => r.role === 'candidate' && fin(r.oos.mde80)).map((r) => r.oos.mde80).sort((a, b) => a - b);
+    const power = mdes.length
+      ? ` With these sample sizes the minimum detectable ROI (80% power) of the candidates ranged from ${pct(mdes[0])} to ${pct(mdes[mdes.length - 1])} (median ${pct(mdes[Math.floor(mdes.length / 2)])}); smaller edges would not have shown up, so this is not evidence that they are absent.`
+      : '';
+    text = `**No hypothesis survived.** ${tested.length} hypotheses were tested out-of-sample after costs (${costs}); none passed all of: n >= ${o.minN}, Benjamini-Hochberg significance at q = ${o.fdr}, a 95% cluster-bootstrap CI for ROI entirely above 0, and positive ROI at a ${o.stressSpread} spread. On this data there is no evidence of a repeatable edge. That is a legitimate result, not a tooling failure.${power}`;
   } else {
     text = `**${survivors.length} of ${tested.length} hypotheses survived every check: ${survivors.map((r) => r.id).join(', ')}.** This is evidence from this dataset only. Before risking money, paper-trade each survivor forward at real order-book fills and confirm the edge persists.`;
   }
   if (rep.source.looksSynthetic) text = `Synthetic data: this run validates the tooling only. ${text}`;
+  else if (rep.source.provenance.status === 'unknown') text = `Unverified data source (no collect-runs.jsonl provenance). ${text}`;
   const base = tested.find((r) => r.id === 'baseline-all');
   const sanity = base && base.oos.n
     ? `Sanity check: baseline-all OOS ROI ${pct(base.oos.roi.estimate)} (95% CI ${ci(base.oos.roi)}); with perfectly calibrated prices the cost drag alone would give ${pct(base.oos.hurdleRoi)}.`
@@ -511,11 +546,16 @@ const paramStr = (c) => (c ? `${c.offsetH}h ${JSON.stringify(c.params)}` : 'none
 function toMarkdown(rep) {
   const c = rep.config, d = rep.data, L = [];
   const label = esc(rep.source.label);
-  L.push(`# Sports edge backtest | data source: ${label}`, '');
-  L.push(`**Data source: ${label}** (from \`--source-label\`; the backtester cannot verify it)`, '');
+  const contradicted = rep.source.looksSynthetic && !rep.source.labelLooksSynthetic;
+  L.push(`# Sports edge backtest | data source: ${label}${contradicted ? ' [SYNTHETIC per provenance]' : ''}`, '');
+  L.push(`**Data source: ${label}** (from \`--source-label\`; checked against the data's provenance below)`, '');
+  const pv = rep.source.provenance;
   L.push(rep.source.looksSynthetic
     ? '> **SYNTHETIC / MOCK DATA.** These numbers only validate the tooling. They are not evidence about real Polymarket markets.'
-    : '> Results are only as real as the data source above. Confirm it before acting on anything here.');
+    : pv.status === 'unknown'
+      ? '> **PROVENANCE UNVERIFIED.** No collect-runs.jsonl was found for this dataset, so it cannot be confirmed as Polymarket data. Do not treat these numbers as real-market evidence.'
+      : `> Provenance: collected by research/collect.js from ${esc(pv.bases.join(', '))}. Results describe this dataset only.`);
+  L.push('', `Provenance check: **${pv.status}**${pv.reasons.length ? ` (${esc(pv.reasons.join('; '))})` : ''}.`);
   L.push('', '## Verdict', '', rep.verdict.text);
   if (rep.verdict.sanity) L.push('', rep.verdict.sanity);
 
@@ -530,16 +570,16 @@ function toMarkdown(rep) {
   L.push(`- Per-sport variants: ${c.sportVariantsFor.length ? c.sportVariantsFor.join(', ') : 'none'} (sports with >= ${c.minSportMarkets} markets).`);
 
   L.push('', '## Results (out-of-sample only)', '');
-  L.push('ROI is profit per $1 staked. CLV = close price minus entry price (positive means the market moved your way). Hurdle = ROI these bets would earn if prices were perfectly calibrated. The spread columns re-cost the same out-of-sample picks at each haircut.', '');
+  L.push('ROI is profit per $1 staked. CLV = close price minus entry price (positive means the market moved your way). Hurdle = ROI these bets would earn if prices were perfectly calibrated. MDE80 = smallest true ROI this sample would detect with 80% power; a "no edge" row says nothing about edges smaller than that. The spread columns re-cost the same out-of-sample picks at each haircut.', '');
   const spreads = rep.hypotheses.find((r) => r.sensitivity)?.sensitivity.map((s) => s.spread) || [];
-  L.push(`| Hypothesis | Bets (events) | ROI | 95% CI | p | BH q-adj | CLV | Hurdle | ROI at spread ${spreads.join(' / ')} | Verdict |`);
-  L.push('|---|---|---|---|---|---|---|---|---|---|');
+  L.push(`| Hypothesis | Bets (events) | ROI | 95% CI | MDE80 | p | BH q-adj | CLV | Hurdle | ROI at spread ${spreads.join(' / ')} | Verdict |`);
+  L.push('|---|---|---|---|---|---|---|---|---|---|---|');
   const tested = rep.hypotheses.filter((r) => r.status === 'tested').sort((a, b) =>
     (b.verdict.survives - a.verdict.survives) || (a.oos.roi.p - b.oos.roi.p) || a.id.localeCompare(b.id));
   for (const r of tested) {
     const tag = r.role === 'candidate' ? '' : ` (${r.role})`;
     const verdict = r.verdict.survives ? '**SURVIVES**' : r.verdict.label;
-    L.push(`| ${esc(r.id)}${tag} | ${r.oos.n} (${r.oos.nEvents}) | ${pct(r.oos.roi.estimate)} | ${ci(r.oos.roi)} | ${fmtP(r.oos.roi.p)} | ${fmtP(r.bh.pAdj)} | ${num(r.oos.clv.estimate, 4)} | ${pct(r.oos.hurdleRoi)} | ${r.sensitivity.map((s) => pct(s.roi)).join(' / ')} | ${verdict} |`);
+    L.push(`| ${esc(r.id)}${tag} | ${r.oos.n} (${r.oos.nEvents}) | ${pct(r.oos.roi.estimate)} | ${ci(r.oos.roi)} | ${pct(r.oos.mde80).replace('+', '')} | ${fmtP(r.oos.roi.p)} | ${fmtP(r.bh.pAdj)} | ${num(r.oos.clv.estimate, 4)} | ${pct(r.oos.hurdleRoi)} | ${r.sensitivity.map((s) => pct(s.roi)).join(' / ')} | ${verdict} |`);
   }
 
   const survivors = tested.filter((r) => r.verdict.survives);
@@ -666,6 +706,7 @@ async function main() {
   if (!o.sourceLabel) throw new Error(SOURCE_LABEL_HELP);
   const { report, jsonPath, mdPath } = await runBacktest(o);
   console.log(`data source: ${report.source.label}`);
+  console.log(`provenance: ${report.source.provenance.status}${report.source.looksSynthetic ? ' (SYNTHETIC: tooling validation only)' : ''}`);
   console.log(report.verdict.text.replace(/\*\*/g, ''));
   if (report.verdict.sanity) console.log(report.verdict.sanity);
   for (const w of report.warnings) console.log(`warning: ${w}`);

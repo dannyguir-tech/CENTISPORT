@@ -256,6 +256,40 @@ export async function readTrades(dataDir, conditionId, validAssets, maxTs) {
   return out;
 }
 
+// ---------- provenance ----------
+
+const SYNTHETIC_MARK = /^\s*\[SYNTHETIC\]/i;
+export const isSyntheticMarket = (m) => SYNTHETIC_MARK.test(m.question || '') || SYNTHETIC_MARK.test(m.eventTitle || '');
+
+// Where the data came from, from <dataDir>/collect-runs.jsonl (written by collect.js and
+// lib/synthetic.js). Any synthetic run or [SYNTHETIC] market taints the whole directory, because
+// markets.jsonl accumulates across runs.
+export function readProvenance(dataDir, syntheticMarkets = 0) {
+  const file = path.join(dataDir, 'collect-runs.jsonl');
+  const p = { status: 'unknown', collectRuns: 0, syntheticRuns: 0, syntheticMarkets, bases: [], reasons: [] };
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+  const bases = new Set();
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    let run;
+    try { run = JSON.parse(line); } catch { continue; }
+    p.collectRuns++;
+    if (run.bases && typeof run.bases === 'object') for (const b of Object.values(run.bases)) bases.add(String(b));
+    if (run.synthetic) {
+      p.syntheticRuns++;
+      const why = `${run.tool || 'research/collect.js'}: ${run.synthetic}`;
+      if (!p.reasons.includes(why)) p.reasons.push(why);
+    }
+  }
+  p.bases = [...bases].sort();
+  if (syntheticMarkets) p.reasons.push(`${syntheticMarkets} market(s) carry a [SYNTHETIC] question/title prefix`);
+  if (p.syntheticRuns || syntheticMarkets) p.status = 'synthetic';
+  else if (p.collectRuns) p.status = 'polymarket-api';
+  else p.reasons.push(`no ${path.basename(file)} in the data dir, so the source cannot be checked`);
+  return p;
+}
+
 // ---------- driver ----------
 
 export async function buildDataset(opts = {}) {
@@ -279,6 +313,7 @@ export async function buildDataset(opts = {}) {
   const tmp = `${out}.tmp-${process.pid}`;
   const ws = fs.createWriteStream(tmp);
   const seen = new Set();
+  let syntheticMarkets = 0;
   const rl = readline.createInterface({ input: fs.createReadStream(marketsFile), crlfDelay: Infinity });
 
   try {
@@ -290,6 +325,7 @@ export async function buildDataset(opts = {}) {
       if (!m) { bump(summary.marketDrops, 'invalid_record'); continue; }
       if (seen.has(m.conditionId)) { bump(summary.marketDrops, 'duplicate'); continue; }
       seen.add(m.conditionId);
+      if (isSyntheticMarket(m)) syntheticMarkets++;
 
       const gs = resolveGameStart(m.times, o.eventStartMaxGapH);
       if (gs.reason) { bump(summary.marketDrops, gs.reason); continue; }
@@ -320,7 +356,8 @@ export async function buildDataset(opts = {}) {
     fs.rmSync(tmp, { force: true });
     throw e;
   }
-  const summaryFile = path.join(path.dirname(out), `${path.basename(out, '.jsonl')}.summary.json`);
+  summary.provenance = readProvenance(dataDir, syntheticMarkets);
+  const summaryFile =path.join(path.dirname(out), `${path.basename(out, '.jsonl')}.summary.json`);
   fs.writeFileSync(summaryFile, JSON.stringify(summary, null, 2) + '\n');
   summary.summaryFile = summaryFile;
   return summary;
@@ -383,6 +420,9 @@ function printSummary(s) {
   console.log(`  game start source:\n${fmt(s.startSource)}`);
   console.log(`  market drops:\n${fmt(s.marketDrops)}`);
   console.log(`  row drops (per outcome x offset):\n${fmt(s.rowDrops)}`);
+  const pv = s.provenance;
+  console.log(`  provenance: ${pv.status === 'synthetic' ? 'SYNTHETIC (tooling validation only)' : pv.status} (${pv.collectRuns} collect runs${pv.bases.length ? `; bases ${pv.bases.join(', ')}` : ''})`);
+  for (const r of pv.reasons) console.log(`    ${r}`);
   console.log(`summary written to ${s.summaryFile}`);
 }
 

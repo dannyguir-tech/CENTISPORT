@@ -598,6 +598,12 @@ export function generateWorld(opts = {}) {
   }
   marketLines.sort((x, y) => x[0] - y[0]);
   fs.writeFileSync(path.join(dataDir, 'markets.jsonl'), marketLines.map((x) => x[1]).join('\n') + '\n');
+  // Same provenance file collect.js writes, so build-dataset/backtest flag this dir as synthetic.
+  fs.appendFileSync(path.join(dataDir, 'collect-runs.jsonl'), JSON.stringify({
+    at: new Date().toISOString(), tool: 'research/lib/synthetic.js',
+    synthetic: `SYNTHETIC generator, ${o.world} world, seed ${o.seed}, ${o.events} events (tooling validation only)`,
+    dataDir, kept: summary.markets,
+  }) + '\n');
   return summary;
 }
 

@@ -9,3 +9,8 @@ yarn-error.log*
 
 .DS_Store
 *.log
+
+# research kit: downloaded market data and generated reports
+research/data/
+research/reports/
+research/btc/data/

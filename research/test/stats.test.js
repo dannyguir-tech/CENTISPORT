@@ -399,3 +399,39 @@ test('CLI: requires --source-label, skips trade hypotheses without trades, valid
   assert.notEqual(run('--source-label', 'x', '--folds', '1').status, 0);
   assert.notEqual(run('--source-label', 'x', '--bogus', '1').status, 0);
 });
+
+test('provenance: synthetic data is labelled SYNTHETIC even under a "real" label', async () => {
+  const rows = genRows({ nEvents: 300, seed: 41, trades: false });
+  const dir = path.join(root, 'prov-synth');
+  const data = path.join(dir, 'dataset.jsonl');
+  writeJsonl(data, rows);
+  fs.writeFileSync(path.join(dir, 'dataset.summary.json'), JSON.stringify({ dataDir: dir, provenance: { status: 'synthetic', collectRuns: 1, syntheticRuns: 1, syntheticMarkets: 0, bases: ['http://127.0.0.1:1/gamma'], reasons: ['research/collect.js: API bases were overridden'] } }));
+  const { report, mdPath } = await runBacktest({ data, out: dir, name: 'p', sourceLabel: 'real: Polymarket', boot: 200, minN: 20 });
+  assert.equal(report.source.labelLooksSynthetic, false);
+  assert.equal(report.source.looksSynthetic, true);
+  assert.match(report.verdict.text, /^Synthetic data: this run validates the tooling only/);
+  assert.ok(report.warnings.some((w) => /does not say synthetic, but the data's provenance does/.test(w)));
+  const md = fs.readFileSync(mdPath, 'utf8');
+  assert.match(md.split('\n')[0], /\[SYNTHETIC per provenance\]$/);
+  assert.match(md, /SYNTHETIC \/ MOCK DATA/);
+
+  // No summary: collect-runs.jsonl beside the dataset is read directly.
+  const realDir = path.join(root, 'prov-real');
+  const realData = path.join(realDir, 'dataset.jsonl');
+  writeJsonl(realData, rows);
+  const bases = { gamma: 'https://gamma-api.polymarket.com', clob: 'https://clob.polymarket.com', data: 'https://data-api.polymarket.com' };
+  fs.writeFileSync(path.join(realDir, 'collect-runs.jsonl'), JSON.stringify({ synthetic: null, bases }) + '\n');
+  const real = await runBacktest({ data: realData, out: realDir, name: 'r', sourceLabel: 'real: Polymarket', boot: 200, minN: 20 });
+  assert.equal(real.report.source.provenance.status, 'polymarket-api');
+  assert.equal(real.report.source.looksSynthetic, false);
+  assert.ok(!/Synthetic data/.test(real.report.verdict.text));
+
+  // Neither: provenance unknown, flagged as unverified.
+  const unkDir = path.join(root, 'prov-unknown');
+  const unkData = path.join(unkDir, 'dataset.jsonl');
+  writeJsonl(unkData, rows);
+  const unk = await runBacktest({ data: unkData, out: unkDir, name: 'u', sourceLabel: 'my data', boot: 200, minN: 20 });
+  assert.equal(unk.report.source.provenance.status, 'unknown');
+  assert.match(unk.report.verdict.text, /^Unverified data source/);
+  assert.match(fs.readFileSync(unk.mdPath, 'utf8'), /PROVENANCE UNVERIFIED/);
+});

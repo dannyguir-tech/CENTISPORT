@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildDataset, parseTime, resolveGameStart } from '../build-dataset.js';
+import { buildDataset, isSyntheticMarket, parseTime, readProvenance, resolveGameStart } from '../build-dataset.js';
 import { classifyMarketType, classifySide } from '../lib/market-type.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -280,4 +280,26 @@ test('market-type classification (ported from the userscript)', () => {
   assert.deepEqual(classifySide('Will the Lakers win?', 'No'), { sideType: 'no', line: null });
   assert.deepEqual(classifySide('Lakers vs. Celtics', 'Lakers'), { sideType: 'team', line: null });
   assert.deepEqual(classifySide('Lakers vs. Celtics', ''), { sideType: 'other', line: null });
+});
+
+test('provenance: collect-runs.jsonl and [SYNTHETIC] markers decide the status', () => {
+  const dir = tmpDir('prov');
+  assert.equal(readProvenance(dir).status, 'unknown');
+  const real = { gamma: 'https://gamma-api.polymarket.com', clob: 'https://clob.polymarket.com', data: 'https://data-api.polymarket.com' };
+  fs.writeFileSync(path.join(dir, 'collect-runs.jsonl'), JSON.stringify({ at: 'x', synthetic: null, bases: real }) + '\n');
+  const p = readProvenance(dir);
+  assert.equal(p.status, 'polymarket-api');
+  assert.deepEqual(p.bases, Object.values(real).sort());
+  assert.equal(readProvenance(dir, 3).status, 'synthetic', '[SYNTHETIC] markets taint a real-looking dir');
+  fs.appendFileSync(path.join(dir, 'collect-runs.jsonl'), JSON.stringify({ synthetic: 'API bases were overridden', bases: { gamma: 'http://127.0.0.1:1/gamma' } }) + '\n');
+  const mixed = readProvenance(dir);
+  assert.equal(mixed.status, 'synthetic', 'one mock run taints the whole dir');
+  assert.equal(mixed.syntheticRuns, 1);
+  assert.ok(isSyntheticMarket({ question: '[SYNTHETIC] Lakers vs. Celtics' }));
+  assert.ok(isSyntheticMarket({ question: 'Lakers vs. Celtics', eventTitle: '[SYNTHETIC] x' }));
+  assert.ok(!isSyntheticMarket({ question: 'Lakers vs. Celtics', eventTitle: null }));
+
+  // buildDataset records it in the summary (the hand-made fixture has no collect-runs.jsonl).
+  const summary = JSON.parse(fs.readFileSync(path.join(base, 'dataset.summary.json'), 'utf8'));
+  assert.equal(summary.provenance.status, 'unknown');
 });
