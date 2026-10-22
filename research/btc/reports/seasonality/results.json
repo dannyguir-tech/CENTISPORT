@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-22T11:21:25.357Z",
+ "generated": "2026-10-22T11:36:12.240Z",
  "design": "// Seasonality / regime study for Polymarket BTC Up/Down markets.\n//\n// PRE-REGISTERED design (written before looking at any split results):\n//   Splits (cells defined at window start, no look-ahead):\n//     ALL      unconditional baseline\n//     SESSION  UTC hour of window start: ASIA [0,8) EU [8,13) US [13,20) LATE [20,24)\n//     WEEKEND  window midpoint on Sat/Sun UTC vs Mon-Fri\n//     VOL      trailing-24h realized BTC vol (hourly Chainlink marks strictly before start), terciles fit on TRAINING days\n//     VOLU     trailing-24h mean market volume / trailing-7d mean (closed windows only), terciles fit on TRAINING days\n//              (1d series: 3d / 14d)\n//   Descriptive-only omnibus splits: HOUR24 (24 UTC hours), DOW7 (day of week).\n//   Actions:\n//     OPEN   buy Up or Down at the pre-window quote (direction / outcome skew)\n//     FAV50  at 50% of the window, buy the favourite or the underdog (favourite price in [0.55, 0.95])\n//     FAV80  same at 80% of the window\n//   Selection modes (walk-forward, expanding window, 40% initial training, 6 OOS folds by calendar day):\n//     TG  taker, per cell trade the side with the higher TRAINING gross edge (always trades)  -> test headline ROI > 0\n//     SIG same trades as TG                                                                 -> test gross edge (won - price) > 0\n//     TN  taker, per cell trade only if TRAINING net edge (headline costs) > 0, n_train >= 50 -> test headline ROI > 0\n//     MN  maker (hypothetical fill), same rule with maker costs                              -> test maker ROI > 0\n//   Headline cost: taker, fee docs_always = 0.07 p (1-p) per share on every market, haircut EMP_HAIRCUT (>= 1c).\n//   Inference: day-clustered t-test (one-sided), day-cluster bootstrap 95% CI, BH q = 0.10 over EVERY test run here.\nimport fs from 'node:fs';\nimport path from 'node:path';\nimport { loadTrades, loadLive, loadUpDown } from '../../lib/load.mjs';\nimport { fees } from '../../lib/load.mjs';\nimport { buildObs, candidates, SESSIONS } from './features.mjs';\nimport { makerFillCheck, tapeMakerByPhase, repriceWithFills, weekendPooled, probeAvailable } from './diag.mjs';\nimport {\n  costOf, COST_MODELS, EMP_HAIRCUT, clusterTest, bootCI, benjaminiHochberg, chi2Sf, terciles, makeFolds,",
  "empHaircut": {
   "5m": {
@@ -336,12 +336,15 @@
      "covered": 73,
      "n": 73,
      "days": 4,
+     "fewClusters": true,
      "roiFill": -0.0349,
      "roiFillCI": [
       -0.1059,
       0.0233
      ],
      "pROI": 0.7682176804792775,
+     "snapMinusFillEdge": -0.0135,
+     "snapMinusFillSE": 0.008,
      "edgeFill": -0.0177,
      "edgeSnapHeadline": -0.0313,
      "meanSlipVsSnapshot": 0.0011,
@@ -351,37 +354,79 @@
      "covered": 70,
      "n": 70,
      "days": 9,
+     "fewClusters": true,
      "roiFill": 0.1571,
      "roiFillCI": [
       0.106,
       0.2079
      ],
      "pROI": 0.00019195248736603165,
+     "snapMinusFillEdge": -0.0073,
+     "snapMinusFillSE": 0.002,
      "edgeFill": 0.1203,
      "edgeSnapHeadline": 0.113,
      "meanSlipVsSnapshot": 0.0025,
      "medianWaitSec": 2
     },
     "1h": {
-     "covered": 0,
-     "n": 0,
-     "pROI": 1
+     "covered": 1270,
+     "n": 1267,
+     "days": 62,
+     "fewClusters": false,
+     "roiFill": 0.0179,
+     "roiFillCI": [
+      -0.0164,
+      0.0504
+     ],
+     "pROI": 0.15261438802511618,
+     "snapMinusFillEdge": -0.0111,
+     "snapMinusFillSE": 0.0009,
+     "edgeFill": 0.0129,
+     "edgeSnapHeadline": 0.0017,
+     "meanSlipVsSnapshot": -0.0014,
+     "medianWaitSec": 10
     },
     "4h": {
-     "covered": 0,
-     "n": 0,
-     "pROI": 1
+     "covered": 327,
+     "n": 311,
+     "days": 62,
+     "fewClusters": false,
+     "roiFill": 0.0804,
+     "roiFillCI": [
+      0.018,
+      0.1453
+     ],
+     "pROI": 0.007562616919700393,
+     "snapMinusFillEdge": -0.0092,
+     "snapMinusFillSE": 0.0029,
+     "edgeFill": 0.0566,
+     "edgeSnapHeadline": 0.0474,
+     "meanSlipVsSnapshot": 0.0006,
+     "medianWaitSec": 82
     },
     "1d": {
-     "covered": 0,
-     "n": 0,
-     "pROI": 1
+     "covered": 75,
+     "n": 72,
+     "days": 72,
+     "fewClusters": false,
+     "roiFill": 0.0006,
+     "roiFillCI": [
+      -0.1402,
+      0.1441
+     ],
+     "pROI": 0.49643566542181916,
+     "snapMinusFillEdge": -0.0088,
+     "snapMinusFillSE": 0.0024,
+     "edgeFill": -0.0031,
+     "edgeSnapHeadline": -0.0119,
+     "meanSlipVsSnapshot": 0.0009,
+     "medianWaitSec": 118
     }
    }
   }
  },
  "bh": {
-  "total": 448,
+  "total": 486,
   "rejected": 2,
   "byFamily": {
    "descriptive": {
@@ -397,7 +442,7 @@
     "rejected": 0
    },
    "fill-robustness": {
-    "tests": 34,
+    "tests": 69,
     "rejected": 0
    },
    "rule-maker": {
@@ -409,8 +454,8 @@
     "rejected": 0
    },
    "post-hoc": {
-    "tests": 4,
-    "rejected": 2
+    "tests": 7,
+    "rejected": 3
    }
   }
  },
@@ -506,12 +551,15 @@
     "covered": 351,
     "n": 342,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.0972,
     "roiFillCI": [
      -0.1881,
      -0.0049
     ],
     "pROI": 0.9695503002701495,
+    "snapMinusFillEdge": -0.0068,
+    "snapMinusFillSE": 0.0007,
     "edgeFill": -0.0482,
     "edgeSnapHeadline": -0.055,
     "meanSlipVsSnapshot": 0.0032,
@@ -871,7 +919,7 @@
    "sizePerTrade": 614.7,
    "capacityNotionalPerDay": 173172,
    "expProfitPerDay": 1298.8,
-   "q": 0.8714048185503379,
+   "q": 0.8845481374015595,
    "bhSig": false,
    "qFamily": 0.4256570454660396,
    "bhSigFamily": false
@@ -962,12 +1010,15 @@
     "covered": 219,
     "n": 219,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.0384,
     "roiFillCI": [
      -0.0425,
      0.1312
     ],
     "pROI": 0.2166538445437327,
+    "snapMinusFillEdge": -0.0207,
+    "snapMinusFillSE": 0.0064,
     "edgeFill": 0.0161,
     "edgeSnapHeadline": -0.0047,
     "meanSlipVsSnapshot": -0.0062,
@@ -1322,7 +1373,7 @@
    "sizePerTrade": 937.3,
    "capacityNotionalPerDay": 154514,
    "expProfitPerDay": 587.2,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.4677579897385417,
    "bhSigFamily": false
@@ -1418,12 +1469,15 @@
     "covered": 102,
     "n": 102,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.158,
     "roiFillCI": [
      -0.3536,
      0.9202
     ],
     "pROI": 0.3257448768211373,
+    "snapMinusFillEdge": -0.0184,
+    "snapMinusFillSE": 0.0089,
     "edgeFill": 0.011,
     "edgeSnapHeadline": -0.0074,
     "meanSlipVsSnapshot": 0.0029,
@@ -1783,7 +1837,7 @@
    "sizePerTrade": 1437.7,
    "capacityNotionalPerDay": 89392,
    "expProfitPerDay": 3253.9,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -1894,12 +1948,15 @@
     "covered": 351,
     "n": 341,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.0435,
     "roiFillCI": [
      -0.145,
      0.0544
     ],
     "pROI": 0.7878870982485422,
+    "snapMinusFillEdge": -0.006,
+    "snapMinusFillSE": 0.0006,
     "edgeFill": -0.0204,
     "edgeSnapHeadline": -0.0264,
     "meanSlipVsSnapshot": 0.004,
@@ -2421,12 +2478,15 @@
     "covered": 219,
     "n": 219,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.0736,
     "roiFillCI": [
      -0.2147,
      0.0728
     ],
     "pROI": 0.8246036366481801,
+    "snapMinusFillEdge": -0.0107,
+    "snapMinusFillSE": 0.0051,
     "edgeFill": -0.0196,
     "edgeSnapHeadline": -0.0302,
     "meanSlipVsSnapshot": 0.0042,
@@ -2837,7 +2897,7 @@
    "sizePerTrade": 937.3,
    "capacityNotionalPerDay": 154514,
    "expProfitPerDay": 2085.9,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -2958,12 +3018,15 @@
     "covered": 102,
     "n": 102,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.0397,
     "roiFillCI": [
      -0.4594,
      0.8483
     ],
     "pROI": 0.45539261778025963,
+    "snapMinusFillEdge": -0.027,
+    "snapMinusFillSE": 0.0078,
     "edgeFill": -0.0443,
     "edgeSnapHeadline": -0.0713,
     "meanSlipVsSnapshot": -0.006,
@@ -3457,7 +3520,7 @@
    "sizePerTrade": 1437.7,
    "capacityNotionalPerDay": 89392,
    "expProfitPerDay": 4013.7,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -3553,12 +3616,15 @@
     "covered": 351,
     "n": 341,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.042,
     "roiFillCI": [
      -0.1281,
      0.0575
     ],
     "pROI": 0.7972209485615132,
+    "snapMinusFillEdge": -0.0058,
+    "snapMinusFillSE": 0.0008,
     "edgeFill": -0.0197,
     "edgeSnapHeadline": -0.0255,
     "meanSlipVsSnapshot": 0.0042,
@@ -3649,7 +3715,7 @@
      -0.0002,
      0.0187
     ],
-    "q": 0.46408238239037286,
+    "q": 0.4782741873875785,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -3930,7 +3996,7 @@
    "sizePerTrade": 614.7,
    "capacityNotionalPerDay": 173172,
    "expProfitPerDay": 5732,
-   "q": 0.14454235764740986,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -4031,12 +4097,15 @@
     "covered": 219,
     "n": 219,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.1211,
     "roiFillCI": [
      -0.3236,
      0.7303
     ],
     "pROI": 0.3297751886495429,
+    "snapMinusFillEdge": -0.003,
+    "snapMinusFillSE": 0.0062,
     "edgeFill": -0.0475,
     "edgeSnapHeadline": -0.0505,
     "meanSlipVsSnapshot": 0.012,
@@ -4413,7 +4482,7 @@
    "sizePerTrade": 937.3,
    "capacityNotionalPerDay": 154514,
    "expProfitPerDay": 1854.2,
-   "q": 0.9188588153905634,
+   "q": 0.9389191547357836,
    "bhSig": false,
    "qFamily": 0.4609948647275311,
    "bhSigFamily": false
@@ -4509,12 +4578,15 @@
     "covered": 102,
     "n": 102,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.1706,
     "roiFillCI": [
      -0.2691,
      0.8852
     ],
     "pROI": 0.29879876785339143,
+    "snapMinusFillEdge": -0.0086,
+    "snapMinusFillSE": 0.0077,
     "edgeFill": 0.0005,
     "edgeSnapHeadline": -0.0081,
     "meanSlipVsSnapshot": 0.0121,
@@ -4605,7 +4677,7 @@
      0.0047,
      0.0337
     ],
-    "q": 0.2807831383689816,
+    "q": 0.270755169141518,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -4703,12 +4775,15 @@
     "covered": 36,
     "n": 36,
     "days": 4,
+    "fewClusters": true,
     "roiFill": -0.0355,
     "roiFillCI": [
      -0.1212,
      0.0662
     ],
     "pROI": 0.6987954200513442,
+    "snapMinusFillEdge": -0.0018,
+    "snapMinusFillSE": 0.0069,
     "edgeFill": -0.0269,
     "edgeSnapHeadline": -0.0287,
     "meanSlipVsSnapshot": 0.0181,
@@ -4971,7 +5046,7 @@
    "sizePerTrade": 1437.7,
    "capacityNotionalPerDay": 89392,
    "expProfitPerDay": 10995.2,
-   "q": 0.3538913294587711,
+   "q": 0.35648683346947,
    "bhSig": false,
    "qFamily": 0.10562572843539852,
    "bhSigFamily": false
@@ -5072,12 +5147,15 @@
     "covered": 351,
     "n": 340,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.0055,
     "roiFillCI": [
      -0.0775,
      0.0947
     ],
     "pROI": 0.4538490719316003,
+    "snapMinusFillEdge": -0.0073,
+    "snapMinusFillSE": 0.0006,
     "edgeFill": 0.0046,
     "edgeSnapHeadline": -0.0028,
     "meanSlipVsSnapshot": 0.0026,
@@ -5174,7 +5252,7 @@
      0,
      0.0163
     ],
-    "q": 0.4576293301478075,
+    "q": 0.46807775490500864,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -5466,7 +5544,7 @@
    "sizePerTrade": 614.7,
    "capacityNotionalPerDay": 173172,
    "expProfitPerDay": 5333.7,
-   "q": 0.12349711001611989,
+   "q": 0.13397231131213005,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -5567,12 +5645,15 @@
     "covered": 219,
     "n": 219,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.0532,
     "roiFillCI": [
      -0.2034,
      0.0691
     ],
     "pROI": 0.760331818671154,
+    "snapMinusFillEdge": -0.0041,
+    "snapMinusFillSE": 0.0071,
     "edgeFill": -0.0323,
     "edgeSnapHeadline": -0.0364,
     "meanSlipVsSnapshot": 0.0107,
@@ -5669,7 +5750,7 @@
      -0.0018,
      0.0197
     ],
-    "q": 0.5597867737646867,
+    "q": 0.5824822105654598,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -5961,7 +6042,7 @@
    "sizePerTrade": 937.3,
    "capacityNotionalPerDay": 154514,
    "expProfitPerDay": 8467.4,
-   "q": 0.46408238239037286,
+   "q": 0.4782741873875785,
    "bhSig": false,
    "qFamily": 0.15681013775737895,
    "bhSigFamily": false
@@ -6067,12 +6148,15 @@
     "covered": 102,
     "n": 102,
     "days": 13,
+    "fewClusters": true,
     "roiFill": 0.1232,
     "roiFillCI": [
      -0.2988,
      0.8482
     ],
     "pROI": 0.34971128657496975,
+    "snapMinusFillEdge": -0.0089,
+    "snapMinusFillSE": 0.0067,
     "edgeFill": -0.0179,
     "edgeSnapHeadline": -0.0267,
     "meanSlipVsSnapshot": 0.0118,
@@ -6169,7 +6253,7 @@
      -0.0026,
      0.03
     ],
-    "q": 0.5597867737646867,
+    "q": 0.5824822105654598,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -6277,12 +6361,15 @@
     "covered": 5,
     "n": 5,
     "days": 1,
+    "fewClusters": true,
     "roiFill": -1,
     "roiFillCI": [
      null,
      null
     ],
     "pROI": 1,
+    "snapMinusFillEdge": -0.021,
+    "snapMinusFillSE": null,
     "edgeFill": -0.1629,
     "edgeSnapHeadline": -0.1838,
     "meanSlipVsSnapshot": 0,
@@ -6556,7 +6643,7 @@
    "sizePerTrade": 1437.7,
    "capacityNotionalPerDay": 89392,
    "expProfitPerDay": 12613.2,
-   "q": 0.14454235764740986,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -6657,12 +6744,15 @@
     "covered": 351,
     "n": 339,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.0242,
     "roiFillCI": [
      -0.1197,
      0.087
     ],
     "pROI": 0.669071339837795,
+    "snapMinusFillEdge": -0.0052,
+    "snapMinusFillSE": 0.0008,
     "edgeFill": -0.0092,
     "edgeSnapHeadline": -0.0144,
     "meanSlipVsSnapshot": 0.0048,
@@ -6759,7 +6849,7 @@
      -0.0041,
      0.0141
     ],
-    "q": 0.7602230452998618,
+    "q": 0.7612673077247242,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -7051,7 +7141,7 @@
    "sizePerTrade": 614.7,
    "capacityNotionalPerDay": 173172,
    "expProfitPerDay": 4208.1,
-   "q": 0.28128083661404646,
+   "q": 0.27832242298004595,
    "bhSig": false,
    "qFamily": 0.06642514500162489,
    "bhSigFamily": true
@@ -7157,12 +7247,15 @@
     "covered": 219,
     "n": 219,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.0862,
     "roiFillCI": [
      -0.2684,
      0.062
     ],
     "pROI": 0.8310211904215945,
+    "snapMinusFillEdge": -0.0094,
+    "snapMinusFillSE": 0.0072,
     "edgeFill": -0.032,
     "edgeSnapHeadline": -0.0414,
     "meanSlipVsSnapshot": 0.0053,
@@ -7672,12 +7765,15 @@
     "covered": 102,
     "n": 102,
     "days": 13,
+    "fewClusters": true,
     "roiFill": -0.1465,
     "roiFillCI": [
      -0.3635,
      0.0478
     ],
     "pROI": 0.8960761093766016,
+    "snapMinusFillEdge": -0.0057,
+    "snapMinusFillSE": 0.0085,
     "edgeFill": -0.0207,
     "edgeSnapHeadline": -0.0264,
     "meanSlipVsSnapshot": 0.0149,
@@ -8152,7 +8248,7 @@
    "sizePerTrade": 1437.7,
    "capacityNotionalPerDay": 89392,
    "expProfitPerDay": 3218.1,
-   "q": 0.8314575716738798,
+   "q": 0.8475813365270359,
    "bhSig": false,
    "qFamily": 0.4042664369343044,
    "bhSigFamily": false
@@ -8243,12 +8339,15 @@
     "covered": 335,
     "n": 216,
     "days": 32,
+    "fewClusters": false,
     "roiFill": 0.0069,
     "roiFillCI": [
      -0.1295,
      0.1477
     ],
     "pROI": 0.4617186996998519,
+    "snapMinusFillEdge": -0.0058,
+    "snapMinusFillSE": 0.0012,
     "edgeFill": 0.0014,
     "edgeSnapHeadline": -0.0044,
     "meanSlipVsSnapshot": 0.0042,
@@ -8603,7 +8702,7 @@
    "sizePerTrade": 111.2,
    "capacityNotionalPerDay": 10584,
    "expProfitPerDay": 202.1,
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.25973439048518676,
    "bhSigFamily": false
@@ -8694,12 +8793,15 @@
     "covered": 272,
     "n": 270,
     "days": 33,
+    "fewClusters": false,
     "roiFill": 0.038,
     "roiFillCI": [
      -0.0182,
      0.094
     ],
     "pROI": 0.10246820874292784,
+    "snapMinusFillEdge": -0.0116,
+    "snapMinusFillSE": 0.0016,
     "edgeFill": 0.0277,
     "edgeSnapHeadline": 0.0161,
     "meanSlipVsSnapshot": -0.0019,
@@ -8784,7 +8886,7 @@
      -0.0021,
      0.0186
     ],
-    "q": 0.5597867737646867,
+    "q": 0.5824822105654598,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -9054,7 +9156,7 @@
    "sizePerTrade": 120.9,
    "capacityNotionalPerDay": 9278,
    "expProfitPerDay": 186.5,
-   "q": 0.18465914210659426,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -9150,12 +9252,15 @@
     "covered": 141,
     "n": 138,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.3916,
     "roiFillCI": [
      -0.6059,
      -0.1317
     ],
     "pROI": 0.9987282208578638,
+    "snapMinusFillEdge": -0.0071,
+    "snapMinusFillSE": 0.0045,
     "edgeFill": -0.0597,
     "edgeSnapHeadline": -0.0668,
     "meanSlipVsSnapshot": 0.0033,
@@ -9621,12 +9726,15 @@
     "covered": 335,
     "n": 216,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.1209,
     "roiFillCI": [
      -0.2104,
      -0.0191
     ],
     "pROI": 0.9891030087646484,
+    "snapMinusFillEdge": -0.0068,
+    "snapMinusFillSE": 0.0015,
     "edgeFill": -0.0647,
     "edgeSnapHeadline": -0.0715,
     "meanSlipVsSnapshot": 0.0032,
@@ -9729,7 +9837,7 @@
      -0.0056,
      0.0204
     ],
-    "q": 0.718539019049911,
+    "q": 0.721439656237375,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -10032,7 +10140,7 @@
    "sizePerTrade": 111.2,
    "capacityNotionalPerDay": 10584,
    "expProfitPerDay": 364.1,
-   "q": 0.223226343724068,
+   "q": 0.21620187193967008,
    "bhSig": false,
    "qFamily": 0.04892135779667075,
    "bhSigFamily": true
@@ -10143,12 +10251,15 @@
     "covered": 272,
     "n": 270,
     "days": 33,
+    "fewClusters": false,
     "roiFill": 0.038,
     "roiFillCI": [
      -0.0182,
      0.094
     ],
     "pROI": 0.10246820874292784,
+    "snapMinusFillEdge": -0.0116,
+    "snapMinusFillSE": 0.0016,
     "edgeFill": 0.0277,
     "edgeSnapHeadline": 0.0161,
     "meanSlipVsSnapshot": -0.0019,
@@ -10757,12 +10868,15 @@
     "covered": 141,
     "n": 139,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.1461,
     "roiFillCI": [
      -0.3723,
      0.1381
     ],
     "pROI": 0.8741745361175665,
+    "snapMinusFillEdge": -0.0066,
+    "snapMinusFillSE": 0.0052,
     "edgeFill": -0.0018,
     "edgeSnapHeadline": -0.0084,
     "meanSlipVsSnapshot": 0.0034,
@@ -10865,7 +10979,7 @@
      -0.0086,
      0.0197
     ],
-    "q": 0.8228564349965063,
+    "q": 0.8381391761726614,
     "bhSig": false,
     "qFamily": 0.5809324448604161
    },
@@ -10978,12 +11092,15 @@
     "covered": 68,
     "n": 68,
     "days": 25,
+    "fewClusters": false,
     "roiFill": 0.0354,
     "roiFillCI": [
      -0.3029,
      0.5531
     ],
     "pROI": 0.4361661467382355,
+    "snapMinusFillEdge": -0.0125,
+    "snapMinusFillSE": 0.0077,
     "edgeFill": 0.03,
     "edgeSnapHeadline": 0.0175,
     "meanSlipVsSnapshot": -0.0025,
@@ -11285,7 +11402,7 @@
    "sizePerTrade": 249.7,
    "capacityNotionalPerDay": 10043,
    "expProfitPerDay": 1003.3,
-   "q": 0.28128083661404646,
+   "q": 0.27832242298004595,
    "bhSig": false,
    "qFamily": 0.0680021632466744,
    "bhSigFamily": true
@@ -11381,12 +11498,15 @@
     "covered": 335,
     "n": 218,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.0105,
     "roiFillCI": [
      -0.1502,
      0.1336
     ],
     "pROI": 0.5573697069033242,
+    "snapMinusFillEdge": -0.007,
+    "snapMinusFillSE": 0.0014,
     "edgeFill": -0.0067,
     "edgeSnapHeadline": -0.0138,
     "meanSlipVsSnapshot": 0.0029,
@@ -11477,7 +11597,7 @@
      -0.0051,
      0.0188
     ],
-    "q": 0.7233726171365079,
+    "q": 0.7237802039960248,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -11758,7 +11878,7 @@
    "sizePerTrade": 111.2,
    "capacityNotionalPerDay": 10584,
    "expProfitPerDay": 348.2,
-   "q": 0.18465914210659426,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -11854,12 +11974,15 @@
     "covered": 272,
     "n": 270,
     "days": 33,
+    "fewClusters": false,
     "roiFill": 0.038,
     "roiFillCI": [
      -0.0182,
      0.094
     ],
     "pROI": 0.10246820874292784,
+    "snapMinusFillEdge": -0.0116,
+    "snapMinusFillSE": 0.0016,
     "edgeFill": 0.0277,
     "edgeSnapHeadline": 0.0161,
     "meanSlipVsSnapshot": -0.0019,
@@ -11950,7 +12073,7 @@
      -0.0021,
      0.0186
     ],
-    "q": 0.5597867737646867,
+    "q": 0.5824822105654598,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -12048,12 +12171,15 @@
     "covered": 38,
     "n": 38,
     "days": 5,
+    "fewClusters": true,
     "roiFill": 0.1873,
     "roiFillCI": [
      0.1024,
      0.2541
     ],
     "pROI": 0.006013110812332023,
+    "snapMinusFillEdge": -0.0071,
+    "snapMinusFillSE": 0.0025,
     "edgeFill": 0.1526,
     "edgeSnapHeadline": 0.1454,
     "meanSlipVsSnapshot": 0.0026,
@@ -12314,7 +12440,7 @@
    "sizePerTrade": 120.9,
    "capacityNotionalPerDay": 9278,
    "expProfitPerDay": 186.5,
-   "q": 0.18465914210659426,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -12415,12 +12541,15 @@
     "covered": 141,
     "n": 139,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.2179,
     "roiFillCI": [
      -0.4326,
      0.0368
     ],
     "pROI": 0.962350236411484,
+    "snapMinusFillEdge": -0.0043,
+    "snapMinusFillSE": 0.0042,
     "edgeFill": -0.0191,
     "edgeSnapHeadline": -0.0234,
     "meanSlipVsSnapshot": 0.0058,
@@ -12866,7 +12995,7 @@
    "sizePerTrade": 249.7,
    "capacityNotionalPerDay": 10043,
    "expProfitPerDay": 313.3,
-   "q": 0.7840675486759413,
+   "q": 0.7941518018951855,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -12982,12 +13111,15 @@
     "covered": 335,
     "n": 219,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.1287,
     "roiFillCI": [
      -0.2378,
      -0.0128
     ],
     "pROI": 0.9842873314318115,
+    "snapMinusFillEdge": -0.0065,
+    "snapMinusFillSE": 0.0019,
     "edgeFill": -0.069,
     "edgeSnapHeadline": -0.0755,
     "meanSlipVsSnapshot": 0.0035,
@@ -13391,7 +13523,7 @@
    "sizePerTrade": 111.2,
    "capacityNotionalPerDay": 10584,
    "expProfitPerDay": 119.6,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -13497,12 +13629,15 @@
     "covered": 272,
     "n": 270,
     "days": 33,
+    "fewClusters": false,
     "roiFill": 0.038,
     "roiFillCI": [
      -0.0182,
      0.094
     ],
     "pROI": 0.10246820874292784,
+    "snapMinusFillEdge": -0.0116,
+    "snapMinusFillSE": 0.0016,
     "edgeFill": 0.0277,
     "edgeSnapHeadline": 0.0161,
     "meanSlipVsSnapshot": -0.0019,
@@ -13599,7 +13734,7 @@
      -0.0046,
      0.0156
     ],
-    "q": 0.7233726171365079,
+    "q": 0.7237802039960248,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -13697,12 +13832,15 @@
     "covered": 15,
     "n": 15,
     "days": 4,
+    "fewClusters": true,
     "roiFill": 0.204,
     "roiFillCI": [
      -0.0983,
      0.2767
     ],
     "pROI": 0.03067187191703269,
+    "snapMinusFillEdge": -0.0035,
+    "snapMinusFillSE": 0.0024,
     "edgeFill": 0.1516,
     "edgeSnapHeadline": 0.1481,
     "meanSlipVsSnapshot": 0.0063,
@@ -13975,7 +14113,7 @@
    "sizePerTrade": 120.9,
    "capacityNotionalPerDay": 9278,
    "expProfitPerDay": 98.3,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -14091,12 +14229,15 @@
     "covered": 141,
     "n": 139,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.2862,
     "roiFillCI": [
      -0.4956,
      -0.0453
     ],
     "pROI": 0.9922662660321991,
+    "snapMinusFillEdge": -0.011,
+    "snapMinusFillSE": 0.0042,
     "edgeFill": -0.0433,
     "edgeSnapHeadline": -0.0543,
     "meanSlipVsSnapshot": -0.0007,
@@ -14683,12 +14824,15 @@
     "covered": 335,
     "n": 225,
     "days": 32,
+    "fewClusters": false,
     "roiFill": 0.0609,
     "roiFillCI": [
      -0.0645,
      0.1884
     ],
     "pROI": 0.17287764301971387,
+    "snapMinusFillEdge": -0.0084,
+    "snapMinusFillSE": 0.0014,
     "edgeFill": 0.0302,
     "edgeSnapHeadline": 0.0218,
     "meanSlipVsSnapshot": 0.0016,
@@ -15198,12 +15342,15 @@
     "covered": 272,
     "n": 270,
     "days": 33,
+    "fewClusters": false,
     "roiFill": 0.038,
     "roiFillCI": [
      -0.0182,
      0.094
     ],
     "pROI": 0.10246820874292784,
+    "snapMinusFillEdge": -0.0116,
+    "snapMinusFillSE": 0.0016,
     "edgeFill": 0.0277,
     "edgeSnapHeadline": 0.0161,
     "meanSlipVsSnapshot": -0.0019,
@@ -15300,7 +15447,7 @@
      -0.0049,
      0.0159
     ],
-    "q": 0.7233726171365079,
+    "q": 0.7237802039960248,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -15662,7 +15809,7 @@
    "sizePerTrade": 120.9,
    "capacityNotionalPerDay": 9278,
    "expProfitPerDay": 81.6,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -15763,12 +15910,15 @@
     "covered": 141,
     "n": 139,
     "days": 32,
+    "fewClusters": false,
     "roiFill": -0.148,
     "roiFillCI": [
      -0.2784,
      -0.0135
     ],
     "pROI": 0.9811573273670132,
+    "snapMinusFillEdge": -0.0158,
+    "snapMinusFillSE": 0.0048,
     "edgeFill": -0.0128,
     "edgeSnapHeadline": -0.0286,
     "meanSlipVsSnapshot": -0.0059,
@@ -15865,7 +16015,7 @@
      -0.0106,
      0.0192
     ],
-    "q": 0.9091803267756342,
+    "q": 0.925079785692154,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -15968,12 +16118,15 @@
     "covered": 43,
     "n": 41,
     "days": 15,
+    "fewClusters": false,
     "roiFill": -0.6376,
     "roiFillCI": [
      -0.8537,
      -0.4554
     ],
     "pROI": 0.9999871714314497,
+    "snapMinusFillEdge": -0.0171,
+    "snapMinusFillSE": 0.0065,
     "edgeFill": -0.0967,
     "edgeSnapHeadline": -0.1138,
     "meanSlipVsSnapshot": -0.0064,
@@ -16247,7 +16400,7 @@
    "sizePerTrade": 249.7,
    "capacityNotionalPerDay": 10043,
    "expProfitPerDay": 756.2,
-   "q": 0.4291936967419474,
+   "q": 0.43455861795122175,
    "bhSig": false,
    "qFamily": 0.12071072720867271,
    "bhSigFamily": false
@@ -16674,7 +16827,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 16409,
    "expProfitPerDay": 247.8,
-   "q": 0.718539019049911,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.3454091950161739,
    "bhSigFamily": false
@@ -16762,9 +16915,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 2098,
+    "n": 2094,
+    "days": 219,
+    "fewClusters": false,
+    "roiFill": 0.0184,
+    "roiFillCI": [
+     -0.0072,
+     0.0448
+    ],
+    "pROI": 0.08028607902189211,
+    "snapMinusFillEdge": -0.0109,
+    "snapMinusFillSE": 0.0007,
+    "edgeFill": 0.0146,
+    "edgeSnapHeadline": 0.0037,
+    "meanSlipVsSnapshot": -0.0011,
+    "medianWaitSec": 8
    },
    "makerFill": null,
    "folds": [
@@ -16845,7 +17011,7 @@
      -0.0005,
      0.0235
     ],
-    "q": 0.4576293301478075,
+    "q": 0.46807775490500864,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -17029,7 +17195,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 2098,
+    "fillRateThrough": 0.774,
+    "fillRateTouch": 0.845,
+    "filledThrough": {
+     "n": 1623,
+     "edge": 0.0004,
+     "roi": -0.0009
+    },
+    "filledTouch": {
+     "n": 1773,
+     "edge": 0.0111,
+     "roi": 0.013
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -17101,7 +17281,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 13629,
    "expProfitPerDay": 369.4,
-   "q": 0.14454235764740986,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -17272,7 +17452,7 @@
      -0.011,
      0.0177
     ],
-    "q": 0.927720012981441,
+    "q": 0.94167068986838,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -17456,7 +17636,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -17528,7 +17710,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 8607,
    "expProfitPerDay": 112.7,
-   "q": 0.6487374130413031,
+   "q": 0.6676737729686762,
    "bhSig": false,
    "qFamily": 0.308613655061077,
    "bhSigFamily": false
@@ -18159,9 +18341,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 2098,
+    "n": 2094,
+    "days": 219,
+    "fewClusters": false,
+    "roiFill": -0.0043,
+    "roiFillCI": [
+     -0.0441,
+     0.0374
+    ],
+    "pROI": 0.5784333378164386,
+    "snapMinusFillEdge": -0.0111,
+    "snapMinusFillSE": 0.0009,
+    "edgeFill": 0.0165,
+    "edgeSnapHeadline": 0.0054,
+    "meanSlipVsSnapshot": -0.0012,
+    "medianWaitSec": 9
    },
    "makerFill": null,
    "folds": [
@@ -18260,7 +18455,7 @@
      0.0009,
      0.0253
     ],
-    "q": 0.3231223111202232,
+    "q": 0.323566160448685,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -18360,9 +18555,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 470,
+    "n": 470,
+    "days": 152,
+    "fewClusters": false,
+    "roiFill": 0.0307,
+    "roiFillCI": [
+     -0.0201,
+     0.0834
+    ],
+    "pROI": 0.1258094559062921,
+    "snapMinusFillEdge": -0.0091,
+    "snapMinusFillSE": 0.0016,
+    "edgeFill": 0.0233,
+    "edgeSnapHeadline": 0.0143,
+    "meanSlipVsSnapshot": 0.0007,
+    "medianWaitSec": 8
    },
    "makerFill": null,
    "folds": [
@@ -18544,7 +18752,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 2098,
+    "fillRateThrough": 0.79,
+    "fillRateTouch": 0.86,
+    "filledThrough": {
+     "n": 1657,
+     "edge": 0.0059,
+     "roi": -0.0223
+    },
+    "filledTouch": {
+     "n": 1805,
+     "edge": 0.0148,
+     "roi": -0.0052
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -18634,7 +18856,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 13629,
    "expProfitPerDay": 477,
-   "q": 0.4576293301478075,
+   "q": 0.46807775490500864,
    "bhSig": false,
    "qFamily": 0.14206277254397945,
    "bhSigFamily": false
@@ -18838,7 +19060,7 @@
      -0.011,
      0.0177
     ],
-    "q": 0.927720012981441,
+    "q": 0.94167068986838,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -19110,7 +19332,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -19200,7 +19424,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 8607,
    "expProfitPerDay": 112.7,
-   "q": 0.6487374130413031,
+   "q": 0.6676737729686762,
    "bhSig": false,
    "qFamily": 0.308613655061077,
    "bhSigFamily": false
@@ -19669,7 +19893,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 16409,
    "expProfitPerDay": 118.1,
-   "q": 0.9269713480163451,
+   "q": 0.9393857620862898,
    "bhSig": false,
    "qFamily": 0.4609948647275311,
    "bhSigFamily": false
@@ -19762,9 +19986,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 2098,
+    "n": 2094,
+    "days": 219,
+    "fewClusters": false,
+    "roiFill": 0.0184,
+    "roiFillCI": [
+     -0.0072,
+     0.0448
+    ],
+    "pROI": 0.08028607902189211,
+    "snapMinusFillEdge": -0.0109,
+    "snapMinusFillSE": 0.0007,
+    "edgeFill": 0.0146,
+    "edgeSnapHeadline": 0.0037,
+    "meanSlipVsSnapshot": -0.0011,
+    "medianWaitSec": 8
    },
    "makerFill": null,
    "folds": [
@@ -19851,7 +20088,7 @@
      -0.0005,
      0.0235
     ],
-    "q": 0.4576293301478075,
+    "q": 0.46807775490500864,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -19946,9 +20183,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 1046,
+    "n": 1043,
+    "days": 51,
+    "fewClusters": false,
+    "roiFill": 0.0097,
+    "roiFillCI": [
+     -0.029,
+     0.0471
+    ],
+    "pROI": 0.3072333774124991,
+    "snapMinusFillEdge": -0.0115,
+    "snapMinusFillSE": 0.001,
+    "edgeFill": 0.0063,
+    "edgeSnapHeadline": -0.0052,
+    "meanSlipVsSnapshot": -0.0018,
+    "medianWaitSec": 10
    },
    "makerFill": null,
    "folds": [
@@ -20113,7 +20363,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 2098,
+    "fillRateThrough": 0.774,
+    "fillRateTouch": 0.845,
+    "filledThrough": {
+     "n": 1623,
+     "edge": 0.0004,
+     "roi": -0.0009
+    },
+    "filledTouch": {
+     "n": 1773,
+     "edge": 0.0111,
+     "roi": 0.013
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -20191,7 +20455,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 13629,
    "expProfitPerDay": 369.4,
-   "q": 0.14454235764740986,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -20373,7 +20637,7 @@
      -0.011,
      0.0177
     ],
-    "q": 0.927720012981441,
+    "q": 0.94167068986838,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -20629,7 +20893,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -20707,7 +20973,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 8607,
    "expProfitPerDay": 112.7,
-   "q": 0.6487374130413031,
+   "q": 0.6676737729686762,
    "bhSig": false,
    "qFamily": 0.308613655061077,
    "bhSigFamily": false
@@ -20907,7 +21173,7 @@
      -0.0029,
      0.0282
     ],
-    "q": 0.5597867737646867,
+    "q": 0.5824822105654598,
     "bhSig": false,
     "qFamily": 0.38439903458191954
    },
@@ -21188,7 +21454,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 13492,
    "expProfitPerDay": 582.9,
-   "q": 0.18465914210659426,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -21286,9 +21552,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 1729,
+    "n": 1725,
+    "days": 183,
+    "fewClusters": false,
+    "roiFill": 0.017,
+    "roiFillCI": [
+     -0.0119,
+     0.045
+    ],
+    "pROI": 0.12101228195146552,
+    "snapMinusFillEdge": -0.011,
+    "snapMinusFillSE": 0.0008,
+    "edgeFill": 0.0145,
+    "edgeSnapHeadline": 0.0035,
+    "meanSlipVsSnapshot": -0.0013,
+    "medianWaitSec": 9
    },
    "makerFill": null,
    "folds": [
@@ -21373,7 +21652,7 @@
      -0.0028,
      0.0234
     ],
-    "q": 0.5688937367489454,
+    "q": 0.5899079280286235,
     "bhSig": false,
     "qFamily": 0.3937959509806981
    },
@@ -21473,9 +21752,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 100,
+    "n": 100,
+    "days": 26,
+    "fewClusters": false,
+    "roiFill": -0.0427,
+    "roiFillCI": [
+     -0.1394,
+     0.0788
+    ],
+    "pROI": 0.778478942554832,
+    "snapMinusFillEdge": -0.0126,
+    "snapMinusFillSE": 0.0037,
+    "edgeFill": -0.0276,
+    "edgeSnapHeadline": -0.0402,
+    "meanSlipVsSnapshot": -0.0029,
+    "medianWaitSec": 8
    },
    "makerFill": null,
    "folds": [
@@ -21635,7 +21927,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 1729,
+    "fillRateThrough": 0.771,
+    "fillRateTouch": 0.854,
+    "filledThrough": {
+     "n": 1333,
+     "edge": 0.0015,
+     "roi": -0.0019
+    },
+    "filledTouch": {
+     "n": 1476,
+     "edge": 0.0134,
+     "roi": 0.014
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -21711,7 +22017,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 11149,
    "expProfitPerDay": 276.5,
-   "q": 0.223226343724068,
+   "q": 0.21620187193967008,
    "bhSig": false,
    "qFamily": 0.04892135779667075,
    "bhSigFamily": true
@@ -21901,7 +22207,7 @@
      -0.0119,
      0.0203
     ],
-    "q": 0.927720012981441,
+    "q": 0.94167068986838,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -22175,7 +22481,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -22251,7 +22559,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 7144,
    "expProfitPerDay": 363.6,
-   "q": 0.6760633857212204,
+   "q": 0.6912581600924178,
    "bhSig": false,
    "qFamily": 0.3426749853449592,
    "bhSigFamily": false
@@ -22732,7 +23040,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 16409,
    "expProfitPerDay": 178.9,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -22835,9 +23143,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 2098,
+    "n": 2094,
+    "days": 219,
+    "fewClusters": false,
+    "roiFill": -0.0173,
+    "roiFillCI": [
+     -0.0519,
+     0.0167
+    ],
+    "pROI": 0.8480961410897845,
+    "snapMinusFillEdge": -0.0103,
+    "snapMinusFillSE": 0.0007,
+    "edgeFill": 0.0053,
+    "edgeSnapHeadline": -0.005,
+    "meanSlipVsSnapshot": -0.0005,
+    "medianWaitSec": 8
    },
    "makerFill": null,
    "folds": [
@@ -22930,7 +23251,7 @@
      -0.0071,
      0.0173
     ],
-    "q": 0.7864150612992208,
+    "q": 0.7993800733826479,
     "bhSig": false,
     "qFamily": 0.5570440017536148
    },
@@ -23025,9 +23346,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 259,
+    "n": 259,
+    "days": 62,
+    "fewClusters": false,
+    "roiFill": 0.0475,
+    "roiFillCI": [
+     -0.0314,
+     0.126
+    ],
+    "pROI": 0.12770703338481182,
+    "snapMinusFillEdge": -0.0071,
+    "snapMinusFillSE": 0.0018,
+    "edgeFill": 0.0336,
+    "edgeSnapHeadline": 0.0266,
+    "meanSlipVsSnapshot": 0.0028,
+    "medianWaitSec": 7
    },
    "makerFill": null,
    "folds": [
@@ -23198,7 +23532,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 2098,
+    "fillRateThrough": 0.781,
+    "fillRateTouch": 0.85,
+    "filledThrough": {
+     "n": 1638,
+     "edge": -0.0099,
+     "roi": -0.0457
+    },
+    "filledTouch": {
+     "n": 1784,
+     "edge": 0.0013,
+     "roi": -0.0258
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -23282,7 +23630,7 @@
    "sizePerTrade": 686.3,
    "capacityNotionalPerDay": 13629,
    "expProfitPerDay": 141.7,
-   "q": 0.8060025503789947,
+   "q": 0.8201444140640082,
    "bhSig": false,
    "qFamily": 0.39184677560835945,
    "bhSigFamily": false
@@ -23764,7 +24112,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -24275,7 +24625,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 3058,
    "expProfitPerDay": 26.6,
-   "q": 0.9899627232388889,
+   "q": 1,
    "bhSig": false,
    "qFamily": 0.5200059338610759,
    "bhSigFamily": false
@@ -24363,9 +24713,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 1140,
+    "n": 1079,
+    "days": 221,
+    "fewClusters": false,
+    "roiFill": -0.0123,
+    "roiFillCI": [
+     -0.0475,
+     0.0218
+    ],
+    "pROI": 0.7565763714195524,
+    "snapMinusFillEdge": -0.0086,
+    "snapMinusFillSE": 0.0015,
+    "edgeFill": -0.0072,
+    "edgeSnapHeadline": -0.0158,
+    "meanSlipVsSnapshot": 0.0013,
+    "medianWaitSec": 66
    },
    "makerFill": null,
    "folds": [
@@ -24446,7 +24809,7 @@
      -0.0171,
      0.0304
     ],
-    "q": 0.9117448583976269,
+    "q": 0.9305163911084096,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -24541,9 +24904,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 184,
+    "n": 175,
+    "days": 37,
+    "fewClusters": false,
+    "roiFill": -0.0678,
+    "roiFillCI": [
+     -0.159,
+     0.015
+    ],
+    "pROI": 0.9270232456120462,
+    "snapMinusFillEdge": -0.0011,
+    "snapMinusFillSE": 0.0024,
+    "edgeFill": -0.0493,
+    "edgeSnapHeadline": -0.0503,
+    "meanSlipVsSnapshot": 0.009,
+    "medianWaitSec": 59
    },
    "makerFill": null,
    "folds": [
@@ -24695,7 +25071,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 1140,
+    "fillRateThrough": 0.724,
+    "fillRateTouch": 0.765,
+    "filledThrough": {
+     "n": 825,
+     "edge": -0.0074,
+     "roi": -0.0146
+    },
+    "filledTouch": {
+     "n": 872,
+     "edge": -0.0044,
+     "roi": -0.0098
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -24767,7 +25157,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 2639,
    "expProfitPerDay": 48.3,
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.3472915034194532,
    "bhSigFamily": false
@@ -24855,9 +25245,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 812,
+    "n": 796,
+    "days": 220,
+    "fewClusters": false,
+    "roiFill": -0.0043,
+    "roiFillCI": [
+     -0.0392,
+     0.0302
+    ],
+    "pROI": 0.594590850283322,
+    "snapMinusFillEdge": -0.007,
+    "snapMinusFillSE": 0.0019,
+    "edgeFill": -0.0015,
+    "edgeSnapHeadline": -0.0085,
+    "meanSlipVsSnapshot": 0.0031,
+    "medianWaitSec": 71
    },
    "makerFill": null,
    "folds": [
@@ -24938,7 +25341,7 @@
      -0.0126,
      0.0361
     ],
-    "q": 0.7818279282771652,
+    "q": 0.7858946118818178,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -25033,9 +25436,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 812,
+    "n": 796,
+    "days": 220,
+    "fewClusters": false,
+    "roiFill": -0.0043,
+    "roiFillCI": [
+     -0.0392,
+     0.0302
+    ],
+    "pROI": 0.594590850283322,
+    "snapMinusFillEdge": -0.007,
+    "snapMinusFillSE": 0.0019,
+    "edgeFill": -0.0015,
+    "edgeSnapHeadline": -0.0085,
+    "meanSlipVsSnapshot": 0.0031,
+    "medianWaitSec": 71
    },
    "makerFill": null,
    "folds": [
@@ -25197,7 +25613,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 812,
+    "fillRateThrough": 0.693,
+    "fillRateTouch": 0.732,
+    "filledThrough": {
+     "n": 563,
+     "edge": -0.0116,
+     "roi": -0.0176
+    },
+    "filledTouch": {
+     "n": 594,
+     "edge": -0.0053,
+     "roi": -0.0096
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -25269,7 +25699,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 1880,
    "expProfitPerDay": 47.7,
-   "q": 0.5783093725164008,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.26615374530584357,
    "bhSigFamily": false
@@ -25981,9 +26411,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 1140,
+    "n": 1077,
+    "days": 221,
+    "fewClusters": false,
+    "roiFill": -0.0853,
+    "roiFillCI": [
+     -0.1487,
+     -0.0221
+    ],
+    "pROI": 0.9955682148381915,
+    "snapMinusFillEdge": -0.0092,
+    "snapMinusFillSE": 0.0014,
+    "edgeFill": -0.0193,
+    "edgeSnapHeadline": -0.0285,
+    "meanSlipVsSnapshot": 0.0008,
+    "medianWaitSec": 62
    },
    "makerFill": null,
    "folds": [
@@ -26187,9 +26630,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 317,
+    "n": 293,
+    "days": 196,
+    "fewClusters": false,
+    "roiFill": -0.0533,
+    "roiFillCI": [
+     -0.1242,
+     0.0158
+    ],
+    "pROI": 0.9279599834843759,
+    "snapMinusFillEdge": -0.0104,
+    "snapMinusFillSE": 0.0028,
+    "edgeFill": -0.035,
+    "edgeSnapHeadline": -0.0454,
+    "meanSlipVsSnapshot": -0.0006,
+    "medianWaitSec": 63
    },
    "makerFill": null,
    "folds": [
@@ -26379,7 +26835,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 1140,
+    "fillRateThrough": 0.746,
+    "fillRateTouch": 0.78,
+    "filledThrough": {
+     "n": 850,
+     "edge": -0.0223,
+     "roi": -0.1
+    },
+    "filledTouch": {
+     "n": 889,
+     "edge": -0.0191,
+     "roi": -0.0901
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -26577,9 +27047,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 812,
+    "n": 793,
+    "days": 220,
+    "fewClusters": false,
+    "roiFill": -0.0284,
+    "roiFillCI": [
+     -0.1003,
+     0.045
+    ],
+    "pROI": 0.7782256226929605,
+    "snapMinusFillEdge": -0.0069,
+    "snapMinusFillSE": 0.0019,
+    "edgeFill": 0.0011,
+    "edgeSnapHeadline": -0.0059,
+    "meanSlipVsSnapshot": 0.0032,
+    "medianWaitSec": 77
    },
    "makerFill": null,
    "folds": [
@@ -26678,7 +27161,7 @@
      -0.0098,
      0.0397
     ],
-    "q": 0.6760633857212204,
+    "q": 0.6912581600924178,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -26788,9 +27271,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 581,
+    "n": 569,
+    "days": 215,
+    "fewClusters": false,
+    "roiFill": 0.0146,
+    "roiFillCI": [
+     -0.0258,
+     0.0532
+    ],
+    "pROI": 0.23853073590674656,
+    "snapMinusFillEdge": -0.0059,
+    "snapMinusFillSE": 0.0024,
+    "edgeFill": 0.0094,
+    "edgeSnapHeadline": 0.0035,
+    "meanSlipVsSnapshot": 0.0042,
+    "medianWaitSec": 74
    },
    "makerFill": null,
    "folds": [
@@ -26877,7 +27373,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 1345,
    "expProfitPerDay": 8.5,
-   "q": 0.9899627232388889,
+   "q": 1,
    "bhSig": false,
    "qFamily": 1,
    "bhSigFamily": false
@@ -26985,7 +27481,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 812,
+    "fillRateThrough": 0.729,
+    "fillRateTouch": 0.766,
+    "filledThrough": {
+     "n": 592,
+     "edge": -0.0108,
+     "roi": -0.0854
+    },
+    "filledTouch": {
+     "n": 622,
+     "edge": -0.0014,
+     "roi": -0.0483
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -27075,7 +27585,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 1880,
    "expProfitPerDay": 57.1,
-   "q": 0.8694509771601706,
+   "q": 0.8816860695212173,
    "bhSig": false,
    "qFamily": 0.4256570454660396,
    "bhSigFamily": false
@@ -27262,7 +27772,7 @@
      -0.0084,
      0.0458
     ],
-    "q": 0.5783093725164008,
+    "q": 0.5899079280286235,
     "bhSig": false,
     "qFamily": 0.4327563235985741
    },
@@ -27534,7 +28044,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 3058,
    "expProfitPerDay": 163.6,
-   "q": 0.4220153304774962,
+   "q": 0.42623808239883815,
    "bhSig": false,
    "qFamily": 0.12071072720867271,
    "bhSigFamily": false
@@ -27632,9 +28142,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 1140,
+    "n": 1085,
+    "days": 221,
+    "fewClusters": false,
+    "roiFill": -0.0169,
+    "roiFillCI": [
+     -0.0646,
+     0.0265
+    ],
+    "pROI": 0.768230982313969,
+    "snapMinusFillEdge": -0.0065,
+    "snapMinusFillSE": 0.0013,
+    "edgeFill": -0.0048,
+    "edgeSnapHeadline": -0.0113,
+    "meanSlipVsSnapshot": 0.0035,
+    "medianWaitSec": 59
    },
    "makerFill": null,
    "folds": [
@@ -27721,7 +28244,7 @@
      -0.0139,
      0.0315
     ],
-    "q": 0.7840675486759413,
+    "q": 0.7964306944450857,
     "bhSig": false,
     "qFamily": 0.5570440017536148
    },
@@ -27816,9 +28339,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 327,
+    "n": 311,
+    "days": 62,
+    "fewClusters": false,
+    "roiFill": 0.0804,
+    "roiFillCI": [
+     0.018,
+     0.1453
+    ],
+    "pROI": 0.007562616919700393,
+    "snapMinusFillEdge": -0.0092,
+    "snapMinusFillSE": 0.0029,
+    "edgeFill": 0.0566,
+    "edgeSnapHeadline": 0.0474,
+    "meanSlipVsSnapshot": 0.0006,
+    "medianWaitSec": 82
    },
    "makerFill": null,
    "folds": [
@@ -27892,7 +28428,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 757,
    "expProfitPerDay": 51.2,
-   "q": 0.28128083661404646,
+   "q": 0.2797111890882984,
    "bhSig": false,
    "qFamily": 1,
    "bhSigFamily": false
@@ -27990,7 +28526,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 1140,
+    "fillRateThrough": 0.711,
+    "fillRateTouch": 0.754,
+    "filledThrough": {
+     "n": 811,
+     "edge": -0.0034,
+     "roi": -0.024
+    },
+    "filledTouch": {
+     "n": 859,
+     "edge": -0.0027,
+     "roi": -0.0251
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -28068,7 +28618,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 2639,
    "expProfitPerDay": 81,
-   "q": 0.718539019049911,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.3454091950161739,
    "bhSigFamily": false
@@ -28161,9 +28711,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 812,
+    "n": 796,
+    "days": 220,
+    "fewClusters": false,
+    "roiFill": -0.0043,
+    "roiFillCI": [
+     -0.0392,
+     0.0302
+    ],
+    "pROI": 0.594590850283322,
+    "snapMinusFillEdge": -0.007,
+    "snapMinusFillSE": 0.0019,
+    "edgeFill": -0.0015,
+    "edgeSnapHeadline": -0.0085,
+    "meanSlipVsSnapshot": 0.0031,
+    "medianWaitSec": 71
    },
    "makerFill": null,
    "folds": [
@@ -28250,7 +28813,7 @@
      -0.0126,
      0.0361
     ],
-    "q": 0.7818279282771652,
+    "q": 0.7858946118818178,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -28350,9 +28913,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 530,
+    "n": 524,
+    "days": 142,
+    "fewClusters": false,
+    "roiFill": -0.0044,
+    "roiFillCI": [
+     -0.0514,
+     0.0426
+    ],
+    "pROI": 0.5736510717830264,
+    "snapMinusFillEdge": -0.0062,
+    "snapMinusFillSE": 0.0025,
+    "edgeFill": 0.0021,
+    "edgeSnapHeadline": -0.0041,
+    "meanSlipVsSnapshot": 0.0039,
+    "medianWaitSec": 71
    },
    "makerFill": null,
    "folds": [
@@ -28522,7 +29098,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 812,
+    "fillRateThrough": 0.693,
+    "fillRateTouch": 0.732,
+    "filledThrough": {
+     "n": 563,
+     "edge": -0.0116,
+     "roi": -0.0176
+    },
+    "filledTouch": {
+     "n": 594,
+     "edge": -0.0053,
+     "roi": -0.0096
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -28600,7 +29190,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 1880,
    "expProfitPerDay": 47.7,
-   "q": 0.5783093725164008,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.26615374530584357,
    "bhSigFamily": false
@@ -29165,7 +29755,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 2519,
    "expProfitPerDay": 34.8,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.4677579897385417,
    "bhSigFamily": false
@@ -29268,9 +29858,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 934,
+    "n": 878,
+    "days": 185,
+    "fewClusters": false,
+    "roiFill": -0.0184,
+    "roiFillCI": [
+     -0.0769,
+     0.043
+    ],
+    "pROI": 0.7242773532654743,
+    "snapMinusFillEdge": -0.008,
+    "snapMinusFillSE": 0.0014,
+    "edgeFill": -0.001,
+    "edgeSnapHeadline": -0.0091,
+    "meanSlipVsSnapshot": 0.0019,
+    "medianWaitSec": 63
    },
    "makerFill": null,
    "folds": [
@@ -29355,7 +29958,7 @@
      -0.0133,
      0.0381
     ],
-    "q": 0.7716277231526609,
+    "q": 0.7733008955115378,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -29455,9 +30058,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 541,
+    "n": 513,
+    "days": 144,
+    "fewClusters": false,
+    "roiFill": 0.0018,
+    "roiFillCI": [
+     -0.0494,
+     0.0487
+    ],
+    "pROI": 0.47139080626408725,
+    "snapMinusFillEdge": -0.0059,
+    "snapMinusFillSE": 0.0017,
+    "edgeFill": 0,
+    "edgeSnapHeadline": -0.0059,
+    "meanSlipVsSnapshot": 0.004,
+    "medianWaitSec": 66
    },
    "makerFill": null,
    "folds": [
@@ -29630,7 +30246,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 934,
+    "fillRateThrough": 0.713,
+    "fillRateTouch": 0.763,
+    "filledThrough": {
+     "n": 666,
+     "edge": -0.0003,
+     "roi": -0.0256
+    },
+    "filledTouch": {
+     "n": 713,
+     "edge": 0.0011,
+     "roi": -0.0279
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -29706,7 +30336,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 2162,
    "expProfitPerDay": 41.5,
-   "q": 0.9046084434425941,
+   "q": 0.9195760531773773,
    "bhSig": false,
    "qFamily": 0.4401498315662783,
    "bhSigFamily": false
@@ -29809,9 +30439,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 664,
+    "n": 639,
+    "days": 182,
+    "fewClusters": false,
+    "roiFill": -0.0399,
+    "roiFillCI": [
+     -0.157,
+     0.0828
+    ],
+    "pROI": 0.7431220554711924,
+    "snapMinusFillEdge": -0.0107,
+    "snapMinusFillSE": 0.0021,
+    "edgeFill": -0.011,
+    "edgeSnapHeadline": -0.0217,
+    "meanSlipVsSnapshot": -0.0005,
+    "medianWaitSec": 81
    },
    "makerFill": null,
    "folds": [
@@ -30001,9 +30644,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 308,
+    "n": 293,
+    "days": 97,
+    "fewClusters": false,
+    "roiFill": 0.0599,
+    "roiFillCI": [
+     -0.1529,
+     0.3144
+    ],
+    "pROI": 0.30361434437247226,
+    "snapMinusFillEdge": -0.0104,
+    "snapMinusFillSE": 0.0034,
+    "edgeFill": -0.004,
+    "edgeSnapHeadline": -0.0144,
+    "meanSlipVsSnapshot": -0.0001,
+    "medianWaitSec": 81
    },
    "makerFill": null,
    "folds": [
@@ -30176,7 +30832,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 534,
+    "fillRateThrough": 0.747,
+    "fillRateTouch": 0.775,
+    "filledThrough": {
+     "n": 399,
+     "edge": -0.0322,
+     "roi": -0.1504
+    },
+    "filledTouch": {
+     "n": 414,
+     "edge": -0.0249,
+     "roi": -0.1174
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -30809,7 +31479,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 3058,
    "expProfitPerDay": 37.9,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.4677579897385417,
    "bhSigFamily": false
@@ -30907,9 +31577,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 1140,
+    "n": 1079,
+    "days": 221,
+    "fewClusters": false,
+    "roiFill": -0.0123,
+    "roiFillCI": [
+     -0.0475,
+     0.0218
+    ],
+    "pROI": 0.7565763714195524,
+    "snapMinusFillEdge": -0.0086,
+    "snapMinusFillSE": 0.0015,
+    "edgeFill": -0.0072,
+    "edgeSnapHeadline": -0.0158,
+    "meanSlipVsSnapshot": 0.0013,
+    "medianWaitSec": 66
    },
    "makerFill": null,
    "folds": [
@@ -31002,7 +31685,7 @@
      -0.0171,
      0.0304
     ],
-    "q": 0.9117448583976269,
+    "q": 0.9305163911084096,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -31102,9 +31785,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 431,
+    "n": 411,
+    "days": 122,
+    "fewClusters": false,
+    "roiFill": -0.0215,
+    "roiFillCI": [
+     -0.0714,
+     0.0314
+    ],
+    "pROI": 0.7966130044339703,
+    "snapMinusFillEdge": -0.0043,
+    "snapMinusFillSE": 0.002,
+    "edgeFill": -0.0139,
+    "edgeSnapHeadline": -0.0181,
+    "meanSlipVsSnapshot": 0.0057,
+    "medianWaitSec": 65
    },
    "makerFill": null,
    "folds": [
@@ -31275,7 +31971,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 1140,
+    "fillRateThrough": 0.724,
+    "fillRateTouch": 0.765,
+    "filledThrough": {
+     "n": 825,
+     "edge": -0.0074,
+     "roi": -0.0146
+    },
+    "filledTouch": {
+     "n": 872,
+     "edge": -0.0044,
+     "roi": -0.0098
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -31359,7 +32069,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 2639,
    "expProfitPerDay": 48.3,
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.3472915034194532,
    "bhSigFamily": false
@@ -31457,9 +32167,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 812,
+    "n": 796,
+    "days": 220,
+    "fewClusters": false,
+    "roiFill": -0.0043,
+    "roiFillCI": [
+     -0.0392,
+     0.0302
+    ],
+    "pROI": 0.594590850283322,
+    "snapMinusFillEdge": -0.007,
+    "snapMinusFillSE": 0.0019,
+    "edgeFill": -0.0015,
+    "edgeSnapHeadline": -0.0085,
+    "meanSlipVsSnapshot": 0.0031,
+    "medianWaitSec": 71
    },
    "makerFill": null,
    "folds": [
@@ -31552,7 +32275,7 @@
      -0.0126,
      0.0361
     ],
-    "q": 0.7818279282771652,
+    "q": 0.7858946118818178,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -31657,9 +32380,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 698,
+    "n": 687,
+    "days": 207,
+    "fewClusters": false,
+    "roiFill": -0.0155,
+    "roiFillCI": [
+     -0.055,
+     0.0232
+    ],
+    "pROI": 0.7821544096479698,
+    "snapMinusFillEdge": -0.0064,
+    "snapMinusFillSE": 0.0021,
+    "edgeFill": -0.0091,
+    "edgeSnapHeadline": -0.0155,
+    "meanSlipVsSnapshot": 0.0036,
+    "medianWaitSec": 72
    },
    "makerFill": null,
    "folds": [
@@ -31840,7 +32576,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 812,
+    "fillRateThrough": 0.693,
+    "fillRateTouch": 0.732,
+    "filledThrough": {
+     "n": 563,
+     "edge": -0.0116,
+     "roi": -0.0176
+    },
+    "filledTouch": {
+     "n": 594,
+     "edge": -0.0053,
+     "roi": -0.0096
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -31924,7 +32674,7 @@
    "sizePerTrade": 511.6,
    "capacityNotionalPerDay": 1880,
    "expProfitPerDay": 47.7,
-   "q": 0.5783093725164008,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.26615374530584357,
    "bhSigFamily": false
@@ -32454,9 +33204,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 262,
+    "n": 245,
+    "days": 245,
+    "fewClusters": false,
+    "roiFill": -0.1833,
+    "roiFillCI": [
+     -0.3461,
+     -0.0081
+    ],
+    "pROI": 0.9829070864168591,
+    "snapMinusFillEdge": -0.0066,
+    "snapMinusFillSE": 0.0009,
+    "edgeFill": -0.0414,
+    "edgeSnapHeadline": -0.048,
+    "meanSlipVsSnapshot": 0.0035,
+    "medianWaitSec": 92
    },
    "makerFill": null,
    "folds": [
@@ -32726,7 +33489,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 262,
+    "fillRateThrough": 0.519,
+    "fillRateTouch": 0.748,
+    "filledThrough": {
+     "n": 136,
+     "edge": -0.0751,
+     "roi": -0.2907
+    },
+    "filledTouch": {
+     "n": 196,
+     "edge": -0.0387,
+     "roi": -0.2476
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -33230,7 +34007,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -33484,7 +34263,7 @@
      -0.0315,
      0.0798
     ],
-    "q": 0.7840675486759413,
+    "q": 0.7965686256637593,
     "bhSig": false,
     "qFamily": 0.5570440017536148
    },
@@ -33834,7 +34613,7 @@
    "sizePerTrade": 10794.6,
    "capacityNotionalPerDay": 10659,
    "expProfitPerDay": 666.2,
-   "q": 0.718539019049911,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.3454091950161739,
    "bhSigFamily": false
@@ -33927,9 +34706,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 262,
+    "n": 246,
+    "days": 246,
+    "fewClusters": false,
+    "roiFill": -0.0863,
+    "roiFillCI": [
+     -0.2527,
+     0.0876
+    ],
+    "pROI": 0.8406838244588906,
+    "snapMinusFillEdge": -0.0085,
+    "snapMinusFillSE": 0.001,
+    "edgeFill": -0.0077,
+    "edgeSnapHeadline": -0.0162,
+    "meanSlipVsSnapshot": 0.0016,
+    "medianWaitSec": 93
    },
    "makerFill": null,
    "folds": [
@@ -34116,9 +34908,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 250,
+    "n": 234,
+    "days": 234,
+    "fewClusters": false,
+    "roiFill": -0.0978,
+    "roiFillCI": [
+     -0.2732,
+     0.0772
+    ],
+    "pROI": 0.8598320424208954,
+    "snapMinusFillEdge": -0.0088,
+    "snapMinusFillSE": 0.001,
+    "edgeFill": -0.0133,
+    "edgeSnapHeadline": -0.0221,
+    "meanSlipVsSnapshot": 0.0013,
+    "medianWaitSec": 93
    },
    "makerFill": null,
    "folds": [
@@ -34290,7 +35095,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 250,
+    "fillRateThrough": 0.56,
+    "fillRateTouch": 0.788,
+    "filledThrough": {
+     "n": 140,
+     "edge": -0.0406,
+     "roi": -0.1172
+    },
+    "filledTouch": {
+     "n": 197,
+     "edge": -0.0183,
+     "roi": -0.138
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -34829,7 +35648,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -35059,7 +35880,7 @@
      -0.1054,
      0.16
     ],
-    "q": 0.9370363403561853,
+    "q": 0.952254525994667,
     "bhSig": false,
     "qFamily": 0.6634325826749632
    },
@@ -35354,7 +36175,7 @@
    "sizePerTrade": 10794.6,
    "capacityNotionalPerDay": 1799,
    "expProfitPerDay": 148.6,
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.4511895413706131,
    "bhSigFamily": false
@@ -35452,9 +36273,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 45,
+    "n": 33,
+    "days": 33,
+    "fewClusters": false,
+    "roiFill": -0.0051,
+    "roiFillCI": [
+     -0.3192,
+     0.3713
+    ],
+    "pROI": 0.5111278418874788,
+    "snapMinusFillEdge": -0.0089,
+    "snapMinusFillSE": 0.0023,
+    "edgeFill": 0.0529,
+    "edgeSnapHeadline": 0.044,
+    "meanSlipVsSnapshot": 0.001,
+    "medianWaitSec": 78
    },
    "makerFill": null,
    "folds": [
@@ -35507,7 +36341,7 @@
      -0.0896,
      0.1472
     ],
-    "q": 0.927720012981441,
+    "q": 0.94167068986838,
     "bhSig": false,
     "qFamily": 0.6624137892433739
    },
@@ -36626,9 +37460,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 254,
+    "n": 238,
+    "days": 238,
+    "fewClusters": false,
+    "roiFill": -0.0328,
+    "roiFillCI": [
+     -0.2084,
+     0.1686
+    ],
+    "pROI": 0.6362248865267328,
+    "snapMinusFillEdge": -0.0079,
+    "snapMinusFillSE": 0.0009,
+    "edgeFill": 0.0199,
+    "edgeSnapHeadline": 0.012,
+    "meanSlipVsSnapshot": 0.0022,
+    "medianWaitSec": 82
    },
    "makerFill": null,
    "folds": [
@@ -36721,7 +37568,7 @@
      -0.0201,
      0.0845
     ],
-    "q": 0.6581885398658321,
+    "q": 0.6778642709682862,
     "bhSig": false,
     "qFamily": 0.5287809425624577
    },
@@ -36826,9 +37673,22 @@
     }
    },
    "fill": {
-    "covered": 0,
-    "n": 0,
-    "pROI": 1
+    "covered": 150,
+    "n": 136,
+    "days": 136,
+    "fewClusters": false,
+    "roiFill": 0.0447,
+    "roiFillCI": [
+     -0.2105,
+     0.3275
+    ],
+    "pROI": 0.37519754954788287,
+    "snapMinusFillEdge": -0.0072,
+    "snapMinusFillSE": 0.0012,
+    "edgeFill": 0.0425,
+    "edgeSnapHeadline": 0.0353,
+    "meanSlipVsSnapshot": 0.003,
+    "medianWaitSec": 75
    },
    "makerFill": null,
    "folds": [
@@ -37014,7 +37874,21 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "tapeTrades": 254,
+    "fillRateThrough": 0.555,
+    "fillRateTouch": 0.756,
+    "filledThrough": {
+     "n": 141,
+     "edge": -0.0131,
+     "roi": -0.1826
+    },
+    "filledTouch": {
+     "n": 192,
+     "edge": 0.0162,
+     "roi": -0.0776
+    }
+   },
    "folds": [
     {
      "k": 0,
@@ -37098,7 +37972,7 @@
    "sizePerTrade": 10794.6,
    "capacityNotionalPerDay": 8622,
    "expProfitPerDay": 456.1,
-   "q": 0.927720012981441,
+   "q": 0.9393857620862898,
    "bhSig": false,
    "qFamily": 0.4609948647275311,
    "bhSigFamily": false
@@ -37599,7 +38473,9 @@
     }
    },
    "fill": null,
-   "makerFill": null,
+   "makerFill": {
+    "n": 0
+   },
    "folds": [
     {
      "k": 0,
@@ -37743,7 +38619,7 @@
    "df": 1,
    "p": 0.04553938783108464,
    "cells": "WKDY:0.497(n9504) WKND:0.516(n3456)",
-   "q": 0.5217884028222264,
+   "q": 0.5390926100586778,
    "bhSig": false,
    "qFamily": 0.3557648201060635,
    "bhSigFamily": false
@@ -37758,7 +38634,7 @@
    "df": 1,
    "p": 0.031233527315655967,
    "cells": "WKDY:-0.0038±0.0056(n5797) WKND:0.0133±0.0057(n2138)",
-   "q": 0.4576293301478075,
+   "q": 0.46807775490500864,
    "bhSig": false,
    "qFamily": 0.3557648201060635,
    "bhSigFamily": false
@@ -37773,7 +38649,7 @@
    "df": 1,
    "p": 0.012598957418849817,
    "cells": "WKDY:-0.0199±0.0087(n1502) WKND:0.0194±0.0131(n590)",
-   "q": 0.28128083661404646,
+   "q": 0.27832242298004595,
    "bhSig": false,
    "qFamily": 0.29007086275823535,
    "bhSigFamily": false
@@ -37788,7 +38664,7 @@
    "df": 2,
    "p": 0.0465882502519845,
    "cells": "hi:0.51(n4330) lo:0.509(n4310) mid:0.487(n4320)",
-   "q": 0.5217884028222264,
+   "q": 0.5390926100586778,
    "bhSig": false,
    "qFamily": 0.3557648201060635,
    "bhSigFamily": false
@@ -37803,7 +38679,7 @@
    "df": 2,
    "p": 0.09586299957437379,
    "cells": "hi:0.0095±0.0084(n2678) lo:0.0054±0.0054(n2641) mid:-0.0127±0.0078(n2616)",
-   "q": 0.6465599650257982,
+   "q": 0.6639939926541724,
    "bhSig": false,
    "qFamily": 0.447360664680411,
    "bhSigFamily": false
@@ -37818,7 +38694,7 @@
    "df": 2,
    "p": 0.259382614665133,
    "cells": "hi:-0.0204±0.0145(n720) lo:0.008±0.0116(n662) mid:-0.0127±0.0136(n710)",
-   "q": 0.8803288740149969,
+   "q": 0.8940422037393947,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -37833,7 +38709,7 @@
    "df": 2,
    "p": 0.2239227567418537,
    "cells": "hi:0.493(n3984) lo:0.509(n3983) mid:0.51(n3984)",
-   "q": 0.8222737296750038,
+   "q": 0.8371266136656992,
    "bhSig": false,
    "qFamily": 0.5632970851762517,
    "bhSigFamily": false
@@ -37893,7 +38769,7 @@
    "df": 23,
    "p": 0.2910257025688853,
    "cells": "h00:-0.0334±0.0189(n313) h01:-0.0365±0.023(n322) h02:-0.0157±0.0208(n327) h03:0.0246±0.0191(n319) h04:-0.0138±0.0176(n318) h05:0.0393±0.0197(n315) h06:0.0116±0.0207(n338) h07:-0.0043±0.0206(n337) h08:-0.0192±0.0217(n314) h09:0.0009±0.0213(n323) h10:0.0037±0.0166(n352) h11:0.025±0.0218(n331) h12:0.01±0.0194(n351) h13:-0.0115±0.0229(n323) h14:-0.0146±0.024(n313) h15:0.0185±0.0167(n352) h16:-0.0301±0.0225(n317) h17:0.0111±0.019(n332) h18:-0.0014±0.0204(n339) h19:0.0216±0.0199(n300) h20:-0.0241±0.0171(n357) h21:0.0131±0.0238(n340) h22:0.0065±0.0212(n357) h23:0.0335±0.0177(n345)",
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -37908,7 +38784,7 @@
    "df": 23,
    "p": 0.19662461412783921,
    "cells": "h00:-0.0325±0.0384(n86) h01:-0.0092±0.0531(n66) h02:-0.0269±0.0365(n87) h03:0.0619±0.0301(n77) h04:-0.0227±0.0433(n81) h05:-0.0052±0.0473(n91) h06:-0.0489±0.0433(n77) h07:0.0164±0.0367(n91) h08:-0.0637±0.0414(n84) h09:-0.0143±0.038(n108) h10:-0.0398±0.0404(n86) h11:0.0619±0.0411(n82) h12:-0.0278±0.0508(n76) h13:-0.035±0.0482(n68) h14:-0.0486±0.0437(n88) h15:0.0254±0.0361(n92) h16:0.0361±0.0348(n79) h17:-0.0122±0.0346(n90) h18:0.0384±0.035(n99) h19:-0.0639±0.0397(n90) h20:0.0089±0.0325(n106) h21:-0.0061±0.0408(n90) h22:-0.0687±0.0426(n99) h23:0.0552±0.0241(n99)",
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.5421092035767251,
    "bhSigFamily": false
@@ -37923,7 +38799,7 @@
    "df": 6,
    "p": 0.28518955169763405,
    "cells": "d0:0.505(n1728) d1:0.492(n1897) d2:0.492(n2016) d3:0.496(n2016) d4:0.496(n1847) d5:0.509(n1728) d6:0.528(n1728)",
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -37938,7 +38814,7 @@
    "df": 6,
    "p": 0.03936413064918341,
    "cells": "d0:0.0046±0.004(n1050) d1:0.0043±0.0078(n1153) d2:-0.0125±0.0184(n1249) d3:-0.0076±0.006(n1259) d4:-0.0198±0.0153(n1067) d5:0.018±0.0085(n1069) d6:0.0218±0.0094(n1088)",
-   "q": 0.46408238239037286,
+   "q": 0.4782741873875785,
    "bhSig": false,
    "qFamily": 0.3557648201060635,
    "bhSigFamily": false
@@ -37953,7 +38829,7 @@
    "df": 6,
    "p": 0.1186211598787696,
    "cells": "d0:0.0164±0.0217(n237) d1:-0.0053±0.0184(n251) d2:-0.0421±0.0198(n291) d3:-0.0108±0.02(n345) d4:-0.0116±0.025(n295) d5:-0.0285±0.0104(n320) d6:0.0214±0.0178(n353)",
-   "q": 0.6726870838694782,
+   "q": 0.6912581600924178,
    "bhSig": false,
    "qFamily": 0.4684996580902977,
    "bhSigFamily": false
@@ -37966,6 +38842,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999988275555622,
    "n": 7888,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -37992,10 +38870,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9695503002701495,
    "n": 342,
-   "cells": "roiFill=-0.0972 CI=[-0.1881,-0.0049] edgeFill=-0.0482 vs snap -0.055",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0972 CI=[-0.1881,-0.0049] edgeFill=-0.0482 vs snap -0.055; snap-fill bias -0.0068±0.0007; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38006,6 +38886,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38019,7 +38900,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.2542118465977736,
    "n": 7888,
-   "q": 0.8714048185503379,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.8845481374015595,
    "bhSig": false,
    "qFamily": 0.4256570454660396,
    "bhSigFamily": false
@@ -38032,6 +38915,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999496407022147,
    "n": 4616,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38058,10 +38943,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.2166538445437327,
    "n": 219,
-   "cells": "roiFill=0.0384 CI=[-0.0425,0.1312] edgeFill=0.0161 vs snap -0.0047",
-   "q": 0.8060025503789947,
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.0384 CI=[-0.0425,0.1312] edgeFill=0.0161 vs snap -0.0047; snap-fill bias -0.0207±0.0064; 13 days",
+   "q": 0.8201444140640082,
    "bhSig": false,
-   "qFamily": 0.920778839310864,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38072,6 +38959,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38085,7 +38973,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.3313285760648004,
    "n": 4616,
-   "q": 0.927720012981441,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.4677579897385417,
    "bhSigFamily": false
@@ -38098,6 +38988,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9994243900910341,
    "n": 1741,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38124,10 +39016,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.3257448768211373,
    "n": 102,
-   "cells": "roiFill=0.158 CI=[-0.3536,0.9202] edgeFill=0.011 vs snap -0.0074",
-   "q": 0.927720012981441,
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.158 CI=[-0.3536,0.9202] edgeFill=0.011 vs snap -0.0074; snap-fill bias -0.0184±0.0089; 13 days",
+   "q": 0.94167068986838,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38138,6 +39032,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38151,7 +39046,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.1961491986624876,
    "n": 1741,
-   "q": 0.7840675486759413,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -38164,6 +39061,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999995257919437,
    "n": 7888,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38190,10 +39089,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.7878870982485422,
    "n": 341,
-   "cells": "roiFill=-0.0435 CI=[-0.145,0.0544] edgeFill=-0.0204 vs snap -0.0264",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0435 CI=[-0.145,0.0544] edgeFill=-0.0204 vs snap -0.0264; snap-fill bias -0.006±0.0006; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38204,6 +39105,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38217,6 +39119,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.5944350961789429,
    "n": 7888,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.7379194297393773,
@@ -38230,6 +39134,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999441410654428,
    "n": 4616,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38256,10 +39162,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.8246036366481801,
    "n": 219,
-   "cells": "roiFill=-0.0736 CI=[-0.2147,0.0728] edgeFill=-0.0196 vs snap -0.0302",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0736 CI=[-0.2147,0.0728] edgeFill=-0.0196 vs snap -0.0302; snap-fill bias -0.0107±0.0051; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38270,6 +39178,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38283,7 +39192,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.19405711887134736,
    "n": 4616,
-   "q": 0.7840675486759413,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -38296,6 +39207,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9986868797895888,
    "n": 1741,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38322,10 +39235,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.45539261778025963,
    "n": 102,
-   "cells": "roiFill=0.0397 CI=[-0.4594,0.8483] edgeFill=-0.0443 vs snap -0.0713",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.0397 CI=[-0.4594,0.8483] edgeFill=-0.0443 vs snap -0.0713; snap-fill bias -0.027±0.0078; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38336,6 +39251,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.885631700288741,
    "n": 131,
+   "days": 9,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38349,7 +39266,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.20236328282532923,
    "n": 1741,
-   "q": 0.7840675486759413,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -38362,6 +39281,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9996883033040308,
    "n": 7888,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38375,7 +39296,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.0378412349928674,
    "n": 7888,
-   "q": 0.46408238239037286,
+   "q": 0.4782741873875785,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -38388,10 +39309,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.7972209485615132,
    "n": 341,
-   "cells": "roiFill=-0.042 CI=[-0.1281,0.0575] edgeFill=-0.0197 vs snap -0.0255",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.042 CI=[-0.1281,0.0575] edgeFill=-0.0197 vs snap -0.0255; snap-fill bias -0.0058±0.0008; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38402,6 +39325,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38415,7 +39339,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.0020042540302372958,
    "n": 7888,
-   "q": 0.14454235764740986,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -38428,6 +39354,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9993397185794279,
    "n": 4616,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38454,10 +39382,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.3297751886495429,
    "n": 219,
-   "cells": "roiFill=0.1211 CI=[-0.3236,0.7303] edgeFill=-0.0475 vs snap -0.0505",
-   "q": 0.927720012981441,
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.1211 CI=[-0.3236,0.7303] edgeFill=-0.0475 vs snap -0.0505; snap-fill bias -0.003±0.0062; 13 days",
+   "q": 0.94167068986838,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38468,6 +39398,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38481,7 +39412,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.2994495246585318,
    "n": 4616,
-   "q": 0.9188588153905634,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.9389191547357836,
    "bhSig": false,
    "qFamily": 0.4609948647275311,
    "bhSigFamily": false
@@ -38494,6 +39427,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9508197623910912,
    "n": 1741,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38507,7 +39442,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.010027969227463629,
    "n": 1741,
-   "q": 0.2807831383689816,
+   "q": 0.270755169141518,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -38520,10 +39455,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.29879876785339143,
    "n": 102,
-   "cells": "roiFill=0.1706 CI=[-0.2691,0.8852] edgeFill=0.0005 vs snap -0.0081",
-   "q": 0.9188588153905634,
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.1706 CI=[-0.2691,0.8852] edgeFill=0.0005 vs snap -0.0081; snap-fill bias -0.0086±0.0077; 13 days",
+   "q": 0.9389191547357836,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38534,6 +39471,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8860935099187764,
    "n": 512,
+   "days": 8,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38547,10 +39486,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.6987954200513442,
    "n": 36,
-   "cells": "roiFill=-0.0355 CI=[-0.1212,0.0662] edgeFill=-0.0269 vs snap -0.0287",
+   "days": 4,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0355 CI=[-0.1212,0.0662] edgeFill=-0.0269 vs snap -0.0287; snap-fill bias -0.0018±0.0069; 4 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38561,7 +39502,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.020538336084660824,
    "n": 1741,
-   "q": 0.3538913294587711,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.35648683346947,
    "bhSig": false,
    "qFamily": 0.10562572843539852,
    "bhSigFamily": false
@@ -38574,6 +39517,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999800462879946,
    "n": 7888,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38587,7 +39532,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.03156808226966645,
    "n": 7888,
-   "q": 0.4576293301478075,
+   "q": 0.46807775490500864,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -38600,10 +39545,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.4538490719316003,
    "n": 340,
-   "cells": "roiFill=0.0055 CI=[-0.0775,0.0947] edgeFill=0.0046 vs snap -0.0028",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.0055 CI=[-0.0775,0.0947] edgeFill=0.0046 vs snap -0.0028; snap-fill bias -0.0073±0.0006; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38614,6 +39561,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38627,7 +39575,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.0008269895760008028,
    "n": 7888,
-   "q": 0.12349711001611989,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.13397231131213005,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -38640,6 +39590,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9585986305140405,
    "n": 4616,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38653,7 +39605,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.05702873672985653,
    "n": 4616,
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -38666,10 +39618,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.760331818671154,
    "n": 219,
-   "cells": "roiFill=-0.0532 CI=[-0.2034,0.0691] edgeFill=-0.0323 vs snap -0.0364",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0532 CI=[-0.2034,0.0691] edgeFill=-0.0323 vs snap -0.0364; snap-fill bias -0.0041±0.0071; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38680,6 +39634,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38693,7 +39648,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.03920253443934474,
    "n": 4616,
-   "q": 0.46408238239037286,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.4782741873875785,
    "bhSig": false,
    "qFamily": 0.15681013775737895,
    "bhSigFamily": false
@@ -38706,6 +39663,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7973288934841956,
    "n": 1741,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38719,7 +39678,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.054502691308901396,
    "n": 1741,
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -38732,10 +39691,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.34971128657496975,
    "n": 102,
-   "cells": "roiFill=0.1232 CI=[-0.2988,0.8482] edgeFill=-0.0179 vs snap -0.0267",
-   "q": 0.9495191296096148,
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=0.1232 CI=[-0.2988,0.8482] edgeFill=-0.0179 vs snap -0.0267; snap-fill bias -0.0089±0.0067; 13 days",
+   "q": 0.9656800299740642,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38746,6 +39707,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9559439121571403,
    "n": 234,
+   "days": 9,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38759,7 +39722,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.002258474338240779,
    "n": 1741,
-   "q": 0.14454235764740986,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -38772,6 +39737,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999832163498765,
    "n": 7888,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38785,7 +39752,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1629049382785418,
    "n": 7888,
-   "q": 0.7602230452998618,
+   "q": 0.7612673077247242,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
    "bhSigFamily": false
@@ -38798,10 +39765,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.669071339837795,
    "n": 339,
-   "cells": "roiFill=-0.0242 CI=[-0.1197,0.087] edgeFill=-0.0092 vs snap -0.0144",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0242 CI=[-0.1197,0.087] edgeFill=-0.0092 vs snap -0.0144; snap-fill bias -0.0052±0.0008; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38812,6 +39781,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38825,7 +39795,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.011070857500270814,
    "n": 7888,
-   "q": 0.28128083661404646,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.27832242298004595,
    "bhSig": false,
    "qFamily": 0.06642514500162489,
    "bhSigFamily": true
@@ -38838,6 +39810,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9996582462238186,
    "n": 4616,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38864,10 +39838,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.8310211904215945,
    "n": 219,
-   "cells": "roiFill=-0.0862 CI=[-0.2684,0.062] edgeFill=-0.032 vs snap -0.0414",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0862 CI=[-0.2684,0.062] edgeFill=-0.032 vs snap -0.0414; snap-fill bias -0.0094±0.0072; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38878,6 +39854,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38891,6 +39868,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.40398177639242017,
    "n": 4616,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.5386423685232269,
@@ -38904,6 +39883,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9983427118007673,
    "n": 1741,
+   "days": 28,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38930,10 +39911,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.8960761093766016,
    "n": 102,
-   "cells": "roiFill=-0.1465 CI=[-0.3635,0.0478] edgeFill=-0.0207 vs snap -0.0264",
+   "days": 13,
+   "fewClusters": true,
+   "cells": "roiFill=-0.1465 CI=[-0.3635,0.0478] edgeFill=-0.0207 vs snap -0.0264; snap-fill bias -0.0057±0.0085; 13 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -38944,6 +39927,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8174241518622589,
    "n": 139,
+   "days": 4,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -38957,7 +39942,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.23020727658759,
    "n": 1741,
-   "q": 0.8314575716738798,
+   "days": 28,
+   "fewClusters": false,
+   "q": 0.8475813365270359,
    "bhSig": false,
    "qFamily": 0.4042664369343044,
    "bhSigFamily": false
@@ -38971,7 +39958,7 @@
    "stat": 1.416,
    "p": 0.09109050325911405,
    "cells": "ALL: 0.0021±0.00148 per share, 13 days",
-   "q": 0.6278237763089707,
+   "q": 0.6415939794772381,
    "bhSig": false,
    "qFamily": 0.3846043470940371,
    "bhSigFamily": false
@@ -38999,7 +39986,7 @@
    "stat": 2.457,
    "p": 0.015101794175775174,
    "cells": "EU: 0.00819±0.00333 per share, 13 days",
-   "q": 0.2941566865542295,
+   "q": 0.29357887877706934,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39027,7 +40014,7 @@
    "stat": 1.623,
    "p": 0.06647320219250308,
    "cells": "US: 0.00581±0.00358 per share, 12 days",
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39042,7 +40029,7 @@
    "df": 3,
    "p": 0.06194633821018862,
    "cells": "ASIA:-0.00276 EU:0.00819 LATE:-0.00505 US:0.00581",
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39056,7 +40043,7 @@
    "stat": 0.348,
    "p": 0.3682690266197368,
    "cells": "WKDY: 0.00057±0.00164 per share, 9 days",
-   "q": 0.9820507376526315,
+   "q": 0.9998812678055424,
    "bhSig": false,
    "qFamily": 0.929372820601126,
    "bhSigFamily": false
@@ -39070,7 +40057,7 @@
    "stat": 2.246,
    "p": 0.05519284704906058,
    "cells": "WKND: 0.00663±0.00295 per share, 4 days",
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39085,7 +40072,7 @@
    "df": 1,
    "p": 0.07258373387053563,
    "cells": "WKDY:0.00057 WKND:0.00663",
-   "q": 0.5704826802456133,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39113,7 +40100,7 @@
    "stat": 1.571,
    "p": 0.07111206175422013,
    "cells": "pre|dog: 0.03418±0.02176/share, 13 days",
-   "q": 0.5688964940337611,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39127,7 +40114,7 @@
    "stat": 1.589,
    "p": 0.06897279455887895,
    "cells": "open|fav: 0.02917±0.01835/share, 13 days",
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -39169,7 +40156,7 @@
    "stat": 0.756,
    "p": 0.23199150995364948,
    "cells": "mid|dog: 0.01083±0.01432/share, 13 days",
-   "q": 0.8314575716738798,
+   "q": 0.847728374717847,
    "bhSig": false,
    "qFamily": 0.7346397815198901,
    "bhSigFamily": false
@@ -39197,7 +40184,7 @@
    "stat": 1.248,
    "p": 0.1179403453885175,
    "cells": "late|dog: 0.02087±0.01673/share, 13 days",
-   "q": 0.6726870838694782,
+   "q": 0.6912581600924178,
    "bhSig": false,
    "qFamily": 0.44817331247636644,
    "bhSigFamily": false
@@ -39225,7 +40212,7 @@
    "stat": 0.566,
    "p": 0.29099418030235036,
    "cells": "end|dog: 0.01334±0.02358/share, 13 days",
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.8505983731914857,
    "bhSigFamily": false
@@ -39240,7 +40227,7 @@
    "df": 3,
    "p": 0.13263528209168235,
    "cells": "ASIA:0.489(n3840) EU:0.493(n2400) LATE:0.49(n1920) US:0.515(n3360)",
-   "q": 0.7159109202057072,
+   "q": 0.7162305232950847,
    "bhSig": false,
    "qFamily": 0.4844071172044051,
    "bhSigFamily": false
@@ -39270,7 +40257,7 @@
    "df": 3,
    "p": 0.012086575131622528,
    "cells": "ASIA:-0.0025±0.0094(n1561) EU:0.0058±0.0124(n920) LATE:-0.0343±0.0152(n866) US:0.024±0.0099(n1324)",
-   "q": 0.28128083661404646,
+   "q": 0.27832242298004595,
    "bhSig": false,
    "qFamily": 0.29007086275823535,
    "bhSigFamily": false
@@ -39285,7 +40272,7 @@
    "df": 1,
    "p": 0.09051364876718726,
    "cells": "WKDY:0.493(n8256) WKND:0.51(n3264)",
-   "q": 0.6278237763089707,
+   "q": 0.6415939794772381,
    "bhSig": false,
    "qFamily": 0.4472439115555135,
    "bhSigFamily": false
@@ -39300,7 +40287,7 @@
    "df": 1,
    "p": 0.20320453932343752,
    "cells": "WKDY:0.0077±0.0048(n6543) WKND:0.0198±0.0082(n2683)",
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.5421092035767251,
    "bhSigFamily": false
@@ -39315,7 +40302,7 @@
    "df": 1,
    "p": 0.24141303650410784,
    "cells": "WKDY:-0.0038±0.0065(n3228) WKND:0.011±0.0109(n1443)",
-   "q": 0.8449456277643774,
+   "q": 0.8563995309561782,
    "bhSig": false,
    "qFamily": 0.5632970851762517,
    "bhSigFamily": false
@@ -39330,7 +40317,7 @@
    "df": 2,
    "p": 0.23972332934876261,
    "cells": "hi:0.5(n3786) lo:0.505(n3782) mid:0.487(n3784)",
-   "q": 0.8449456277643774,
+   "q": 0.8563995309561782,
    "bhSig": false,
    "qFamily": 0.5632970851762517,
    "bhSigFamily": false
@@ -39390,7 +40377,7 @@
    "df": 2,
    "p": 0.15323370520420398,
    "cells": "hi:0.0143±0.0067(n3033) lo:0.0165±0.0082(n2961) mid:-0.0003±0.0062(n2970)",
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.4950627398905052,
    "bhSigFamily": false
@@ -39405,7 +40392,7 @@
    "df": 2,
    "p": 0.2705748469225616,
    "cells": "hi:-0.0117±0.0096(n1557) lo:0.0106±0.01(n1505) mid:0.0009±0.0115(n1487)",
-   "q": 0.9046084434425941,
+   "q": 0.9195760531773773,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -39420,7 +40407,7 @@
    "df": 23,
    "p": 0.28790033579634394,
    "cells": "h00:0.463(n480) h01:0.454(n480) h02:0.492(n480) h03:0.485(n480) h04:0.512(n480) h05:0.519(n480) h06:0.5(n480) h07:0.487(n480) h08:0.506(n480) h09:0.492(n480) h10:0.504(n480) h11:0.51(n480) h12:0.454(n480) h13:0.485(n480) h14:0.55(n480) h15:0.519(n480) h16:0.512(n480) h17:0.498(n480) h18:0.521(n480) h19:0.517(n480) h20:0.523(n480) h21:0.506(n480) h22:0.456(n480) h23:0.475(n480)",
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -39435,7 +40422,7 @@
    "df": 23,
    "p": 0.3347915472733376,
    "cells": "h00:-0.0078±0.0195(n378) h01:-0.0034±0.0223(n368) h02:0.0178±0.0177(n393) h03:0.0136±0.0196(n406) h04:0.0193±0.0199(n392) h05:0.0009±0.0213(n382) h06:0.0329±0.0192(n399) h07:0.0399±0.0194(n388) h08:0.0003±0.0212(n368) h09:0.0544±0.0204(n367) h10:-0.0029±0.0191(n400) h11:-0.0258±0.0207(n388) h12:0.0194±0.0203(n374) h13:0.005±0.0215(n361) h14:0.0028±0.0194(n385) h15:0.0407±0.0183(n400) h16:0.031±0.0226(n387) h17:0.0162±0.0214(n358) h18:0.0115±0.0195(n377) h19:-0.026±0.0202(n389) h20:-0.0028±0.0202(n388) h21:0.0405±0.0208(n391) h22:0.0051±0.0207(n394) h23:-0.0142±0.0202(n393)",
-   "q": 0.9295827351730953,
+   "q": 0.9443113633573511,
    "bhSig": false,
    "qFamily": 0.6007675655506973,
    "bhSigFamily": false
@@ -39450,7 +40437,7 @@
    "df": 23,
    "p": 0.14228994954468874,
    "cells": "h00:-0.0276±0.0263(n204) h01:-0.0089±0.0302(n184) h02:0.0246±0.0257(n202) h03:0.002±0.0245(n201) h04:-0.0061±0.0257(n212) h05:0.0314±0.0282(n175) h06:-0.0501±0.0277(n179) h07:0.0138±0.024(n204) h08:0.0287±0.0251(n172) h09:0.0045±0.0324(n163) h10:0.0082±0.0269(n202) h11:-0.0256±0.0279(n206) h12:0.0183±0.0298(n177) h13:0.0427±0.0242(n191) h14:0.0427±0.0297(n185) h15:0.0231±0.0279(n194) h16:-0.0049±0.0306(n182) h17:0.0644±0.0234(n187) h18:-0.0162±0.0286(n186) h19:0.0156±0.028(n199) h20:-0.0228±0.0236(n220) h21:-0.0133±0.0277(n213) h22:-0.0655±0.032(n207) h23:-0.0369±0.0287(n226)",
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.4950627398905052,
    "bhSigFamily": false
@@ -39508,6 +40495,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999740360115508,
    "n": 6946,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39534,10 +40523,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.4617186996998519,
    "n": 216,
-   "cells": "roiFill=0.0069 CI=[-0.1295,0.1477] edgeFill=0.0014 vs snap -0.0044",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=0.0069 CI=[-0.1295,0.1477] edgeFill=0.0014 vs snap -0.0044; snap-fill bias -0.0058±0.0012; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -39548,6 +40539,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39561,7 +40553,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.06854101971136872,
    "n": 6946,
-   "q": 0.5688937367489454,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.25973439048518676,
    "bhSigFamily": false
@@ -39574,6 +40568,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9941217088109054,
    "n": 5603,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39587,7 +40583,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.05712164394025043,
    "n": 5603,
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -39600,10 +40596,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.10246820874292784,
    "n": 270,
-   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161",
-   "q": 0.6465599650257982,
+   "days": 33,
+   "fewClusters": false,
+   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161; snap-fill bias -0.0116±0.0016; 33 days",
+   "q": 0.6639939926541724,
    "bhSig": false,
-   "qFamily": 0.5806531828765911,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -39614,6 +40612,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39627,7 +40626,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.004871598129567611,
    "n": 5603,
-   "q": 0.18465914210659426,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -39640,6 +40641,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999570217252819,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39666,10 +40669,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9987282208578638,
    "n": 138,
-   "cells": "roiFill=-0.3916 CI=[-0.6059,-0.1317] edgeFill=-0.0597 vs snap -0.0668",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.3916 CI=[-0.6059,-0.1317] edgeFill=-0.0597 vs snap -0.0668; snap-fill bias -0.0071±0.0045; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -39680,6 +40685,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39693,6 +40699,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.7190631966272185,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8698287911917438,
@@ -39706,6 +40714,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9974596738546275,
    "n": 6946,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39719,7 +40729,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1395377112887104,
    "n": 6946,
-   "q": 0.718539019049911,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
    "bhSigFamily": false
@@ -39732,10 +40742,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9891030087646484,
    "n": 216,
-   "cells": "roiFill=-0.1209 CI=[-0.2104,-0.0191] edgeFill=-0.0647 vs snap -0.0715",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.1209 CI=[-0.2104,-0.0191] edgeFill=-0.0647 vs snap -0.0715; snap-fill bias -0.0068±0.0015; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -39746,6 +40758,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39759,7 +40772,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.007185208819166067,
    "n": 6946,
-   "q": 0.223226343724068,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.21620187193967008,
    "bhSig": false,
    "qFamily": 0.04892135779667075,
    "bhSigFamily": true
@@ -39772,6 +40787,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999780702367185,
    "n": 5603,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39798,10 +40815,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.10246820874292784,
    "n": 270,
-   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161",
-   "q": 0.6465599650257982,
+   "days": 33,
+   "fewClusters": false,
+   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161; snap-fill bias -0.0116±0.0016; 33 days",
+   "q": 0.6639939926541724,
    "bhSig": false,
-   "qFamily": 0.5806531828765911,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -39812,6 +40831,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999005462337895,
    "n": 1161,
+   "days": 36,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39825,6 +40846,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.7369773032164166,
    "n": 5603,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8698287911917438,
@@ -39838,6 +40861,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.70473529361068,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39851,7 +40876,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.22591817300127293,
    "n": 2936,
-   "q": 0.8228564349965063,
+   "q": 0.8381391761726614,
    "bhSig": false,
    "qFamily": 0.5809324448604161,
    "bhSigFamily": false
@@ -39864,10 +40889,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.8741745361175665,
    "n": 139,
-   "cells": "roiFill=-0.1461 CI=[-0.3723,0.1381] edgeFill=-0.0018 vs snap -0.0084",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.1461 CI=[-0.3723,0.1381] edgeFill=-0.0018 vs snap -0.0084; snap-fill bias -0.0066±0.0052; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -39878,6 +40905,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.4643315042979861,
    "n": 1431,
+   "days": 72,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39891,10 +40920,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.4361661467382355,
    "n": 68,
-   "cells": "roiFill=0.0354 CI=[-0.3029,0.5531] edgeFill=0.03 vs snap 0.0175",
+   "days": 25,
+   "fewClusters": false,
+   "cells": "roiFill=0.0354 CI=[-0.3029,0.5531] edgeFill=0.03 vs snap 0.0175; snap-fill bias -0.0125±0.0077; 25 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9811522368621853,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -39905,7 +40936,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.012278168363982878,
    "n": 2936,
-   "q": 0.28128083661404646,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.27832242298004595,
    "bhSig": false,
    "qFamily": 0.0680021632466744,
    "bhSigFamily": true
@@ -39918,6 +40951,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9992603400094106,
    "n": 6946,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39931,7 +40966,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.14967936965389095,
    "n": 6946,
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
    "bhSigFamily": false
@@ -39944,10 +40979,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.5573697069033242,
    "n": 218,
-   "cells": "roiFill=-0.0105 CI=[-0.1502,0.1336] edgeFill=-0.0067 vs snap -0.0138",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0105 CI=[-0.1502,0.1336] edgeFill=-0.0067 vs snap -0.0138; snap-fill bias -0.007±0.0014; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -39958,6 +40995,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39971,7 +41009,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.004946227020712346,
    "n": 6946,
-   "q": 0.18465914210659426,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -39984,6 +41024,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9941217088109054,
    "n": 5603,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -39997,7 +41039,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.05712164394025043,
    "n": 5603,
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -40010,10 +41052,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.10246820874292784,
    "n": 270,
-   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161",
-   "q": 0.6465599650257982,
+   "days": 33,
+   "fewClusters": false,
+   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161; snap-fill bias -0.0116±0.0016; 33 days",
+   "q": 0.6639939926541724,
    "bhSig": false,
-   "qFamily": 0.5806531828765911,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -40024,6 +41068,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.876078307237935,
    "n": 1298,
+   "days": 16,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40037,10 +41083,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.006013110812332023,
    "n": 38,
-   "cells": "roiFill=0.1873 CI=[0.1024,0.2541] edgeFill=0.1526 vs snap 0.1454",
-   "q": 0.20722104953267279,
+   "days": 5,
+   "fewClusters": true,
+   "cells": "roiFill=0.1873 CI=[0.1024,0.2541] edgeFill=0.1526 vs snap 0.1454; snap-fill bias -0.0071±0.0025; 5 days",
+   "q": 0.21620187193967008,
    "bhSig": false,
-   "qFamily": 0.2044457676192888,
+   "qFamily": 0.2609102837296636,
    "bhSigFamily": false
   },
   {
@@ -40051,7 +41099,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.004871598129567611,
    "n": 5603,
-   "q": 0.18465914210659426,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -40064,6 +41114,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9912638869417384,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40090,10 +41142,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.962350236411484,
    "n": 139,
-   "cells": "roiFill=-0.2179 CI=[-0.4326,0.0368] edgeFill=-0.0191 vs snap -0.0234",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.2179 CI=[-0.4326,0.0368] edgeFill=-0.0191 vs snap -0.0234; snap-fill bias -0.0043±0.0042; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -40104,6 +41158,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9228757126395354,
    "n": 442,
+   "days": 10,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40117,7 +41173,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.18464846422665837,
    "n": 2936,
-   "q": 0.7840675486759413,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.7941518018951855,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -40130,6 +41188,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999978139473606,
    "n": 6946,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40156,10 +41216,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9842873314318115,
    "n": 219,
-   "cells": "roiFill=-0.1287 CI=[-0.2378,-0.0128] edgeFill=-0.069 vs snap -0.0755",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.1287 CI=[-0.2378,-0.0128] edgeFill=-0.069 vs snap -0.0755; snap-fill bias -0.0065±0.0019; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -40170,6 +41232,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40183,7 +41246,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.18728572124045062,
    "n": 6946,
-   "q": 0.7840675486759413,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -40196,6 +41261,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9995516735688519,
    "n": 5603,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40209,7 +41276,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.15079523995761845,
    "n": 5603,
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
    "bhSigFamily": false
@@ -40222,10 +41289,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.10246820874292784,
    "n": 270,
-   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161",
-   "q": 0.6465599650257982,
+   "days": 33,
+   "fewClusters": false,
+   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161; snap-fill bias -0.0116±0.0016; 33 days",
+   "q": 0.6639939926541724,
    "bhSig": false,
-   "qFamily": 0.5806531828765911,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -40236,6 +41305,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.887137544187372,
    "n": 833,
+   "days": 17,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40249,7 +41320,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.19463815478638224,
    "n": 5603,
-   "q": 0.7840675486759413,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -40262,6 +41335,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999743147701267,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40288,10 +41363,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9922662660321991,
    "n": 139,
-   "cells": "roiFill=-0.2862 CI=[-0.4956,-0.0453] edgeFill=-0.0433 vs snap -0.0543",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.2862 CI=[-0.4956,-0.0453] edgeFill=-0.0433 vs snap -0.0543; snap-fill bias -0.011±0.0042; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -40302,6 +41379,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8345632188294974,
    "n": 350,
+   "days": 11,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40315,6 +41394,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.7569337528610798,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8698287911917438,
@@ -40328,6 +41409,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999999978275069,
    "n": 6946,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40354,10 +41437,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.17287764301971387,
    "n": 225,
-   "cells": "roiFill=0.0609 CI=[-0.0645,0.1884] edgeFill=0.0302 vs snap 0.0218",
-   "q": 0.7818279282771652,
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=0.0609 CI=[-0.0645,0.1884] edgeFill=0.0302 vs snap 0.0218; snap-fill bias -0.0084±0.0014; 32 days",
+   "q": 0.7858946118818178,
    "bhSig": false,
-   "qFamily": 0.8396914089528958,
+   "qFamily": 0.9175813360277121,
    "bhSigFamily": false
   },
   {
@@ -40368,6 +41453,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40381,6 +41467,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.8385276743296504,
    "n": 6946,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.9147574629050732,
@@ -40394,6 +41482,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9993485084274281,
    "n": 5603,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40407,7 +41497,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.15339374693742913,
    "n": 5603,
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
    "bhSigFamily": false
@@ -40420,10 +41510,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.10246820874292784,
    "n": 270,
-   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161",
-   "q": 0.6465599650257982,
+   "days": 33,
+   "fewClusters": false,
+   "cells": "roiFill=0.038 CI=[-0.0182,0.094] edgeFill=0.0277 vs snap 0.0161; snap-fill bias -0.0116±0.0016; 33 days",
+   "q": 0.6639939926541724,
    "bhSig": false,
-   "qFamily": 0.5806531828765911,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -40434,6 +41526,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7616683534995683,
    "n": 156,
+   "days": 5,
+   "fewClusters": true,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40447,7 +41541,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.20149360700037033,
    "n": 5603,
-   "q": 0.7840675486759413,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -40460,6 +41556,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7737852497595804,
    "n": 2936,
+   "days": 73,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40473,7 +41571,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.275472139722423,
    "n": 2936,
-   "q": 0.9091803267756342,
+   "q": 0.925079785692154,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
    "bhSigFamily": false
@@ -40486,10 +41584,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9811573273670132,
    "n": 139,
-   "cells": "roiFill=-0.148 CI=[-0.2784,-0.0135] edgeFill=-0.0128 vs snap -0.0286",
+   "days": 32,
+   "fewClusters": false,
+   "cells": "roiFill=-0.148 CI=[-0.2784,-0.0135] edgeFill=-0.0128 vs snap -0.0286; snap-fill bias -0.0158±0.0048; 32 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -40500,6 +41600,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9052843336151062,
    "n": 883,
+   "days": 41,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -40513,10 +41615,12 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.9999871714314497,
    "n": 41,
-   "cells": "roiFill=-0.6376 CI=[-0.8537,-0.4554] edgeFill=-0.0967 vs snap -0.1138",
+   "days": 15,
+   "fewClusters": false,
+   "cells": "roiFill=-0.6376 CI=[-0.8537,-0.4554] edgeFill=-0.0967 vs snap -0.1138; snap-fill bias -0.0171±0.0065; 15 days",
    "q": 1,
    "bhSig": false,
-   "qFamily": 0.9999871714314497,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -40527,7 +41631,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.026824606046371713,
    "n": 2936,
-   "q": 0.4291936967419474,
+   "days": 73,
+   "fewClusters": false,
+   "q": 0.43455861795122175,
    "bhSig": false,
    "qFamily": 0.12071072720867271,
    "bhSigFamily": false
@@ -40655,7 +41761,7 @@
    "df": 1,
    "p": 0.3219089324597775,
    "cells": "WKDY:-0.00018 WKND:-0.02203",
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.8737528166765388,
    "bhSigFamily": false
@@ -40683,7 +41789,7 @@
    "stat": 1.561,
    "p": 0.06423578969153465,
    "cells": "pre|dog: 0.10288±0.06592/share, 33 days",
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3447727358850442,
    "bhSigFamily": false
@@ -40767,7 +41873,7 @@
    "stat": 0.923,
    "p": 0.18157266705500175,
    "cells": "late|dog: 0.01664±0.01804/share, 33 days",
-   "q": 0.7840675486759413,
+   "q": 0.7941518018951855,
    "bhSig": false,
    "qFamily": 0.6272510316445515,
    "bhSigFamily": false
@@ -40825,7 +41931,7 @@
    "df": 3,
    "p": 0.18397639656605425,
    "cells": "ASIA:0.0096±0.0079(n2487) EU:0.024±0.0107(n1539) LATE:0.0241±0.0115(n1220) US:-0.0028±0.0096(n2144)",
-   "q": 0.7840675486759413,
+   "q": 0.7941518018951855,
    "bhSig": false,
    "qFamily": 0.5421092035767251,
    "bhSigFamily": false
@@ -40855,7 +41961,7 @@
    "df": 1,
    "p": 0.35599532497368347,
    "cells": "WKDY:0.497(n6252) WKND:0.508(n2499)",
-   "q": 0.9607584673988565,
+   "q": 0.9774786889107919,
    "bhSig": false,
    "qFamily": 0.6058919700006006,
    "bhSigFamily": false
@@ -40870,7 +41976,7 @@
    "df": 1,
    "p": 0.013812898226582637,
    "cells": "WKDY:0.004±0.0058(n5239) WKND:0.0293±0.0085(n2151)",
-   "q": 0.28128083661404646,
+   "q": 0.2797111890882984,
    "bhSig": false,
    "qFamily": 0.29007086275823535,
    "bhSigFamily": false
@@ -40885,7 +41991,7 @@
    "df": 1,
    "p": 0.36064998214321464,
    "cells": "WKDY:0.0059±0.0066(n3175) WKND:0.0169±0.0101(n1462)",
-   "q": 0.9674921676656296,
+   "q": 0.9846960186606872,
    "bhSig": false,
    "qFamily": 0.6058919700006006,
    "bhSigFamily": false
@@ -40900,7 +42006,7 @@
    "df": 2,
    "p": 0.12270229140460177,
    "cells": "hi:0.507(n1695) lo:0.517(n1695) mid:0.483(n1695)",
-   "q": 0.6760633857212204,
+   "q": 0.6912581600924178,
    "bhSig": false,
    "qFamily": 0.4684996580902977,
    "bhSigFamily": false
@@ -40975,7 +42081,7 @@
    "df": 2,
    "p": 0.19245603306039405,
    "cells": "hi:0.0218±0.0086(n1522) lo:0.0044±0.0096(n1520) mid:-0.0008±0.0105(n1542)",
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.5421092035767251,
    "bhSigFamily": false
@@ -41050,7 +42156,7 @@
    "df": 6,
    "p": 0.06984186500266071,
    "cells": "d0:0.0249±0.0115(n1079) d1:0.0156±0.0147(n1045) d2:0.0077±0.0119(n1045) d3:0.0182±0.0117(n1053) d4:-0.0057±0.0138(n1059) d5:-0.0158±0.0121(n1037) d6:0.0337±0.0125(n1072)",
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.41905119001596425,
    "bhSigFamily": false
@@ -41078,6 +42184,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999819407726069,
    "n": 5260,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41104,6 +42212,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41117,7 +42226,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.1391231479926256,
    "n": 5260,
-   "q": 0.718539019049911,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.3454091950161739,
    "bhSigFamily": false
@@ -41130,6 +42241,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9378475836490389,
    "n": 4369,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41143,9 +42256,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.03370930333678046,
    "n": 4369,
-   "q": 0.4576293301478075,
+   "q": 0.46807775490500864,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|ALL|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "ALL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.08028607902189211,
+   "n": 2094,
+   "days": 219,
+   "fewClusters": false,
+   "cells": "roiFill=0.0184 CI=[-0.0072,0.0448] edgeFill=0.0146 vs snap 0.0037; snap-fill bias -0.0109±0.0007; 219 days",
+   "q": 0.5899079280286235,
+   "bhSig": false,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -41156,6 +42285,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41169,7 +42299,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.0016399578547729998,
    "n": 4369,
-   "q": 0.14454235764740986,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -41182,6 +42314,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9869879765230458,
    "n": 2759,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41195,7 +42329,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.33120689462168695,
    "n": 2759,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
    "bhSigFamily": false
@@ -41208,6 +42342,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41221,7 +42356,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.10715751911842952,
    "n": 2759,
-   "q": 0.6487374130413031,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.6676737729686762,
    "bhSig": false,
    "qFamily": 0.308613655061077,
    "bhSigFamily": false
@@ -41234,6 +42371,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999998105119358,
    "n": 5260,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41260,6 +42399,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41273,6 +42413,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.5672689617950075,
    "n": 5260,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.7165502675305359,
@@ -41286,6 +42428,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9599885732743445,
    "n": 4369,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41299,9 +42443,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.017310123810011957,
    "n": 4369,
-   "q": 0.3231223111202232,
+   "q": 0.323566160448685,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|SESSION|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "SESSION",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.5784333378164386,
+   "n": 2094,
+   "days": 219,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0043 CI=[-0.0441,0.0374] edgeFill=0.0165 vs snap 0.0054; snap-fill bias -0.0111±0.0009; 219 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -41312,9 +42472,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.6691484455063115,
    "n": 979,
+   "days": 183,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|SESSION|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "SESSION",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.1258094559062921,
+   "n": 470,
+   "days": 152,
+   "fewClusters": false,
+   "cells": "roiFill=0.0307 CI=[-0.0201,0.0834] edgeFill=0.0233 vs snap 0.0143; snap-fill bias -0.0091±0.0016; 152 days",
+   "q": 0.6948113133006587,
+   "bhSig": false,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -41325,7 +42503,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.03354259907288404,
    "n": 4369,
-   "q": 0.4576293301478075,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.46807775490500864,
    "bhSig": false,
    "qFamily": 0.14206277254397945,
    "bhSigFamily": false
@@ -41338,6 +42518,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9869879765230458,
    "n": 2759,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41351,7 +42533,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.33120689462168695,
    "n": 2759,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
    "bhSigFamily": false
@@ -41364,6 +42546,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8422463457313791,
    "n": 433,
+   "days": 173,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41377,7 +42561,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.10715751911842952,
    "n": 2759,
-   "q": 0.6487374130413031,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.6676737729686762,
    "bhSig": false,
    "qFamily": 0.308613655061077,
    "bhSigFamily": false
@@ -41390,6 +42576,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.999998248222128,
    "n": 5260,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41416,6 +42604,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41429,7 +42618,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.3041624735678632,
    "n": 5260,
-   "q": 0.9269713480163451,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.9393857620862898,
    "bhSig": false,
    "qFamily": 0.4609948647275311,
    "bhSigFamily": false
@@ -41442,6 +42633,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9378475836490389,
    "n": 4369,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41455,9 +42648,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.03370930333678046,
    "n": 4369,
-   "q": 0.4576293301478075,
+   "q": 0.46807775490500864,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|WEEKEND|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.08028607902189211,
+   "n": 2094,
+   "days": 219,
+   "fewClusters": false,
+   "cells": "roiFill=0.0184 CI=[-0.0072,0.0448] edgeFill=0.0146 vs snap 0.0037; snap-fill bias -0.0109±0.0007; 219 days",
+   "q": 0.5899079280286235,
+   "bhSig": false,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -41468,9 +42677,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.6227529379232347,
    "n": 1046,
+   "days": 51,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|WEEKEND|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.3072333774124991,
+   "n": 1043,
+   "days": 51,
+   "fewClusters": false,
+   "cells": "roiFill=0.0097 CI=[-0.029,0.0471] edgeFill=0.0063 vs snap -0.0052; snap-fill bias -0.0115±0.001; 51 days",
+   "q": 0.9393857620862898,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -41481,7 +42708,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.0016399578547729998,
    "n": 4369,
-   "q": 0.14454235764740986,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.15680264691214552,
    "bhSig": false,
    "qFamily": 0.03252203047066722,
    "bhSigFamily": true
@@ -41494,6 +42723,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9869879765230458,
    "n": 2759,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41507,7 +42738,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.33120689462168695,
    "n": 2759,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
    "bhSigFamily": false
@@ -41520,6 +42751,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.883826956977634,
    "n": 272,
+   "days": 20,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41533,7 +42766,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.10715751911842952,
    "n": 2759,
-   "q": 0.6487374130413031,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.6676737729686762,
    "bhSig": false,
    "qFamily": 0.308613655061077,
    "bhSigFamily": false
@@ -41546,6 +42781,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9685738400833799,
    "n": 4325,
+   "days": 184,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41559,7 +42796,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.05872763028334882,
    "n": 4325,
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.38439903458191954,
    "bhSigFamily": false
@@ -41572,6 +42809,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41585,7 +42823,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.004349766335885352,
    "n": 4325,
-   "q": 0.18465914210659426,
+   "days": 184,
+   "fewClusters": false,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.03956981616569877,
    "bhSigFamily": true
@@ -41598,6 +42838,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9464930143872694,
    "n": 3574,
+   "days": 184,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41611,9 +42853,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.06563265849678301,
    "n": 3574,
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.3937959509806981,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|VOL|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.12101228195146552,
+   "n": 1725,
+   "days": 183,
+   "fewClusters": false,
+   "cells": "roiFill=0.017 CI=[-0.0119,0.045] edgeFill=0.0145 vs snap 0.0035; snap-fill bias -0.011±0.0008; 183 days",
+   "q": 0.6912581600924178,
+   "bhSig": false,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -41624,9 +42882,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.981070256286754,
    "n": 254,
+   "days": 30,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|VOL|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.778478942554832,
+   "n": 100,
+   "days": 26,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0427 CI=[-0.1394,0.0788] edgeFill=-0.0276 vs snap -0.0402; snap-fill bias -0.0126±0.0037; 26 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -41637,7 +42913,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.00747409633004692,
    "n": 3574,
-   "q": 0.223226343724068,
+   "days": 184,
+   "fewClusters": false,
+   "q": 0.21620187193967008,
    "bhSig": false,
    "qFamily": 0.04892135779667075,
    "bhSigFamily": true
@@ -41650,6 +42928,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.976547641684517,
    "n": 2290,
+   "days": 184,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41663,7 +42943,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.3151453433070073,
    "n": 2290,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
    "bhSigFamily": false
@@ -41676,6 +42956,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8539594950770665,
    "n": 1204,
+   "days": 118,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41689,7 +42971,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.12374374470790195,
    "n": 2290,
-   "q": 0.6760633857212204,
+   "days": 184,
+   "fewClusters": false,
+   "q": 0.6912581600924178,
    "bhSig": false,
    "qFamily": 0.3426749853449592,
    "bhSigFamily": false
@@ -41702,6 +42986,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999988845577212,
    "n": 5260,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41728,6 +43014,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41741,7 +43028,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.20014042675462163,
    "n": 5260,
-   "q": 0.7840675486759413,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.3735937529083001,
    "bhSigFamily": false
@@ -41754,6 +43043,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9990515533568756,
    "n": 4369,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41767,9 +43058,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.20889150065760553,
    "n": 4369,
-   "q": 0.7864150612992208,
+   "q": 0.7993800733826479,
    "bhSig": false,
    "qFamily": 0.5570440017536148,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|VOLU|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.8480961410897845,
+   "n": 2094,
+   "days": 219,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0173 CI=[-0.0519,0.0167] edgeFill=0.0053 vs snap -0.005; snap-fill bias -0.0103±0.0007; 219 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -41780,9 +43087,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.6961924057879039,
    "n": 673,
+   "days": 69,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1h|VOLU|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "1h",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.12770703338481182,
+   "n": 259,
+   "days": 62,
+   "fewClusters": false,
+   "cells": "roiFill=0.0475 CI=[-0.0314,0.126] edgeFill=0.0336 vs snap 0.0266; snap-fill bias -0.0071±0.0018; 62 days",
+   "q": 0.6973664969103207,
+   "bhSig": false,
+   "qFamily": 0.734315441962668,
    "bhSigFamily": false
   },
   {
@@ -41793,7 +43118,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.21769265311575525,
    "n": 4369,
-   "q": 0.8060025503789947,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.8201444140640082,
    "bhSig": false,
    "qFamily": 0.39184677560835945,
    "bhSigFamily": false
@@ -41806,6 +43133,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9990560785514048,
    "n": 2759,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41832,6 +43161,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7856867899452648,
    "n": 886,
+   "days": 122,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -41845,6 +43176,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.5568481694726464,
    "n": 2759,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.715947646464831,
@@ -41890,7 +43223,7 @@
    "df": 3,
    "p": 0.18400105182146342,
    "cells": "ASIA:-0.003±0.0181(n457) EU:0.0445±0.0183(n375) LATE:0.0307±0.0237(n252) US:0.0488±0.02(n295)",
-   "q": 0.7840675486759413,
+   "q": 0.7941518018951855,
    "bhSig": false,
    "qFamily": 0.5421092035767251,
    "bhSigFamily": false
@@ -41905,7 +43238,7 @@
    "df": 1,
    "p": 0.08112612020079232,
    "cells": "WKDY:0.489(n1572) WKND:0.53(n624)",
-   "q": 0.5783093725164008,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.4259121310541597,
    "bhSigFamily": false
@@ -41920,7 +43253,7 @@
    "df": 1,
    "p": 0.003355552335950441,
    "cells": "WKDY:-0.0045±0.011(n1361) WKND:0.0534±0.0164(n541)",
-   "q": 0.18465914210659426,
+   "q": 0.20032219433885,
    "bhSig": false,
    "qFamily": 0.28186639621983706,
    "bhSigFamily": false
@@ -41935,7 +43268,7 @@
    "df": 1,
    "p": 0.038582498384600254,
    "cells": "WKDY:0.0139±0.0118(n937) WKND:0.0553±0.0161(n442)",
-   "q": 0.46408238239037286,
+   "q": 0.4782741873875785,
    "bhSig": false,
    "qFamily": 0.3557648201060635,
    "bhSigFamily": false
@@ -41950,7 +43283,7 @@
    "df": 2,
    "p": 0.07609037196086571,
    "cells": "hi:0.496(n423) lo:0.551(n423) mid:0.475(n423)",
-   "q": 0.5783093725164008,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.4259121310541597,
    "bhSigFamily": false
@@ -41965,7 +43298,7 @@
    "df": 2,
    "p": 0.25480810542431753,
    "cells": "hi:0.0132±0.019(n359) lo:0.0389±0.0208(n368) mid:-0.0108±0.0217(n364)",
-   "q": 0.8714048185503379,
+   "q": 0.8845481374015595,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -41980,7 +43313,7 @@
    "df": 2,
    "p": 0.3361437569152711,
    "cells": "hi:0.0054±0.0224(n267) lo:0.0417±0.0208(n255) mid:-0.001±0.0254(n256)",
-   "q": 0.9295827351730953,
+   "q": 0.9443113633573511,
    "bhSig": false,
    "qFamily": 0.6007675655506973,
    "bhSigFamily": false
@@ -41995,7 +43328,7 @@
    "df": 2,
    "p": 0.2065177918387524,
    "cells": "hi:0.499(n716) lo:0.529(n716) mid:0.483(n716)",
-   "q": 0.7840675486759413,
+   "q": 0.7965686256637593,
    "bhSig": false,
    "qFamily": 0.5421092035767251,
    "bhSigFamily": false
@@ -42070,7 +43403,7 @@
    "df": 11,
    "p": 0.05836123271867456,
    "cells": "h00:0.0203±0.0312(n146) h01:0.0578±0.0401(n71) h04:-0.0553±0.034(n156) h05:0.0021±0.0394(n84) h08:0.0548±0.0282(n158) h09:0.0353±0.0369(n87) h12:0.0383±0.0322(n130) h13:0.126±0.0326(n67) h16:0.0063±0.0299(n158) h17:0.0711±0.0412(n70) h20:0.0143±0.0302(n161) h21:0.0598±0.0381(n91)",
-   "q": 0.5597867737646867,
+   "q": 0.5824822105654598,
    "bhSig": false,
    "qFamily": 0.40852862903072196,
    "bhSigFamily": false
@@ -42085,7 +43418,7 @@
    "df": 6,
    "p": 0.0351865204408907,
    "cells": "d0:0.535(n312) d1:0.56(n307) d2:0.439(n310) d3:0.474(n321) d4:0.47(n319) d5:0.505(n315) d6:0.526(n312)",
-   "q": 0.4636341516917362,
+   "q": 0.4750180259520244,
    "bhSig": false,
    "qFamily": 0.3557648201060635,
    "bhSigFamily": false
@@ -42100,7 +43433,7 @@
    "df": 6,
    "p": 0.11205017161527714,
    "cells": "d0:0.0553±0.0225(n273) d1:-0.0062±0.0246(n267) d2:-0.0247±0.0252(n272) d3:0.0209±0.0235(n280) d4:-0.0074±0.0229(n275) d5:-0.0055±0.0274(n267) d6:0.0515±0.0239(n268)",
-   "q": 0.6605062747847916,
+   "q": 0.6807047925628086,
    "bhSig": false,
    "qFamily": 0.4684996580902977,
    "bhSigFamily": false
@@ -42115,7 +43448,7 @@
    "df": 6,
    "p": 0.3158805436958264,
    "cells": "d0:0.0451±0.0231(n208) d1:0.0466±0.0273(n170) d2:0.0282±0.0246(n196) d3:-0.0006±0.0288(n187) d4:0±0.0259(n190) d5:-0.0015±0.0255(n194) d6:0.0643±0.0227(n234)",
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.5896436815655426,
    "bhSigFamily": false
@@ -42128,6 +43461,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9904385019917572,
    "n": 1321,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42154,6 +43489,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42167,7 +43503,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.3755598411218881,
    "n": 1321,
-   "q": 0.9899627232388889,
+   "days": 221,
+   "fewClusters": false,
+   "q": 1,
    "bhSig": false,
    "qFamily": 0.5200059338610759,
    "bhSigFamily": false
@@ -42180,6 +43518,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9098939759253564,
    "n": 1140,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42193,9 +43533,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.28985259404259733,
    "n": 1140,
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|ALL|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "ALL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7565763714195524,
+   "n": 1079,
+   "days": 221,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0123 CI=[-0.0475,0.0218] edgeFill=-0.0072 vs snap -0.0158; snap-fill bias -0.0086±0.0015; 221 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42206,9 +43562,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9419308479135653,
    "n": 184,
+   "days": 37,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|ALL|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "ALL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.9270232456120462,
+   "n": 175,
+   "days": 37,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0678 CI=[-0.159,0.015] edgeFill=-0.0493 vs snap -0.0503; snap-fill bias -0.0011±0.0024; 37 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42219,7 +43593,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.14952828619448677,
    "n": 1140,
-   "q": 0.7233726171365079,
+   "days": 221,
+   "fewClusters": false,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.3472915034194532,
    "bhSigFamily": false
@@ -42232,6 +43608,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7369405183457817,
    "n": 812,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42245,9 +43623,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1762603141874859,
    "n": 812,
-   "q": 0.7818279282771652,
+   "q": 0.7858946118818178,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|ALL|FAV80|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "ALL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.594590850283322,
+   "n": 796,
+   "days": 220,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0043 CI=[-0.0392,0.0302] edgeFill=-0.0015 vs snap -0.0085; snap-fill bias -0.007±0.0019; 220 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42258,9 +43652,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7369405183457817,
    "n": 812,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|ALL|FAV80|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "ALL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.594590850283322,
+   "n": 796,
+   "days": 220,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0043 CI=[-0.0392,0.0302] edgeFill=-0.0015 vs snap -0.0085; snap-fill bias -0.007±0.0019; 220 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42271,7 +43683,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.08132475551011886,
    "n": 812,
-   "q": 0.5783093725164008,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.26615374530584357,
    "bhSigFamily": false
@@ -42284,6 +43698,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9959940439472417,
    "n": 1321,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42310,6 +43726,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9798613586842129,
    "n": 291,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42323,6 +43741,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.401838622292255,
    "n": 1321,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.5386423685232269,
@@ -42336,6 +43756,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.996523786517702,
    "n": 1140,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42355,6 +43777,22 @@
    "bhSigFamily": false
   },
   {
+   "id": "4h|SESSION|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "SESSION",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.9955682148381915,
+   "n": 1077,
+   "days": 221,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0853 CI=[-0.1487,-0.0221] edgeFill=-0.0193 vs snap -0.0285; snap-fill bias -0.0092±0.0014; 221 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
+   "bhSigFamily": false
+  },
+  {
    "id": "4h|SESSION|FAV50|TN",
    "family": "rule-taker",
    "tf": "4h",
@@ -42362,9 +43800,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9555356100759109,
    "n": 317,
+   "days": 204,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|SESSION|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "SESSION",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.9279599834843759,
+   "n": 293,
+   "days": 196,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0533 CI=[-0.1242,0.0158] edgeFill=-0.035 vs snap -0.0454; snap-fill bias -0.0104±0.0028; 196 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42375,6 +43831,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.7611001922927758,
    "n": 1140,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8698287911917438,
@@ -42388,6 +43846,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.814498530311222,
    "n": 812,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42401,9 +43861,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1223499464938409,
    "n": 812,
-   "q": 0.6760633857212204,
+   "q": 0.6912581600924178,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|SESSION|FAV80|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "SESSION",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7782256226929605,
+   "n": 793,
+   "days": 220,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0284 CI=[-0.1003,0.045] edgeFill=0.0011 vs snap -0.0059; snap-fill bias -0.0069±0.0019; 220 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42414,9 +43890,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.3756554976576141,
    "n": 581,
-   "q": 0.9899627232388889,
+   "days": 216,
+   "fewClusters": false,
+   "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|SESSION|FAV80|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "SESSION",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.23853073590674656,
+   "n": 569,
+   "days": 215,
+   "fewClusters": false,
+   "cells": "roiFill=0.0146 CI=[-0.0258,0.0532] edgeFill=0.0094 vs snap 0.0035; snap-fill bias -0.0059±0.0024; 215 days",
+   "q": 0.8563995309561782,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42427,7 +43921,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.25035530369120984,
    "n": 812,
-   "q": 0.8694509771601706,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.8816860695212173,
    "bhSig": false,
    "qFamily": 0.4256570454660396,
    "bhSigFamily": false
@@ -42440,6 +43936,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7658573014503638,
    "n": 1321,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42453,7 +43951,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.07813655842752032,
    "n": 1321,
-   "q": 0.5783093725164008,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.4327563235985741,
    "bhSigFamily": false
@@ -42466,6 +43964,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42479,7 +43978,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.025433959649313387,
    "n": 1321,
-   "q": 0.4220153304774962,
+   "days": 221,
+   "fewClusters": false,
+   "q": 0.42623808239883815,
    "bhSig": false,
    "qFamily": 0.12071072720867271,
    "bhSigFamily": false
@@ -42492,6 +43993,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.815212268423869,
    "n": 1140,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42505,9 +44008,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1995119451790206,
    "n": 1140,
-   "q": 0.7840675486759413,
+   "q": 0.7964306944450857,
    "bhSig": false,
    "qFamily": 0.5570440017536148,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|WEEKEND|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.768230982313969,
+   "n": 1085,
+   "days": 221,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0169 CI=[-0.0646,0.0265] edgeFill=-0.0048 vs snap -0.0113; snap-fill bias -0.0065±0.0013; 221 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42518,9 +44037,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.013341093655947267,
    "n": 327,
-   "q": 0.28128083661404646,
+   "days": 62,
+   "fewClusters": false,
+   "q": 0.2797111890882984,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|WEEKEND|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.007562616919700393,
+   "n": 311,
+   "days": 62,
+   "fewClusters": false,
+   "cells": "roiFill=0.0804 CI=[0.018,0.1453] edgeFill=0.0566 vs snap 0.0474; snap-fill bias -0.0092±0.0029; 62 days",
+   "q": 0.21620187193967008,
+   "bhSig": false,
+   "qFamily": 0.2609102837296636,
    "bhSigFamily": false
   },
   {
@@ -42531,7 +44068,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.1377908452858787,
    "n": 1140,
-   "q": 0.718539019049911,
+   "days": 221,
+   "fewClusters": false,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.3454091950161739,
    "bhSigFamily": false
@@ -42544,6 +44083,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7369405183457817,
    "n": 812,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42557,9 +44098,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1762603141874859,
    "n": 812,
-   "q": 0.7818279282771652,
+   "q": 0.7858946118818178,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|WEEKEND|FAV80|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.594590850283322,
+   "n": 796,
+   "days": 220,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0043 CI=[-0.0392,0.0302] edgeFill=-0.0015 vs snap -0.0085; snap-fill bias -0.007±0.0019; 220 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42570,9 +44127,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.6102175735981379,
    "n": 530,
+   "days": 142,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|WEEKEND|FAV80|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.5736510717830264,
+   "n": 524,
+   "days": 142,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0044 CI=[-0.0514,0.0426] edgeFill=0.0021 vs snap -0.0041; snap-fill bias -0.0062±0.0025; 142 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42583,7 +44158,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.08132475551011886,
    "n": 812,
-   "q": 0.5783093725164008,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.26615374530584357,
    "bhSigFamily": false
@@ -42596,6 +44173,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9743005294566575,
    "n": 1088,
+   "days": 185,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42622,6 +44201,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8769335282775843,
    "n": 591,
+   "days": 126,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42635,7 +44216,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.3256904565292724,
    "n": 1088,
-   "q": 0.927720012981441,
+   "days": 185,
+   "fewClusters": false,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.4677579897385417,
    "bhSigFamily": false
@@ -42648,6 +44231,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8953989078036648,
    "n": 934,
+   "days": 185,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42661,9 +44246,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.16707118112903596,
    "n": 934,
-   "q": 0.7716277231526609,
+   "q": 0.7733008955115378,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOL|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7242773532654743,
+   "n": 878,
+   "days": 185,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0184 CI=[-0.0769,0.043] edgeFill=-0.001 vs snap -0.0091; snap-fill bias -0.008±0.0014; 185 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42674,9 +44275,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.617586005557387,
    "n": 541,
+   "days": 146,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOL|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.47139080626408725,
+   "n": 513,
+   "days": 144,
+   "fewClusters": false,
+   "cells": "roiFill=0.0018 CI=[-0.0494,0.0487] edgeFill=0 vs snap -0.0059; snap-fill bias -0.0059±0.0017; 144 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42687,7 +44306,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.26898045262383674,
    "n": 934,
-   "q": 0.9046084434425941,
+   "days": 185,
+   "fewClusters": false,
+   "q": 0.9195760531773773,
    "bhSig": false,
    "qFamily": 0.4401498315662783,
    "bhSigFamily": false
@@ -42700,6 +44321,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9884711480423176,
    "n": 664,
+   "days": 182,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42719,6 +44342,22 @@
    "bhSigFamily": false
   },
   {
+   "id": "4h|VOL|FAV80|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7431220554711924,
+   "n": 639,
+   "days": 182,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0399 CI=[-0.157,0.0828] edgeFill=-0.011 vs snap -0.0217; snap-fill bias -0.0107±0.0021; 182 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
+   "bhSigFamily": false
+  },
+  {
    "id": "4h|VOL|FAV80|TN",
    "family": "rule-taker",
    "tf": "4h",
@@ -42726,9 +44365,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7560378227987106,
    "n": 308,
+   "days": 97,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOL|FAV80|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.30361434437247226,
+   "n": 293,
+   "days": 97,
+   "fewClusters": false,
+   "cells": "roiFill=0.0599 CI=[-0.1529,0.3144] edgeFill=-0.004 vs snap -0.0144; snap-fill bias -0.0104±0.0034; 97 days",
+   "q": 0.9393857620862898,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42739,6 +44396,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.7822245028008543,
    "n": 534,
+   "days": 146,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8800025656509611,
@@ -42752,6 +44411,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9862383104304833,
    "n": 1321,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42778,6 +44439,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.980643384876135,
    "n": 756,
+   "days": 187,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42791,7 +44454,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.32576715613330565,
    "n": 1321,
-   "q": 0.927720012981441,
+   "days": 221,
+   "fewClusters": false,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.4677579897385417,
    "bhSigFamily": false
@@ -42804,6 +44469,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9098939759253564,
    "n": 1140,
+   "days": 221,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42817,9 +44484,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.28985259404259733,
    "n": 1140,
-   "q": 0.9117448583976269,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOLU|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7565763714195524,
+   "n": 1079,
+   "days": 221,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0123 CI=[-0.0475,0.0218] edgeFill=-0.0072 vs snap -0.0158; snap-fill bias -0.0086±0.0015; 221 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42830,9 +44513,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8205478879797558,
    "n": 431,
+   "days": 122,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOLU|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7966130044339703,
+   "n": 411,
+   "days": 122,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0215 CI=[-0.0714,0.0314] edgeFill=-0.0139 vs snap -0.0181; snap-fill bias -0.0043±0.002; 122 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42843,7 +44544,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.14952828619448677,
    "n": 1140,
-   "q": 0.7233726171365079,
+   "days": 221,
+   "fewClusters": false,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.3472915034194532,
    "bhSigFamily": false
@@ -42856,6 +44559,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.7369405183457817,
    "n": 812,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -42869,9 +44574,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1762603141874859,
    "n": 812,
-   "q": 0.7818279282771652,
+   "q": 0.7858946118818178,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOLU|FAV80|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.594590850283322,
+   "n": 796,
+   "days": 220,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0043 CI=[-0.0392,0.0302] edgeFill=-0.0015 vs snap -0.0085; snap-fill bias -0.007±0.0019; 220 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42882,9 +44603,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8615645090617463,
    "n": 698,
+   "days": 208,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|VOLU|FAV80|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "4h",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.7821544096479698,
+   "n": 687,
+   "days": 207,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0155 CI=[-0.055,0.0232] edgeFill=-0.0091 vs snap -0.0155; snap-fill bias -0.0064±0.0021; 207 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -42895,7 +44634,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.08132475551011886,
    "n": 812,
-   "q": 0.5783093725164008,
+   "days": 220,
+   "fewClusters": false,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.26615374530584357,
    "bhSigFamily": false
@@ -42910,7 +44651,7 @@
    "df": 1,
    "p": 0.020269147581073396,
    "cells": "WKDY:0.488(n379) WKND:0.6(n150)",
-   "q": 0.3538913294587711,
+   "q": 0.35648683346947,
    "bhSig": false,
    "qFamily": 0.34052167936203304,
    "bhSigFamily": false
@@ -42925,7 +44666,7 @@
    "df": 1,
    "p": 0.2347755752866012,
    "cells": "WKDY:-0.0189±0.0243(n313) WKND:0.0347±0.0381(n116)",
-   "q": 0.8347576010190265,
+   "q": 0.8514994745469268,
    "bhSig": false,
    "qFamily": 0.5632970851762517,
    "bhSigFamily": false
@@ -42970,7 +44711,7 @@
    "df": 2,
    "p": 0.11494043231083505,
    "cells": "hi:-0.0169±0.0535(n61) lo:-0.0498±0.0597(n58) mid:0.1006±0.0511(n53)",
-   "q": 0.6687443334448584,
+   "q": 0.6896425938650104,
    "bhSig": false,
    "qFamily": 0.4684996580902977,
    "bhSigFamily": false
@@ -42985,7 +44726,7 @@
    "df": 2,
    "p": 0.14961713340131022,
    "cells": "hi:-0.049±0.0584(n44) lo:-0.014±0.0603(n52) mid:0.0843±0.0444(n50)",
-   "q": 0.7233726171365079,
+   "q": 0.7237802039960248,
    "bhSig": false,
    "qFamily": 0.4950627398905052,
    "bhSigFamily": false
@@ -43000,7 +44741,7 @@
    "df": 2,
    "p": 0.2953030722618152,
    "cells": "hi:0.515(n171) lo:0.491(n171) mid:0.573(n171)",
-   "q": 0.9187206692589805,
+   "q": 0.9380215236551775,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -43015,7 +44756,7 @@
    "df": 2,
    "p": 0.0673679335608396,
    "cells": "hi:0.0008±0.036(n136) lo:-0.0661±0.0376(n142) mid:0.0516±0.0341(n138)",
-   "q": 0.5688937367489454,
+   "q": 0.5899079280286235,
    "bhSig": false,
    "qFamily": 0.41905119001596425,
    "bhSigFamily": false
@@ -43045,7 +44786,7 @@
    "df": 6,
    "p": 0.2760011706283175,
    "cells": "d0:0.613(n75) d1:0.539(n76) d2:0.434(n76) d3:0.487(n76) d4:0.467(n75) d5:0.513(n76) d6:0.587(n75)",
-   "q": 0.9091803267756342,
+   "q": 0.925079785692154,
    "bhSig": false,
    "qFamily": 0.5637604106816472,
    "bhSigFamily": false
@@ -43075,7 +44816,7 @@
    "df": 6,
    "p": 0.3483962884814732,
    "cells": "d0:-0.0218±0.0545(n57) d1:0.0488±0.0577(n48) d2:-0.0227±0.0569(n52) d3:0.0588±0.0472(n52) d4:0.0028±0.0542(n58) d5:-0.057±0.0562(n55) d6:0.0927±0.0445(n46)",
-   "q": 0.9495191296096148,
+   "q": 0.9656800299740642,
    "bhSig": false,
    "qFamily": 0.6058919700006006,
    "bhSigFamily": false
@@ -43088,6 +44829,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9982210195594945,
    "n": 314,
+   "days": 314,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43114,6 +44857,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43127,6 +44871,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.952530800582917,
    "n": 314,
+   "days": 314,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.9939451832169568,
@@ -43140,6 +44886,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9937348706349631,
    "n": 262,
+   "days": 262,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43159,6 +44907,22 @@
    "bhSigFamily": false
   },
   {
+   "id": "1d|ALL|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1d",
+   "split": "ALL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.9829070864168591,
+   "n": 245,
+   "days": 245,
+   "fewClusters": false,
+   "cells": "roiFill=-0.1833 CI=[-0.3461,-0.0081] edgeFill=-0.0414 vs snap -0.048; snap-fill bias -0.0066±0.0009; 245 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
+   "bhSigFamily": false
+  },
+  {
    "id": "1d|ALL|FAV50|TN",
    "family": "rule-taker",
    "tf": "1d",
@@ -43166,6 +44930,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43179,6 +44944,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.9107357064540573,
    "n": 262,
+   "days": 262,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.9643083950690018,
@@ -43192,6 +44959,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9742684910511925,
    "n": 231,
+   "days": 231,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43218,6 +44987,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.826316372921471,
    "n": 70,
+   "days": 70,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43231,6 +45002,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.8322393266834034,
    "n": 231,
+   "days": 231,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.9147574629050732,
@@ -43244,6 +45017,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.5590691255031708,
    "n": 314,
+   "days": 314,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43257,7 +45032,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.2060954640229875,
    "n": 314,
-   "q": 0.7840675486759413,
+   "q": 0.7965686256637593,
    "bhSig": false,
    "qFamily": 0.5570440017536148,
    "bhSigFamily": false
@@ -43270,6 +45045,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8029840405708293,
    "n": 203,
+   "days": 203,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43283,7 +45060,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.1385736077755948,
    "n": 314,
-   "q": 0.718539019049911,
+   "days": 314,
+   "fewClusters": false,
+   "q": 0.721439656237375,
    "bhSig": false,
    "qFamily": 0.3454091950161739,
    "bhSigFamily": false
@@ -43296,6 +45075,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9473985716582719,
    "n": 262,
+   "days": 262,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43315,6 +45096,22 @@
    "bhSigFamily": false
   },
   {
+   "id": "1d|WEEKEND|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1d",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.8406838244588906,
+   "n": 246,
+   "days": 246,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0863 CI=[-0.2527,0.0876] edgeFill=-0.0077 vs snap -0.0162; snap-fill bias -0.0085±0.001; 246 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
+   "bhSigFamily": false
+  },
+  {
    "id": "1d|WEEKEND|FAV50|TN",
    "family": "rule-taker",
    "tf": "1d",
@@ -43322,9 +45119,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9559440120567784,
    "n": 250,
+   "days": 250,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1d|WEEKEND|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "1d",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.8598320424208954,
+   "n": 234,
+   "days": 234,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0978 CI=[-0.2732,0.0772] edgeFill=-0.0133 vs snap -0.0221; snap-fill bias -0.0088±0.001; 234 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -43335,6 +45150,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.7387146522139275,
    "n": 250,
+   "days": 250,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8698287911917438,
@@ -43348,6 +45165,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.988706315946886,
    "n": 231,
+   "days": 231,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43374,6 +45193,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9351867546374426,
    "n": 114,
+   "days": 114,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43387,6 +45208,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.9029838977307059,
    "n": 220,
+   "days": 220,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.9643083950690018,
@@ -43400,6 +45223,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.4755230946040544,
    "n": 53,
+   "days": 53,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43413,7 +45238,7 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.34093063276352276,
    "n": 53,
-   "q": 0.9370363403561853,
+   "q": 0.952254525994667,
    "bhSig": false,
    "qFamily": 0.6634325826749632,
    "bhSigFamily": false
@@ -43426,6 +45251,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.4755230946040544,
    "n": 53,
+   "days": 53,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43439,7 +45266,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.2819934633566332,
    "n": 53,
-   "q": 0.9117448583976269,
+   "days": 53,
+   "fewClusters": false,
+   "q": 0.9305163911084096,
    "bhSig": false,
    "qFamily": 0.4511895413706131,
    "bhSigFamily": false
@@ -43452,6 +45281,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.6593253762105274,
    "n": 45,
+   "days": 45,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43465,9 +45296,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.31364891602845113,
    "n": 45,
-   "q": 0.927720012981441,
+   "q": 0.94167068986838,
    "bhSig": false,
    "qFamily": 0.6624137892433739,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1d|VOL|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1d",
+   "split": "VOL",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.5111278418874788,
+   "n": 33,
+   "days": 33,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0051 CI=[-0.3192,0.3713] edgeFill=0.0529 vs snap 0.044; snap-fill bias -0.0089±0.0023; 33 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -43478,6 +45325,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43491,6 +45339,7 @@
    "metric": "MAKER_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43504,6 +45353,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.5961959749897796,
    "n": 40,
+   "days": 40,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43530,6 +45381,7 @@
    "metric": "HEADLINE_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43543,6 +45395,7 @@
    "metric": "MAKER_ROI>0",
    "p": 1,
    "n": 0,
+   "fewClusters": null,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43556,6 +45409,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.8895596523311244,
    "n": 306,
+   "days": 306,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43582,6 +45437,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9231521888163831,
    "n": 160,
+   "days": 160,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43595,6 +45452,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.5026884330825293,
    "n": 306,
+   "days": 306,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 0.6580648578534929,
@@ -43608,6 +45467,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.6877479771195798,
    "n": 254,
+   "days": 254,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43621,9 +45482,25 @@
    "metric": "GROSS_EDGE>0",
    "p": 0.1101878135936103,
    "n": 254,
-   "q": 0.6581885398658321,
+   "q": 0.6778642709682862,
    "bhSig": false,
    "qFamily": 0.5287809425624577,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1d|VOLU|FAV50|TG|FILL",
+   "family": "fill-robustness",
+   "tf": "1d",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.6362248865267328,
+   "n": 238,
+   "days": 238,
+   "fewClusters": false,
+   "cells": "roiFill=-0.0328 CI=[-0.2084,0.1686] edgeFill=0.0199 vs snap 0.012; snap-fill bias -0.0079±0.0009; 238 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -43634,9 +45511,27 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.41342070707218526,
    "n": 150,
+   "days": 150,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
+   "bhSigFamily": false
+  },
+  {
+   "id": "1d|VOLU|FAV50|TN|FILL",
+   "family": "fill-robustness",
+   "tf": "1d",
+   "split": "VOLU",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.37519754954788287,
+   "n": 136,
+   "days": 136,
+   "fewClusters": false,
+   "cells": "roiFill=0.0447 CI=[-0.2105,0.3275] edgeFill=0.0425 vs snap 0.0353; snap-fill bias -0.0072±0.0012; 136 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.9999871714314498,
    "bhSigFamily": false
   },
   {
@@ -43647,7 +45542,9 @@
    "metric": "MAKER_ROI>0",
    "p": 0.30732990981835406,
    "n": 254,
-   "q": 0.927720012981441,
+   "days": 254,
+   "fewClusters": false,
+   "q": 0.9393857620862898,
    "bhSig": false,
    "qFamily": 0.4609948647275311,
    "bhSigFamily": false
@@ -43660,6 +45557,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9989921744106922,
    "n": 226,
+   "days": 226,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43686,6 +45585,8 @@
    "metric": "HEADLINE_ROI>0",
    "p": 0.9999998487566699,
    "n": 109,
+   "days": 109,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43699,6 +45600,8 @@
    "metric": "MAKER_ROI>0",
    "p": 0.987082989459615,
    "n": 189,
+   "days": 189,
+   "fewClusters": false,
    "q": 1,
    "bhSig": false,
    "qFamily": 1,
@@ -43713,9 +45616,9 @@
    "stat": 3.951,
    "p": 0.00007771207876539066,
    "cells": "diff=0.0213±0.0054",
-   "q": 0.034815011286895015,
+   "q": 0.03776807027997986,
    "bhSig": true,
-   "qFamily": 0.00031084831506156263,
+   "qFamily": 0.0005439845513577346,
    "bhSigFamily": true
   },
   {
@@ -43740,7 +45643,9 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.7682176804792775,
    "n": 73,
-   "cells": "roiFill=-0.0349 CI=[-0.1059,0.0233]",
+   "days": 4,
+   "fewClusters": true,
+   "cells": "roiFill=-0.0349 CI=[-0.1059,0.0233] snap-fill bias -0.0135±0.008; 4 days",
    "q": 1,
    "bhSig": false,
    "qFamily": 0.8724374204608525,
@@ -43754,11 +45659,61 @@
    "metric": "FILL_PRICED_ROI>0",
    "p": 0.00019195248736603165,
    "n": 70,
-   "cells": "roiFill=0.1571 CI=[0.106,0.2079]",
-   "q": 0.04299735716999109,
+   "days": 9,
+   "fewClusters": true,
+   "cells": "roiFill=0.1571 CI=[0.106,0.2079] snap-fill bias -0.0073±0.002; 9 days",
+   "q": 0.04664445442994569,
    "bhSig": true,
-   "qFamily": 0.0003839049747320633,
+   "qFamily": 0.0006718337057811108,
    "bhSigFamily": true
+  },
+  {
+   "id": "1h|WEEKEND|FAV50|POSTHOC_RULE|FILL",
+   "family": "post-hoc",
+   "tf": "1h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.15261438802511618,
+   "n": 1267,
+   "days": 62,
+   "fewClusters": false,
+   "cells": "roiFill=0.0179 CI=[-0.0164,0.0504] snap-fill bias -0.0111±0.0009; 62 days",
+   "q": 0.7237802039960248,
+   "bhSig": false,
+   "qFamily": 0.2670751790439533,
+   "bhSigFamily": false
+  },
+  {
+   "id": "4h|WEEKEND|FAV50|POSTHOC_RULE|FILL",
+   "family": "post-hoc",
+   "tf": "4h",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.007562616919700393,
+   "n": 311,
+   "days": 62,
+   "fewClusters": false,
+   "cells": "roiFill=0.0804 CI=[0.018,0.1453] snap-fill bias -0.0092±0.0029; 62 days",
+   "q": 0.21620187193967008,
+   "bhSig": false,
+   "qFamily": 0.017646106145967583,
+   "bhSigFamily": true
+  },
+  {
+   "id": "1d|WEEKEND|FAV50|POSTHOC_RULE|FILL",
+   "family": "post-hoc",
+   "tf": "1d",
+   "split": "WEEKEND",
+   "metric": "FILL_PRICED_ROI>0",
+   "p": 0.49643566542181916,
+   "n": 72,
+   "days": 72,
+   "fewClusters": false,
+   "cells": "roiFill=0.0006 CI=[-0.1402,0.1441] snap-fill bias -0.0088±0.0024; 72 days",
+   "q": 1,
+   "bhSig": false,
+   "qFamily": 0.6950099315905469,
+   "bhSigFamily": false
   }
  ],
  "tape": [

@@ -1,0 +1,302 @@
+{
+ "all": {
+  "n": 327,
+  "days": 62,
+  "win": 0.801,
+  "avgPrice": 0.73,
+  "gross": 0.0708,
+  "edge": 0.0481,
+  "roi": 0.0676,
+  "roiSE": 0.0298,
+  "fillN": 311,
+  "fillRoi": 0.0804
+ },
+ "fold": {
+  "fold0": {
+   "n": 56,
+   "days": 10,
+   "win": 0.839,
+   "avgPrice": 0.723,
+   "gross": 0.1163,
+   "edge": 0.0934,
+   "roi": 0.137,
+   "roiSE": 0.0617,
+   "fillN": 55,
+   "fillRoi": 0.1223
+  },
+  "fold1": {
+   "n": 51,
+   "days": 10,
+   "win": 0.804,
+   "avgPrice": 0.749,
+   "gross": 0.0547,
+   "edge": 0.0327,
+   "roi": 0.0438,
+   "roiSE": 0.0875,
+   "fillN": 49,
+   "fillRoi": 0.0905
+  },
+  "fold2": {
+   "n": 52,
+   "days": 10,
+   "win": 0.788,
+   "avgPrice": 0.751,
+   "gross": 0.0376,
+   "edge": 0.0156,
+   "roi": 0.0298,
+   "roiSE": 0.0757,
+   "fillN": 50,
+   "fillRoi": 0.0264
+  },
+  "fold3": {
+   "n": 62,
+   "days": 12,
+   "win": 0.855,
+   "avgPrice": 0.731,
+   "gross": 0.124,
+   "edge": 0.1014,
+   "roi": 0.1371,
+   "roiSE": 0.0723,
+   "fillN": 57,
+   "fillRoi": 0.1314
+  },
+  "fold4": {
+   "n": 51,
+   "days": 10,
+   "win": 0.745,
+   "avgPrice": 0.716,
+   "gross": 0.0294,
+   "edge": 0.0062,
+   "roi": 0.0061,
+   "roiSE": 0.0805,
+   "fillN": 50,
+   "fillRoi": 0.0131
+  },
+  "fold5": {
+   "n": 55,
+   "days": 10,
+   "win": 0.764,
+   "avgPrice": 0.715,
+   "gross": 0.0491,
+   "edge": 0.0259,
+   "roi": 0.0333,
+   "roiSE": 0.0666,
+   "fillN": 50,
+   "fillRoi": 0.0874
+  }
+ },
+ "feeEra": {
+  "crypto_fees": {
+   "n": 23,
+   "days": 4,
+   "win": 0.87,
+   "avgPrice": 0.708,
+   "gross": 0.1611,
+   "edge": 0.1377,
+   "roi": 0.1997,
+   "roiSE": 0.1159,
+   "fillN": 23,
+   "fillRoi": 0.1633
+  },
+  "crypto_fees_v2": {
+   "n": 304,
+   "days": 58,
+   "win": 0.796,
+   "avgPrice": 0.732,
+   "gross": 0.064,
+   "edge": 0.0413,
+   "roi": 0.0576,
+   "roiSE": 0.0306,
+   "fillN": 288,
+   "fillRoi": 0.0737
+  }
+ },
+ "dow": {
+  "Sat": {
+   "n": 161,
+   "days": 31,
+   "win": 0.789,
+   "avgPrice": 0.721,
+   "gross": 0.0679,
+   "edge": 0.0449,
+   "roi": 0.0675,
+   "roiSE": 0.0439,
+   "fillN": 148,
+   "fillRoi": 0.0896
+  },
+  "Sun": {
+   "n": 166,
+   "days": 31,
+   "win": 0.813,
+   "avgPrice": 0.74,
+   "gross": 0.0736,
+   "edge": 0.0513,
+   "roi": 0.0677,
+   "roiSE": 0.041,
+   "fillN": 163,
+   "fillRoi": 0.072
+  }
+ },
+ "startHourUTC": {
+  "h00": {
+   "n": 54,
+   "days": 54,
+   "win": 0.722,
+   "avgPrice": 0.731,
+   "gross": -0.009,
+   "edge": -0.0317,
+   "roi": -0.0559,
+   "roiSE": 0.0827,
+   "fillN": 51,
+   "fillRoi": -0.0102
+  },
+  "h04": {
+   "n": 51,
+   "days": 51,
+   "win": 0.863,
+   "avgPrice": 0.73,
+   "gross": 0.1324,
+   "edge": 0.1097,
+   "roi": 0.1574,
+   "roiSE": 0.0698,
+   "fillN": 50,
+   "fillRoi": 0.1745
+  },
+  "h08": {
+   "n": 55,
+   "days": 55,
+   "win": 0.855,
+   "avgPrice": 0.723,
+   "gross": 0.1313,
+   "edge": 0.1084,
+   "roi": 0.1574,
+   "roiSE": 0.0689,
+   "fillN": 52,
+   "fillRoi": 0.1532
+  },
+  "h12": {
+   "n": 54,
+   "days": 54,
+   "win": 0.815,
+   "avgPrice": 0.734,
+   "gross": 0.0804,
+   "edge": 0.0579,
+   "roi": 0.0783,
+   "roiSE": 0.0743,
+   "fillN": 52,
+   "fillRoi": 0.091
+  },
+  "h16": {
+   "n": 57,
+   "days": 57,
+   "win": 0.754,
+   "avgPrice": 0.722,
+   "gross": 0.0323,
+   "edge": 0.0094,
+   "roi": 0.0186,
+   "roiSE": 0.081,
+   "fillN": 52,
+   "fillRoi": 0.0335
+  },
+  "h20": {
+   "n": 56,
+   "days": 56,
+   "win": 0.804,
+   "avgPrice": 0.741,
+   "gross": 0.0622,
+   "edge": 0.0397,
+   "roi": 0.0561,
+   "roiSE": 0.073,
+   "fillN": 54,
+   "fillRoi": 0.0435
+  }
+ },
+ "favPrice": {
+  "0.55-0.65": {
+   "n": 83,
+   "days": 46,
+   "win": 0.699,
+   "avgPrice": 0.598,
+   "gross": 0.1006,
+   "edge": 0.074,
+   "roi": 0.121,
+   "roiSE": 0.0826,
+   "fillN": 78,
+   "fillRoi": 0.144
+  },
+  "0.65-0.75": {
+   "n": 107,
+   "days": 51,
+   "win": 0.766,
+   "avgPrice": 0.7,
+   "gross": 0.0666,
+   "edge": 0.0422,
+   "roi": 0.0549,
+   "roiSE": 0.0572,
+   "fillN": 100,
+   "fillRoi": 0.0629
+  },
+  "0.75-0.85": {
+   "n": 82,
+   "days": 46,
+   "win": 0.866,
+   "avgPrice": 0.797,
+   "gross": 0.0687,
+   "edge": 0.0478,
+   "roi": 0.0599,
+   "roiSE": 0.0402,
+   "fillN": 82,
+   "fillRoi": 0.0769
+  },
+  "0.85-0.95": {
+   "n": 55,
+   "days": 39,
+   "win": 0.927,
+   "avgPrice": 0.89,
+   "gross": 0.0372,
+   "edge": 0.0209,
+   "roi": 0.0231,
+   "roiSE": 0.0483,
+   "fillN": 51,
+   "fillRoi": 0.023
+  }
+ },
+ "volume": {
+  "10-25k": {
+   "n": 183,
+   "days": 58,
+   "win": 0.809,
+   "avgPrice": 0.728,
+   "gross": 0.0811,
+   "edge": 0.0583,
+   "roi": 0.0792,
+   "roiSE": 0.0396,
+   "fillN": 173,
+   "fillRoi": 0.0976
+  },
+  "<10k": {
+   "n": 39,
+   "days": 22,
+   "win": 0.897,
+   "avgPrice": 0.717,
+   "gross": 0.1801,
+   "edge": 0.1571,
+   "roi": 0.2192,
+   "roiSE": 0.0733,
+   "fillN": 35,
+   "fillRoi": 0.2338
+  },
+  ">=25k": {
+   "n": 105,
+   "days": 45,
+   "win": 0.752,
+   "avgPrice": 0.74,
+   "gross": 0.0123,
+   "edge": -0.0101,
+   "roi": -0.0089,
+   "roiSE": 0.0467,
+   "fillN": 103,
+   "fillRoi": -0.0006
+  }
+ }
+}

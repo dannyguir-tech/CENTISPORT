@@ -367,9 +367,13 @@ const eventStub = (ev) => {
   return rest;
 };
 
-function route(fixture, u, send, limitCap, tradesCap) {
+function route(fixture, u, send, limitCap, tradesCap, offsetCap) {
   const q = u.searchParams;
   const p = u.pathname;
+  // Live gamma rejects deep offsets on its listings (seen 2026-10: offset > 2000 -> 422).
+  if ((p === '/gamma/events' || p === '/gamma/markets') && Number(q.get('offset')) > offsetCap) {
+    return send(422, { type: 'validation error', error: 'offset too large, use /events/keyset for deeper pagination' });
+  }
   if (p === '/gamma/events') return send(200, paginate(filterEvents(fixture, q), q, limitCap));
   if (p.startsWith('/gamma/events/slug/')) {
     const slug = decodeURIComponent(p.slice('/gamma/events/slug/'.length));
@@ -452,8 +456,8 @@ function defaultFaults(fixture) {
 }
 
 // limitCap / tradesCap mimic a server that silently returns fewer rows than the requested `limit`
-// (gamma listings / data-api trades).
-export async function startMockServer({ port = 0, host = '127.0.0.1', fixture = buildFixture(), faults = true, limitCap = 500, tradesCap = 500 } = {}) {
+// (gamma listings / data-api trades); offsetCap mimics gamma's 422 for offsets above it.
+export async function startMockServer({ port = 0, host = '127.0.0.1', fixture = buildFixture(), faults = true, limitCap = 500, tradesCap = 500, offsetCap = Infinity } = {}) {
   const requests = [];
   const faultList = faults ? defaultFaults(fixture) : [];
   const server = http.createServer((req, res) => {
@@ -472,7 +476,7 @@ export async function startMockServer({ port = 0, host = '127.0.0.1', fixture = 
       return send(fault.status, fault.body, fault.headers);
     }
     try {
-      route(fixture, u, send, limitCap, tradesCap);
+      route(fixture, u, send, limitCap, tradesCap, offsetCap);
     } catch (err) {
       send(500, { error: String(err && err.message) });
     }

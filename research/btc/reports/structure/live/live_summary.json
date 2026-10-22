@@ -1,21 +1,21 @@
 {
- "snapshots": 68,
- "polls": 66,
+ "snapshots": 117,
+ "polls": 115,
  "from": "2026-10-22T10:12:42.000Z",
- "to": "2026-10-22T11:27:23.000Z",
- "hours": 1.2447,
+ "to": "2026-10-22T11:43:44.000Z",
+ "hours": 1.5172,
  "families": {
   "above_daily_mono": {
    "instances": 385,
-   "snapshotEvaluations": 26180,
-   "priced": 22168,
+   "snapshotEvaluations": 45045,
+   "priced": 38142,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0019,
    "marginQuantiles": {
-    "p50": -0.5238,
+    "p50": -0.5247,
     "p90": -0.0265,
-    "p99": -0.0062,
+    "p99": -0.006,
     "max": -0.0019
    },
    "maxProfitUsd": 0,
@@ -24,28 +24,28 @@
    "medianEpisodeSnapshots": null,
    "usdPerDayUpperBound": 0,
    "makerLegged": {
-    "snapshotInstancesPositive": 153,
+    "snapshotInstancesPositive": 259,
     "instancesPositive": 4,
     "marginQuantiles": {
      "p50": -0.4835,
-     "p90": -0.0146,
+     "p90": -0.0144,
      "p99": -0.0004,
-     "max": 0.0128
+     "max": 0.0138
     }
    }
   },
   "above_hourly_mono": {
-   "instances": 380,
-   "snapshotEvaluations": 12920,
-   "priced": 1733,
+   "instances": 570,
+   "snapshotEvaluations": 23180,
+   "priced": 2267,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
-   "maxMargin": -0.0311,
+   "maxMargin": -0.0098,
    "marginQuantiles": {
-    "p50": -0.5565,
+    "p50": -0.5837,
     "p90": -0.0492,
     "p99": -0.0311,
-    "max": -0.0311
+    "max": -0.0098
    },
    "maxProfitUsd": 0,
    "episodeFirstProfitUsdSum": 0,
@@ -56,22 +56,22 @@
     "snapshotInstancesPositive": 79,
     "instancesPositive": 30,
     "marginQuantiles": {
-     "p50": -0.4532,
-     "p90": -0.0001,
-     "p99": 0.015,
+     "p50": -0.4807,
+     "p90": -0.0011,
+     "p99": 0.014,
      "max": 0.9489
     }
    }
   },
   "hit_daily_mono": {
    "instances": 49,
-   "snapshotEvaluations": 3332,
-   "priced": 3332,
+   "snapshotEvaluations": 5733,
+   "priced": 5404,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0023,
    "marginQuantiles": {
-    "p50": -0.0525,
+    "p50": -0.0743,
     "p90": -0.0056,
     "p99": -0.0033,
     "max": -0.0023
@@ -82,11 +82,11 @@
    "medianEpisodeSnapshots": null,
    "usdPerDayUpperBound": 0,
    "makerLegged": {
-    "snapshotInstancesPositive": 67,
+    "snapshotInstancesPositive": 116,
     "instancesPositive": 1,
     "marginQuantiles": {
-     "p50": -0.0451,
-     "p90": -0.0023,
+     "p50": -0.0586,
+     "p90": -0.0024,
      "p99": 0.0007,
      "max": 0.0007
     }
@@ -94,13 +94,13 @@
   },
   "hit_weekly_mono": {
    "instances": 36,
-   "snapshotEvaluations": 2448,
-   "priced": 2448,
+   "snapshotEvaluations": 4212,
+   "priced": 4212,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0035,
    "marginQuantiles": {
-    "p50": -0.0332,
+    "p50": -0.0342,
     "p90": -0.0092,
     "p99": -0.0035,
     "max": -0.0035
@@ -115,7 +115,7 @@
     "instancesPositive": 0,
     "marginQuantiles": {
      "p50": -0.0286,
-     "p90": -0.0043,
+     "p90": -0.0046,
      "p99": -0.0021,
      "max": -0.0021
     }
@@ -123,8 +123,8 @@
   },
   "hit_monthly_mono": {
    "instances": 292,
-   "snapshotEvaluations": 5930,
-   "priced": 5318,
+   "snapshotEvaluations": 9899,
+   "priced": 8846,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0016,
@@ -152,15 +152,15 @@
   },
   "range_allyes": {
    "instances": 7,
-   "snapshotEvaluations": 476,
-   "priced": 476,
+   "snapshotEvaluations": 819,
+   "priced": 819,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0778,
    "marginQuantiles": {
-    "p50": -0.267,
-    "p90": -0.099,
-    "p99": -0.0851,
+    "p50": -0.2751,
+    "p90": -0.0983,
+    "p99": -0.0848,
     "max": -0.0778
    },
    "maxProfitUsd": 0,
@@ -172,25 +172,25 @@
     "snapshotInstancesPositive": 0,
     "instancesPositive": 0,
     "marginQuantiles": {
-     "p50": -0.1986,
+     "p50": -0.1978,
      "p90": -0.0481,
-     "p99": -0.0232,
+     "p99": -0.0235,
      "max": -0.0014
     }
    }
   },
   "range_allno": {
    "instances": 7,
-   "snapshotEvaluations": 476,
-   "priced": 340,
+   "snapshotEvaluations": 819,
+   "priced": 585,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
-   "maxMargin": -0.1254,
+   "maxMargin": -0.1235,
    "marginQuantiles": {
-    "p50": -0.1758,
-    "p90": -0.1348,
+    "p50": -0.173,
+    "p90": -0.133,
     "p99": -0.1273,
-    "max": -0.1254
+    "max": -0.1235
    },
    "maxProfitUsd": 0,
    "episodeFirstProfitUsdSum": 0,
@@ -198,25 +198,25 @@
    "medianEpisodeSnapshots": null,
    "usdPerDayUpperBound": 0,
    "makerLegged": {
-    "snapshotInstancesPositive": 3,
-    "instancesPositive": 2,
+    "snapshotInstancesPositive": 8,
+    "instancesPositive": 4,
     "marginQuantiles": {
      "p50": -0.1073,
-     "p90": -0.0554,
-     "p99": -0.0295,
+     "p90": -0.0483,
+     "p99": 0.2501,
      "max": 0.8157
     }
    }
   },
   "above_vs_range": {
    "instances": 140,
-   "snapshotEvaluations": 9520,
-   "priced": 9180,
+   "snapshotEvaluations": 16380,
+   "priced": 15795,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0001,
    "marginQuantiles": {
-    "p50": -0.1282,
+    "p50": -0.1327,
     "p90": -0.0158,
     "p99": -0.0023,
     "max": -0.0001
@@ -227,20 +227,20 @@
    "medianEpisodeSnapshots": null,
    "usdPerDayUpperBound": 0,
    "makerLegged": {
-    "snapshotInstancesPositive": 575,
-    "instancesPositive": 17,
+    "snapshotInstancesPositive": 997,
+    "instancesPositive": 21,
     "marginQuantiles": {
-     "p50": -0.0673,
-     "p90": -0.0046,
+     "p50": -0.0698,
+     "p90": -0.0037,
      "p99": 0.0073,
-     "max": 0.0251
+     "max": 0.097
     }
    }
   },
   "hit_vs_above_daily": {
    "instances": 15,
-   "snapshotEvaluations": 1020,
-   "priced": 680,
+   "snapshotEvaluations": 1755,
+   "priced": 1170,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0047,
@@ -268,13 +268,13 @@
   },
   "hit_vs_above_weekly": {
    "instances": 36,
-   "snapshotEvaluations": 2448,
-   "priced": 1972,
+   "snapshotEvaluations": 4212,
+   "priced": 3393,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0083,
    "marginQuantiles": {
-    "p50": -0.0342,
+    "p50": -0.0351,
     "p90": -0.0108,
     "p99": -0.0083,
     "max": -0.0083
@@ -288,22 +288,22 @@
     "snapshotInstancesPositive": 2,
     "instancesPositive": 1,
     "marginQuantiles": {
-     "p50": -0.0256,
+     "p50": -0.0266,
      "p90": -0.0038,
-     "p99": -0.0019,
+     "p99": -0.0024,
      "max": 0.006
     }
    }
   },
   "hit_vs_above_monthly": {
    "instances": 49,
-   "snapshotEvaluations": 3332,
-   "priced": 2992,
+   "snapshotEvaluations": 5733,
+   "priced": 5148,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0524,
    "marginQuantiles": {
-    "p50": -0.2463,
+    "p50": -0.2435,
     "p90": -0.0622,
     "p99": -0.0524,
     "max": -0.0524
@@ -317,22 +317,22 @@
     "snapshotInstancesPositive": 0,
     "instancesPositive": 0,
     "marginQuantiles": {
-     "p50": -0.2235,
+     "p50": -0.2207,
      "p90": -0.0544,
      "p99": -0.0383,
-     "max": -0.034
+     "max": -0.033
     }
    }
   },
   "hit_nest_wd": {
    "instances": 6,
-   "snapshotEvaluations": 408,
-   "priced": 408,
+   "snapshotEvaluations": 702,
+   "priced": 655,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0162,
    "marginQuantiles": {
-    "p50": -0.0388,
+    "p50": -0.0758,
     "p90": -0.0172,
     "p99": -0.0162,
     "max": -0.0162
@@ -346,7 +346,7 @@
     "snapshotInstancesPositive": 0,
     "instancesPositive": 0,
     "marginQuantiles": {
-     "p50": -0.0346,
+     "p50": -0.0607,
      "p90": -0.0121,
      "p99": -0.0121,
      "max": -0.0121
@@ -355,13 +355,13 @@
   },
   "hit_nest_md": {
    "instances": 6,
-   "snapshotEvaluations": 408,
-   "priced": 408,
+   "snapshotEvaluations": 702,
+   "priced": 655,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.1159,
    "marginQuantiles": {
-    "p50": -0.2518,
+    "p50": -0.3091,
     "p90": -0.1159,
     "p99": -0.1159,
     "max": -0.1159
@@ -375,7 +375,7 @@
     "snapshotInstancesPositive": 0,
     "instancesPositive": 0,
     "marginQuantiles": {
-     "p50": -0.2291,
+     "p50": -0.2844,
      "p90": -0.0991,
      "p99": -0.0991,
      "max": -0.0991
@@ -384,8 +384,8 @@
   },
   "hit_nest_mw": {
    "instances": 10,
-   "snapshotEvaluations": 680,
-   "priced": 680,
+   "snapshotEvaluations": 1170,
+   "priced": 1170,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
    "maxMargin": -0.0195,
@@ -413,45 +413,45 @@
   },
   "daily_ud_vs_above": {
    "instances": 2,
-   "snapshotEvaluations": 136,
-   "priced": 136,
-   "violatingSnapshotInstances": 4,
+   "snapshotEvaluations": 234,
+   "priced": 234,
+   "violatingSnapshotInstances": 13,
    "violatingInstances": 1,
-   "maxMargin": 0.0018,
+   "maxMargin": 0.0029,
    "marginQuantiles": {
     "p50": -0.0193,
-    "p90": -0.0034,
-    "p99": 0.0009,
-    "max": 0.0018
+    "p90": -0.001,
+    "p99": 0.0019,
+    "max": 0.0029
    },
-   "maxProfitUsd": 0.4094,
+   "maxProfitUsd": 0.765,
    "episodeFirstProfitUsdSum": 0.0851,
-   "episodeMaxProfitUsdSum": 0.4094,
-   "medianEpisodeSnapshots": 4,
-   "usdPerDayUpperBound": 7.8938,
+   "episodeMaxProfitUsdSum": 0.765,
+   "medianEpisodeSnapshots": 13,
+   "usdPerDayUpperBound": 12.1011,
    "makerLegged": {
-    "snapshotInstancesPositive": 58,
+    "snapshotInstancesPositive": 79,
     "instancesPositive": 1,
     "marginQuantiles": {
      "p50": -0.0068,
-     "p90": 0.0023,
-     "p99": 0.0066,
-     "max": 0.0066
+     "p90": 0.0045,
+     "p99": 0.0076,
+     "max": 0.0076
     }
    }
   },
   "hourly_ud_vs_above_hourly": {
    "instances": 4,
-   "snapshotEvaluations": 136,
-   "priced": 136,
+   "snapshotEvaluations": 234,
+   "priced": 234,
    "violatingSnapshotInstances": 0,
    "violatingInstances": 0,
-   "maxMargin": -0.0719,
+   "maxMargin": -0.0283,
    "marginQuantiles": {
-    "p50": -0.1644,
-    "p90": -0.0935,
-    "p99": -0.0735,
-    "max": -0.0719
+    "p50": -0.1545,
+    "p90": -0.0693,
+    "p99": -0.0463,
+    "max": -0.0283
    },
    "maxProfitUsd": 0,
    "episodeFirstProfitUsdSum": 0,
@@ -459,13 +459,42 @@
    "medianEpisodeSnapshots": null,
    "usdPerDayUpperBound": 0,
    "makerLegged": {
-    "snapshotInstancesPositive": 3,
+    "snapshotInstancesPositive": 29,
     "instancesPositive": 2,
     "marginQuantiles": {
      "p50": -0.0757,
-     "p90": -0.0208,
-     "p99": 0.0065,
+     "p90": 0.0059,
+     "p99": 0.0421,
      "max": 0.5732
+    }
+   }
+  },
+  "nest_cl_15m_5m": {
+   "instances": 2,
+   "snapshotEvaluations": 30,
+   "priced": 24,
+   "violatingSnapshotInstances": 0,
+   "violatingInstances": 0,
+   "maxMargin": -0.0311,
+   "marginQuantiles": {
+    "p50": -0.5263,
+    "p90": -0.1998,
+    "p99": -0.0311,
+    "max": -0.0311
+   },
+   "maxProfitUsd": 0,
+   "episodeFirstProfitUsdSum": 0,
+   "episodeMaxProfitUsdSum": 0,
+   "medianEpisodeSnapshots": null,
+   "usdPerDayUpperBound": 0,
+   "makerLegged": {
+    "snapshotInstancesPositive": 0,
+    "instancesPositive": 0,
+    "marginQuantiles": {
+     "p50": -0.5031,
+     "p90": -0.1791,
+     "p99": -0.0191,
+     "max": -0.0191
     }
    }
   }

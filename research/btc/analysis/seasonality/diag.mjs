@@ -39,11 +39,16 @@ function firstIdxAfter(tr, T) { let lo = 0, hi = tr.length; while (lo < hi) { co
  *  `life` seconds is FILLED-THROUGH if a taker SELL of tok prints below b or a taker BUY of the complement prints above 1 - b
  *  (price traded through our level, so we were filled regardless of queue position); TOUCH if a print reaches b. */
 export function makerFillCheck(trades, tf, action) {
-  const tm = tapeMap(tf); if (!tm.size) return null;
-  const life = tf === '5m' ? 60 : 120;
+  // 5m/15m: full tapes (life 60 s / 120 s). 1h/4h/1d: fills_probe windows after the FAV50/FAV80 decision (life = probe window).
+  const tapes = tf === '5m' || tf === '15m';
+  const tm = tapes ? tapeMap(tf) : null;
+  if (tapes ? !tm.size : !probeAvailable() || action === 'OPEN') return null;
   let n = 0; const through = [], touch = [];
   for (const x of trades) {
-    const tr = tm.get(x.conditionId); if (!tr) continue;
+    let tr = null, life = tf === '5m' ? 60 : 120;
+    if (tapes) tr = tm.get(x.conditionId);
+    else { const pr = probeMap().get(`${x.conditionId}|${action}`); if (pr) { tr = pr.trades; life = pr.wait; } }
+    if (!tr) continue;
     n++;
     const b = clampP(x.q - 0.005);
     const tEnd = action === 'OPEN' ? x.start + life : x.t + life;

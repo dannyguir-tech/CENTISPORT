@@ -56,6 +56,17 @@ Options:
   --page-size N               discovery page size (default 100)
   --max-pages N               discovery page cap per tag/series (default 500)
   --order FIELD               gamma sort field, newest first (default endDate; "none" to omit)
+  --window-hours H            sample over time: list events in end-date windows of H hours, newest
+                              window first, from --until (+8 days) back to --since (needs --since;
+                              default 0 = one listing, newest first)
+  --max-markets-per-window N  with --window-hours: accept at most N markets per window (markets
+                              already in markets.jsonl count); the rest are skipped as
+                              sampled_out_window (default 0 = no cap). A capped window is read
+                              until it holds 4N markets (or ends) and taken round-robin over sports
+                              (fixed per-window shuffle), first game of each sport first
+  --max-markets-per-game N    accept at most N markets per game (gameKey: the event slug up to its
+                              date, else gamma gameId), in gamma's order; the rest are skipped as
+                              sampled_out_game (default 0 = no cap)
   --timeout-ms N / --retries N / --retry-base-ms N   HTTP tuning (30000 / 6 / 1000)
   --no-cache                  do not read or write raw/ cache
   --quiet                     only warnings and the final summary
@@ -82,6 +93,9 @@ const OPTIONS = {
   'page-size': { type: 'int', default: 100, min: 1, max: 500 },
   'max-pages': { type: 'int', default: 500, min: 1 },
   order: { type: 'string', default: 'endDate' },
+  'window-hours': { type: 'number', default: 0, min: 0 },
+  'max-markets-per-window': { type: 'int', default: 0, min: 0 },
+  'max-markets-per-game': { type: 'int', default: 0, min: 0 },
   'timeout-ms': { type: 'int', default: 30000, min: 1 },
   retries: { type: 'int', default: 6, min: 0 },
   'retry-base-ms': { type: 'int', default: 1000, min: 0 },
@@ -124,6 +138,9 @@ export function parseArgs(argv) {
   if (out.strategy === 'event-slugs' && !out.eventSlugs) throw new UsageError('--strategy event-slugs needs --event-slugs <file>');
   if (out.strategy === 'events-series' && !out.series) throw new UsageError('--strategy events-series needs --series <id,...>');
   if (out.since && out.until && out.since > out.until) throw new UsageError('--since is after --until');
+  if (out.windowHours > 0 && !out.since) throw new UsageError('--window-hours needs --since (the oldest window)');
+  if (out.windowHours > 0 && !['events-tag', 'events-series'].includes(out.strategy)) throw new UsageError('--window-hours works with --strategy events-tag or events-series');
+  if (out.maxMarketsPerWindow > 0 && !(out.windowHours > 0)) throw new UsageError('--max-markets-per-window needs --window-hours');
   return out;
 }
 
@@ -206,6 +223,11 @@ const SPORT_ALIASES = (() => {
     cricket: ['cricket', 'ipl'],
     cs2: ['cs2', 'csgo', 'cs-go', 'counter-strike', 'counter-strike-2'],
     lol: ['lol', 'league-of-legends'], dota2: ['dota2', 'dota-2', 'dota'], valorant: ['valorant'],
+    // Generic buckets for gamma's many smaller leagues (2026: setka table tennis, bkarg, cpbl, ...).
+    // They come from tags, which are checked last, so a league-level match always wins.
+    'table-tennis': ['table-tennis'], basketball: ['basketball'], baseball: ['baseball'], hockey: ['hockey'],
+    handball: ['handball'], darts: ['darts'], pickleball: ['pickleball'], rugby: ['rugby'], volleyball: ['volleyball'],
+    esports: ['esports'],
   };
   const map = new Map();
   for (const [key, list] of Object.entries(groups)) for (const a of list) map.set(a, key);
@@ -220,9 +242,12 @@ function slugPrefixes(slug) {
   return [3, 2, 1].filter((n) => parts.length > n).map((n) => parts.slice(0, n).join('-'));
 }
 
-// Evidence order: series, then event/market slug prefix ("nba-lal-bos-..."), then tags.
+// Evidence order: gamma's event.sport.sport league key ("nba", "cfb", "atp"), series, event/market
+// slug prefix ("nba-lal-bos-..."), then tags. A league key with no alias is kept as is (slugified)
+// when nothing else matches, rather than losing the sport.
 export function inferSport(event, market, tags = []) {
-  const cands = [];
+  const league = event?.sport && typeof event.sport === 'object' ? event.sport.sport : null;
+  const cands = [league];
   for (const s of Array.isArray(event?.series) ? event.series : []) cands.push(s?.slug, s?.ticker, s?.title);
   cands.push(...slugPrefixes(event?.slug), ...slugPrefixes(market?.slug), ...tags);
   for (const c of cands) {
@@ -230,7 +255,19 @@ export function inferSport(event, market, tags = []) {
     const hit = SPORT_ALIASES.get(String(c).toLowerCase().trim()) || SPORT_ALIASES.get(slugify(c));
     if (hit) return hit;
   }
-  return null;
+  return league != null && slugify(league) ? slugify(league) : null;
+}
+
+// One real game is often split across several gamma events ("mlb-mil-lad-2026-10-15",
+// "...-player-props", "...-inning-1-winner", "...-more-markets"). Markets of one game are
+// correlated, so the dataset clusters on this key: the event slug up to its date, else gamma's
+// gameId, else the event slug.
+export function gameKeyOf(event, market) {
+  const slug = event?.slug ?? market?.slug ?? null;
+  const dated = slug ? /^(.+?-\d{4}-\d{2}-\d{2})(?:-|$)/.exec(slugify(slug)) : null;
+  if (dated) return dated[1];
+  if (event?.gameId != null && String(event.gameId).trim() !== '') return `game-${String(event.gameId).trim()}`;
+  return slug ?? null;
 }
 
 export function tagList(...lists) {
@@ -344,6 +381,7 @@ export function normalizeMarket(m, ev, { sinceTs = null, untilTs = null } = {}) 
       slug: m.slug ?? null,
       eventSlug: ev?.slug ?? null,
       eventTitle: ev?.title ?? null,
+      gameKey: gameKeyOf(ev, m),
       sport: inferSport(ev, m, tags),
       tags,
       outcomes: outcomes.map(String),
@@ -426,38 +464,100 @@ function tagFilters(spec) {
     .map((t) => (/^\d+$/.test(t) ? { label: `tag_id=${t}`, params: { tag_id: t } } : { label: `tag_slug=${t}`, params: { tag_slug: t } }));
 }
 
+const isoSec = (ts) => new Date(ts * 1000).toISOString().replace('.000Z', 'Z');
+
+// endDate can trail the game by days, so the server-side bound is loose; startTs is filtered exactly.
+function endDateBounds(opts) {
+  const until = opts.until ?? new Date().toISOString().slice(0, 10);
+  return { min: opts.since ? parseTs(opts.since) : null, max: parseTs(until) + 8 * DAY };
+}
+
 function listingParams(ctx) {
   const p = { closed: 'true' };
   if (ctx.opts.order && ctx.opts.order !== 'none') Object.assign(p, { order: ctx.opts.order, ascending: 'false' });
-  if (ctx.opts.since) p.end_date_min = `${ctx.opts.since}T00:00:00Z`;
-  // endDate can trail the game by days, so the server-side bound is loose; startTs is filtered exactly.
-  const until = ctx.opts.until ?? new Date().toISOString().slice(0, 10);
-  p.end_date_max = new Date((parseTs(until) + 8 * DAY) * 1000).toISOString().replace('.000Z', 'Z');
+  const { min, max } = endDateBounds(ctx.opts);
+  if (min != null) p.end_date_min = isoSec(min);
+  p.end_date_max = isoSec(max);
   return p;
 }
 
+// --window-hours: end-date windows [a, b - 1s] on a fixed UTC grid, newest first, so re-runs hit the
+// same (cacheable) URLs and adjacent windows never overlap.
+export function endDateWindows(opts) {
+  const step = Math.round(opts.windowHours * HOUR);
+  if (!(step > 0)) return null;
+  const { min, max } = endDateBounds(opts);
+  const out = [];
+  for (let b = Math.ceil((max + 1) / step) * step; b > min; b -= step) {
+    out.push({ min: isoSec(Math.max(min, b - step)), max: isoSec(b - 1), label: `${isoSec(Math.max(min, b - step))}..${isoSec(b - 1)}` });
+  }
+  return out;
+}
+
 const itemKey = (it) => (it && (it.id ?? it.conditionId ?? it.slug)) ?? JSON.stringify(it).slice(0, 200);
+const OFFSET_CAP_RE = /offset/i;
 
 // Advances by the number of items actually returned and stops on an empty page, so a server-side
 // cap on `limit` below --page-size can't silently end discovery after the first page.
+// gamma rejects deep offsets (offset > 2000 -> HTTP 422 "offset too large, use /events/keyset").
+// When the listing is sorted by endDate newest first, paging then continues with a date cursor:
+// end_date_max moves to the oldest endDate seen (inclusive) and offset restarts at 0; items at that
+// boundary that were already yielded are dropped.
 async function* pagedList(ctx, base, endpoint, params, label, cacheIf) {
   const { pageSize, maxPages } = ctx.opts;
+  const byEndDesc = params.order === 'endDate' && params.ascending === 'false';
+  let cur = params;
   let offset = 0;
   let prevFirst = null;
+  let edgeT = null; // oldest endDate yielded so far
+  let edge = new Set(); // keys of yielded items with endDate === edgeT
+  let resets = 0;
   for (let page = 0; page < maxPages; page++) {
-    const qs = new URLSearchParams({ ...params, limit: String(pageSize), offset: String(offset) });
+    const qs = new URLSearchParams({ ...cur, limit: String(pageSize), offset: String(offset) });
     const url = `${base}${endpoint}?${qs}`;
-    const items = asArray(await ctx.http.getJson(url, { cache: ctx.cache, cacheIf }), url);
+    let body;
+    try {
+      body = await ctx.http.getJson(url, { cache: ctx.cache, cacheIf });
+    } catch (err) {
+      if (!(offset > 0 && err instanceof HttpError && (err.status === 422 || err.status === 400) && OFFSET_CAP_RE.test(err.body))) throw err;
+      ctx.stats.discovery.offsetCapHits = (ctx.stats.discovery.offsetCapHits || 0) + 1;
+      if (!byEndDesc || edgeT == null) {
+        ctx.warn(`${label}: ${endpoint} rejects offset ${offset} and the listing is not sorted by endDate newest first, so it cannot go deeper; stopping`);
+        return;
+      }
+      if (cur.end_date_max != null && parseTs(cur.end_date_max) === edgeT) {
+        ctx.warn(`${label}: more than ${offset} items share endDate ${isoSec(edgeT)}; cannot page past them, stopping`);
+        return;
+      }
+      if (!resets++) ctx.log(`${label}: ${endpoint} caps offset at ${offset - pageSize}..${offset}; continuing with end_date_max as a date cursor`);
+      cur = { ...cur, end_date_max: isoSec(edgeT) };
+      offset = 0;
+      prevFirst = null;
+      continue;
+    }
+    const items = asArray(body, url);
     ctx.stats.discovery.pages++;
     if (!items.length) return;
     const first = itemKey(items[0]);
-    if (page > 0 && first === prevFirst) {
+    if (offset > 0 && first === prevFirst) {
       ctx.warn(`${label}: ${endpoint} returned the same page for offset ${offset}; the API seems to ignore offset, stopping`);
       return;
     }
     prevFirst = first;
-    yield { items, url };
     offset += items.length;
+    const fresh = [];
+    for (const it of items) {
+      const key = itemKey(it);
+      const t = parseTs(it?.endDate);
+      if (edge.has(key) && t === edgeT) continue; // already yielded before a date-cursor reset
+      fresh.push(it);
+      if (t != null && (edgeT == null || t < edgeT)) {
+        edgeT = t;
+        edge = new Set();
+      }
+      if (t === edgeT) edge.add(key);
+    }
+    if (fresh.length) yield { items: fresh, url };
   }
   ctx.warn(`${label}: stopped after --max-pages ${maxPages}; raise it to go further back`);
 }
@@ -467,25 +567,77 @@ const noEventsHelp = (ctx, what) =>
   'Gamma filter params are not guaranteed; try a numeric --tag (sent as tag_id), --strategy events-series --series <id>, ' +
   '--strategy markets --tag <id>, or --strategy event-slugs --event-slugs <file>, and check the date range.';
 
+// FNV-1a: a fixed, outcome-blind shuffle key.
+function hash32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+}
+
+/**
+ * Order for a capped window: round-robin over sports (in a fixed per-window shuffle), game-major:
+ * the first game of every sport, then the second game of every sport, ...; a game's markets stay
+ * together in gamma's order. Without it the cap fills with whatever ends last in the window, which
+ * near "now" is all table tennis (setka endDate = start + 7 days). Uses only listing fields
+ * (sport, slug, gameId, order), never prices, volume or outcomes.
+ */
+export function sampleOrder(pairs, windowLabel = '') {
+  const sports = new Map(); // sport -> Map(gameKey -> pairs[])
+  for (const p of pairs) {
+    const sport = inferSport(p.event, p.market, tagList(p.event?.tags, p.market?.tags)) ?? 'unknown';
+    const game = gameKeyOf(p.event, p.market) ?? p.market?.conditionId ?? '';
+    if (!sports.has(sport)) sports.set(sport, new Map());
+    const games = sports.get(sport);
+    if (!games.has(game)) games.set(game, []);
+    games.get(game).push(p);
+  }
+  const order = [...sports.keys()].sort((a, b) => hash32(`${windowLabel}|${a}`) - hash32(`${windowLabel}|${b}`) || (a < b ? -1 : 1));
+  const lists = order.map((s) => [...sports.get(s).values()]);
+  const out = [];
+  for (let g = 0; out.length < pairs.length; g++) for (const games of lists) if (games[g]) out.push(...games[g]);
+  return out;
+}
+
 async function* discoverEvents(ctx, filters) {
   let total = 0;
   let withMarkets = 0;
-  for (const f of filters) {
-    let n = 0;
-    for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', { ...listingParams(ctx), ...f.params }, f.label, finalEventsPage)) {
-      n += items.length;
-      ctx.stats.discovery.events += items.length;
-      const pairs = [];
-      for (const ev of items) {
-        if (!ev || !Array.isArray(ev.markets)) continue;
-        withMarkets++;
-        for (const m of ev.markets) pairs.push({ market: m, event: ev });
+  const perFilter = new Map(filters.map((f) => [f.label, 0]));
+  // Without --window-hours this is one window spanning the whole range.
+  const windows = endDateWindows(ctx.opts) ?? [null];
+  const cap = ctx.opts.maxMarketsPerWindow;
+  for (const w of windows) {
+    ctx.window = w ? w.label : null;
+    ctx.windowFull = false;
+    if (w) ctx.stats.discovery.windows++;
+    // A capped window is buffered (until it holds 4x the cap in markets, or ends) and reordered by
+    // sampleOrder; otherwise pages are passed on as they arrive.
+    const buffer = w && cap > 0 ? [] : null;
+    for (const f of filters) {
+      if (ctx.windowFull || (buffer && buffer.length >= 4 * cap)) break;
+      const params = { ...listingParams(ctx), ...f.params, ...(w ? { end_date_min: w.min, end_date_max: w.max } : {}) };
+      for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', params, w ? `${f.label} ${w.label}` : f.label, finalEventsPage)) {
+        perFilter.set(f.label, perFilter.get(f.label) + items.length);
+        total += items.length;
+        ctx.stats.discovery.events += items.length;
+        const pairs = [];
+        for (const ev of items) {
+          if (!ev || !Array.isArray(ev.markets)) continue;
+          withMarkets++;
+          for (const m of ev.markets) pairs.push({ market: m, event: ev });
+        }
+        if (buffer) {
+          buffer.push(...pairs);
+          if (buffer.length >= 4 * cap) break;
+          continue;
+        }
+        yield pairs;
+        // The consumer sets windowFull once --max-markets-per-window is reached.
+        if (ctx.windowFull) break;
       }
-      yield pairs;
     }
-    if (n === 0) ctx.warn(`${f.label} returned no closed events`);
-    total += n;
+    if (buffer && buffer.length) yield sampleOrder(buffer, w.label);
   }
+  for (const [label, n] of perFilter) if (n === 0) ctx.warn(`${label} returned no closed events`);
   if (total === 0) throw new CollectError(noEventsHelp(ctx, `Discovery (${filters.map((f) => f.label).join(', ')})`));
   if (withMarkets === 0) throw new CollectError(`Events from ${ctx.bases.gamma}/events carry no "markets" array; the response shape has changed.`);
 }
@@ -913,7 +1065,7 @@ async function collectInto({ opts, stdout, say, log, warn, bases, runLine, dataD
     log,
   });
   const stats = {
-    discovery: { pages: 0, events: 0, markets: 0, candidates: 0 },
+    discovery: { pages: 0, events: 0, markets: 0, candidates: 0, windows: 0, offsetCapHits: 0 },
     skipped: {},
     prices: { fetched: 0, fromDisk: 0, emptyTokens: 0, splits: 0, maxFallback: 0 },
     trades: { fetched: 0, fromDisk: 0, rows: 0, truncated: 0, backfilled: 0, backfillFailed: 0 },
@@ -936,7 +1088,11 @@ async function collectInto({ opts, stdout, say, log, warn, bases, runLine, dataD
   const untilTs = opts.until ? parseTs(opts.until) + DAY : null;
   let kept = 0;
   let alreadyCollected = 0;
+  let pending = 0;
+  const inflight = new Set();
+  const backlog = Math.max(16, 4 * opts.concurrency);
   const total = () => existing.size + kept;
+  const committed = () => total() + pending;
   let appendChain = Promise.resolve();
   const appendRecord = (rec) => (appendChain = appendChain.then(() => appendFile(marketsFile, `${JSON.stringify(rec)}\n`)));
   let lastLog = 0;
@@ -946,7 +1102,8 @@ async function collectInto({ opts, stdout, say, log, warn, bases, runLine, dataD
     const s = http.stats;
     const skipped = Object.values(stats.skipped).reduce((x, y) => x + y, 0);
     const secs = (Date.now() - t0) / 1000;
-    log(`pages ${stats.discovery.pages} | kept ${kept} new, ${alreadyCollected} already | skipped ${skipped} | requests ${s.requests} (cache ${s.cacheHits}, retries ${s.retries}) | ${(s.requests / Math.max(secs, 0.001)).toFixed(1)} req/s`);
+    const win = ctx.window ? ` | window ${ctx.window}` : '';
+    log(`pages ${stats.discovery.pages}${win} | kept ${kept} new, ${alreadyCollected} already | skipped ${skipped} | requests ${s.requests} (cache ${s.cacheHits}, retries ${s.retries}, 429s ${s.byStatus[429] || 0}) | ${(s.requests / Math.max(secs, 0.001)).toFixed(1)} req/s`);
   };
 
   if (existing.size >= opts.maxMarkets) {
@@ -954,7 +1111,19 @@ async function collectInto({ opts, stdout, say, log, warn, bases, runLine, dataD
   } else {
     log(`strategy ${opts.strategy}, ${existing.size} markets already collected, target ${opts.maxMarkets}`);
     const seen = new Set();
+    // Sampling caps (--max-markets-per-window / --max-markets-per-game). Markets already in
+    // markets.jsonl count, so a re-run walks the same listings and accepts the same markets.
+    const perWindowCap = opts.maxMarketsPerWindow > 0 ? opts.maxMarketsPerWindow : Infinity;
+    const perGameCap = opts.maxMarketsPerGame > 0 ? opts.maxMarketsPerGame : Infinity;
+    const perGame = new Map();
+    let windowKey;
+    let inWindow = 0;
+    try {
     for await (const pairs of discover(ctx)) {
+      if (ctx.window !== windowKey) {
+        windowKey = ctx.window;
+        inWindow = 0;
+      }
       const todo = [];
       for (const { market, event } of pairs) {
         stats.discovery.candidates++;
@@ -964,35 +1133,69 @@ async function collectInto({ opts, stdout, say, log, warn, bases, runLine, dataD
           continue;
         }
         if (cid) seen.add(cid);
-        if (cid && existing.has(cid)) {
-          alreadyCollected++;
+        const isOld = cid != null && existing.has(cid);
+        let n = null;
+        if (!isOld) {
+          n = normalizeMarket(market, event, { sinceTs, untilTs });
+          if (n.skip) {
+            ctx.skip(n.skip);
+            continue;
+          }
+        }
+        if (inWindow >= perWindowCap) {
+          ctx.skip('sampled_out_window');
           continue;
         }
-        const n = normalizeMarket(market, event, { sinceTs, untilTs });
-        if (n.skip) ctx.skip(n.skip);
+        const game = gameKeyOf(event, market) ?? cid;
+        const g = perGame.get(game) || 0;
+        if (g >= perGameCap) {
+          ctx.skip('sampled_out_game');
+          continue;
+        }
+        perGame.set(game, g + 1);
+        inWindow++;
+        if (inWindow >= perWindowCap) ctx.windowFull = true;
+        if (isOld) alreadyCollected++;
         else todo.push(n);
       }
-      // Launch only as many as could still fit, so failures can be backfilled from the same page.
-      while (todo.length && total() < opts.maxMarkets) {
-        const batch = todo.splice(0, opts.maxMarkets - total());
-        await Promise.all(
-          batch.map((cand) =>
-            marketLimit(async () => {
-              const res = await processMarket(ctx, cand);
-              if (res.skip) ctx.skip(res.skip);
-              else {
-                kept++;
-                await appendRecord(res.record);
-              }
-              progress();
-            })
-          )
-        );
+      // Launch only as many as could still fit (in flight counts), so failures can be backfilled
+      // from the same page. Downloads run while discovery reads the next page, with a bounded
+      // backlog, so listing latency does not add up serially.
+      while (todo.length) {
+        if (committed() >= opts.maxMarkets) {
+          if (!inflight.size) break;
+          await Promise.race(inflight);
+          continue;
+        }
+        for (const cand of todo.splice(0, opts.maxMarkets - committed())) {
+          pending++;
+          const task = marketLimit(async () => {
+            const res = await processMarket(ctx, cand);
+            if (res.skip) ctx.skip(res.skip);
+            else {
+              kept++;
+              await appendRecord(res.record);
+            }
+            progress();
+          }).finally(() => {
+            pending--;
+            inflight.delete(task);
+          });
+          inflight.add(task);
+        }
+        while (inflight.size > backlog) await Promise.race(inflight);
       }
       progress();
-      if (total() >= opts.maxMarkets) break;
+      if (committed() >= opts.maxMarkets) {
+        await Promise.all([...inflight]);
+        if (total() >= opts.maxMarkets) break;
+      }
     }
-    await appendChain;
+    } finally {
+      // Also on a discovery error: downloads already started are finished and written first.
+      await Promise.allSettled([...inflight]);
+      await appendChain;
+    }
   }
 
   const failures = (stats.skipped.price_fetch_failed || 0) + (stats.skipped.trades_fetch_failed || 0) + stats.trades.backfillFailed;

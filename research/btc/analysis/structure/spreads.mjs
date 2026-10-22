@@ -49,5 +49,5 @@ for (const [kind, bands] of Object.entries(acc)) {
   out.byKind[kind] = {};
   for (const [band, o] of Object.entries(bands)) out.byKind[kind][band] = { n: o.hs.length, median: r4(med(o.hs)), p75: r4(q(o.hs, 0.75)), medDepthShares1c: r4(med(o.depth1c)), medDepthUsd1c: r4(med(o.depthUsd1c)), medTopSize: r4(med(o.topSize)) };
 }
-writeJSON('spread_model.json', out);
+writeJSON(process.argv[2] || 'spread_model.json', out);
 for (const [k, v] of Object.entries(out.byKind)) console.log(k.padEnd(14), Object.entries(v).map(([b, o]) => `${b}:${o.median}(${o.n}) $${Math.round(o.medDepthUsd1c)}`).join('  '));

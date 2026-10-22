@@ -17,3 +17,5 @@ research/btc/data/
 # large intermediate analysis dumps (regenerable)
 research/btc/reports/**/*.jsonl
 research/data-*/
+research/btc/reports/**/*.jsonl.gz
+research/btc/verify/**/out/

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { eventsPage, startMockServer } from './mock-server.js';
 import { cachePathFor, createHttpClient, createLimiter, createRateLimiter, fetchJson, HttpError, parseRetryAfter } from '../lib/http.js';
-import { inferSport, isFinalMarket, looksLikeGameTime, normalizeMarket, parseTs, readSlugList, resolveWinner } from '../collect.js';
+import { endDateWindows, gameKeyOf, inferSport, sampleOrder, isFinalMarket, looksLikeGameTime, normalizeMarket, parseArgs, parseTs, readSlugList, resolveWinner } from '../collect.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const COLLECT = path.join(HERE, '..', 'collect.js');
@@ -508,5 +508,129 @@ describe('collect.js other strategies and failures', () => {
     assert.equal(r.code, 2);
     assert.match(r.stderr, /--strategy must be one of/);
     assert.equal(r.requests.length, 0);
+  });
+});
+
+// Adaptations to the live gamma API as seen on 2026-10-22 (first real run).
+describe('live gamma API adaptations', () => {
+  test('sport from gamma event.sport.sport, generic tag buckets, raw league key as last resort', () => {
+    assert.equal(inferSport({ slug: 'cfb-colst-txst-2026-10-15', sport: { sport: 'cfb' } }, {}, ['sports', 'cfb', 'games']), 'ncaaf');
+    assert.equal(inferSport({ slug: 'atp-doubles-x-y-2026-10-22', sport: { sport: 'atp-doubles' } }, {}, ['tennis', 'sports']), 'tennis');
+    // setka table tennis: no league alias, the table-tennis tag decides.
+    assert.equal(inferSport({ slug: 'setkameua-a-b-2026-10-22', series: [{ slug: 'setkameua-games' }], sport: { sport: 'setkameua' } }, {}, ['sports', 'games', 'table-tennis', 'setka']), 'table-tennis');
+    assert.equal(inferSport({ slug: 'bkarg-rac-san-2026-10-08', sport: { sport: 'bkarg' } }, {}, ['sports', 'games', 'basketball', 'lnb']), 'basketball');
+    assert.equal(inferSport({ slug: 'r6siege-dz-m80-2026-10-15', sport: { sport: 'r6siege' } }, {}, ['esports', 'rainbow-six-siege', 'games', 'sports']), 'esports');
+    assert.equal(inferSport({ slug: 'zz-a-b-2026-10-15', sport: { sport: 'Crazy League' } }, {}, ['sports', 'games']), 'crazy-league');
+    // League-level evidence beats generic tags.
+    assert.equal(inferSport({ slug: 'nba-tor-nyk-2026-10-15', series: [{ slug: 'nba-2026' }] }, {}, ['sports', 'nba', 'games', 'basketball']), 'nba');
+  });
+
+  test('gameKey groups the sub-events of one game', () => {
+    const k = (slug, gameId) => gameKeyOf({ slug, gameId }, {});
+    assert.equal(k('mlb-mil-lad-2026-10-15', 10079784), 'mlb-mil-lad-2026-10-15');
+    assert.equal(k('mlb-mil-lad-2026-10-15-inning-9-winner', 10079784), 'mlb-mil-lad-2026-10-15');
+    assert.equal(k('mlb-mil-lad-2026-10-15-player-props', null), 'mlb-mil-lad-2026-10-15');
+    assert.equal(k('nfl-bills-vs-jets', 123), 'game-123');
+    assert.equal(k('nfl-bills-vs-jets', null), 'nfl-bills-vs-jets');
+    const rec = normalizeMarket(
+      { conditionId: '0xabc', outcomes: '["A","B"]', clobTokenIds: '["1","2"]', closed: true, outcomePrices: '["1","0"]', gameStartTime: '2026-10-15 23:10:00+00', closedTime: '2026-10-16 03:00:00+00' },
+      { slug: 'mlb-mil-lad-2026-10-15-inning-1-winner', gameId: 1 }
+    );
+    assert.equal(rec.record.gameKey, 'mlb-mil-lad-2026-10-15');
+  });
+
+  test('sampleOrder: round-robin over sports, game-major, deterministic, uses no prices or outcomes', () => {
+    const ev = (slug, sport, tags = []) => ({ slug, sport: { sport }, tags: tags.map((t) => ({ slug: t })) });
+    const mk = (ev, i) => ({ event: ev, market: { conditionId: `${ev.slug}#${i}`, outcomePrices: '["1","0"]' } });
+    const tt = [1, 2, 3, 4].map((k) => ev(`setkameua-a${k}-b${k}-2026-10-15`, 'setkameua', ['table-tennis']));
+    const nba = ev('nba-tor-nyk-2026-10-15', 'nba');
+    const props = ev('nba-tor-nyk-2026-10-15-player-props', 'nba');
+    const mlb = ev('mlb-mil-lad-2026-10-15', 'mlb');
+    const pairs = [...tt.flatMap((e) => [mk(e, 0), mk(e, 1)]), mk(nba, 0), mk(nba, 1), mk(props, 0), mk(mlb, 0)];
+    const out = sampleOrder(pairs, 'w1');
+    assert.equal(out.length, pairs.length);
+    assert.deepEqual(new Set(out), new Set(pairs));
+    // The first three games come from three different sports; a game's markets stay together
+    // (including its player-props sub-event).
+    const sportOf = (p) => p.event.sport.sport;
+    const firstGames = [];
+    for (const p of out) {
+      const g = gameKeyOf(p.event, p.market);
+      if (!firstGames.includes(g)) firstGames.push(g);
+    }
+    assert.equal(new Set(firstGames.slice(0, 3).map((g) => (g.startsWith('setka') ? 'tt' : g.slice(0, 3)))).size, 3);
+    const nbaIdx = out.map((p, i) => (sportOf(p) === 'nba' ? i : -1)).filter((i) => i >= 0);
+    assert.deepEqual(nbaIdx, [nbaIdx[0], nbaIdx[0] + 1, nbaIdx[0] + 2]);
+    assert.deepEqual(sampleOrder(pairs, 'w1'), out, 'deterministic');
+    // Flipping outcomes does not change the order.
+    const flipped = pairs.map((p) => ({ ...p, market: { ...p.market, outcomePrices: '["0","1"]' } }));
+    assert.deepEqual(sampleOrder(flipped, 'w1').map((p) => p.market.conditionId), out.map((p) => p.market.conditionId));
+  });
+
+  test('end-date windows tile [since, until + 8d] on a fixed grid, newest first, without overlap', () => {
+    const w = endDateWindows(parseArgs(['--since', '2026-10-01', '--until', '2026-10-03', '--window-hours', '6']));
+    assert.ok(w.length > 0);
+    assert.equal(w.at(-1).min, '2026-10-01T00:00:00Z');
+    for (let i = 0; i < w.length; i++) {
+      assert.ok(parseTs(w[i].max) - parseTs(w[i].min) <= 6 * HOUR - 1);
+      if (i > 0) assert.equal(parseTs(w[i - 1].min) - parseTs(w[i].max), 1, 'adjacent, non-overlapping');
+    }
+    assert.ok(parseTs(w[0].max) >= parseTs('2026-10-03') + 8 * 24 * HOUR, 'covers until + 8 days (the bound listingParams uses)');
+    assert.equal(endDateWindows(parseArgs(['--since', '2026-10-01'])), null);
+    assert.throws(() => parseArgs(['--window-hours', '6']), /needs --since/);
+    assert.throws(() => parseArgs(['--since', '2026-10-01', '--max-markets-per-window', '5']), /needs --window-hours/);
+  });
+
+  test('a listing that rejects deep offsets (gamma 422) continues with an end-date cursor', async () => {
+    const capped = await startMockServer({ faults: false, offsetCap: 10 });
+    try {
+      const fx = capped.fixture;
+      const dataDir = path.join(tmpRoot, 'offset-cap');
+      const r = await runCollect(['--data-dir', dataDir, ...FAST], capped);
+      assert.equal(r.code, 0, r.stderr);
+      assert.equal(r.summary.kept, fx.entries.filter((e) => e.meta.kind === 'ok').length, 'nothing lost past the offset cap');
+      assert.ok(r.summary.discovery.offsetCapHits >= 1);
+      assert.ok(r.requests.some((q) => q.path === '/gamma/events' && q.status === 422));
+      const maxes = new Set(r.requests.filter((q) => q.path === '/gamma/events').map((q) => q.query.end_date_max));
+      assert.ok(maxes.size >= 2, 'end_date_max moved as a cursor');
+      const rows = readJsonl(path.join(dataDir, 'markets.jsonl'));
+      assert.equal(new Set(rows.map((m) => m.conditionId)).size, rows.length);
+    } finally {
+      await capped.close();
+    }
+  });
+
+  test('time-stratified sampling: per-window and per-game caps, stable on re-run', async () => {
+    const srv = await startMockServer({ faults: false });
+    try {
+      const fx = srv.fixture;
+      const dataDir = path.join(tmpRoot, 'windowed');
+      const args = ['--data-dir', dataDir, ...FAST, '--window-hours', '24', '--max-markets-per-window', '3', '--max-markets-per-game', '2', '--max-markets', '1000'];
+      const r = await runCollect(args, srv);
+      assert.equal(r.code, 0, r.stderr);
+      const rows = readJsonl(path.join(dataDir, 'markets.jsonl'));
+      assert.ok(rows.length > 0);
+      const perWindow = new Map();
+      const perGame = new Map();
+      for (const m of rows) {
+        const e = fx.byCid.get(m.conditionId);
+        const w = Math.floor(parseTs(e.event.endDate) / (24 * HOUR));
+        perWindow.set(w, (perWindow.get(w) || 0) + 1);
+        perGame.set(m.gameKey, (perGame.get(m.gameKey) || 0) + 1);
+      }
+      assert.ok(Math.max(...perWindow.values()) <= 3, 'window cap');
+      assert.ok(Math.max(...perGame.values()) <= 2, 'game cap');
+      assert.ok(r.summary.skipped.sampled_out_game > 0 || r.summary.skipped.sampled_out_window > 0);
+      assert.ok(r.summary.discovery.windows > 1);
+      // Every window that had an eligible market contributed one.
+      const okWindows = new Set(fx.entries.filter((e) => e.meta.kind === 'ok').map((e) => Math.floor(parseTs(e.event.endDate) / (24 * HOUR))));
+      assert.equal(perWindow.size, okWindows.size);
+      const again = await runCollect(args, srv);
+      assert.equal(again.code, 0, again.stderr);
+      assert.equal(again.summary.kept, 0, 'a re-run accepts the same markets and adds none');
+      assert.equal(again.summary.alreadyCollected, rows.length);
+    } finally {
+      await srv.close();
+    }
   });
 });

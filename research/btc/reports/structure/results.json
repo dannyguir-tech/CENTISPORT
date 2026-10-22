@@ -1,13 +1,802 @@
 {
- "variantsTested": 943,
- "variantsWithP": 817,
- "bhSignificant": 685,
+ "variantsTested": 1593,
+ "variantsWithP": 1087,
+ "bhSignificant": 877,
  "bhSignificantByGroup": {
   "M": 673,
-  "P": 0,
+  "P": 192,
   "I": 12
  },
- "verifySummary": {},
+ "verifySummary": {
+  "above_daily_mono": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 2089,
+   "legsWithNoPrints": 80,
+   "plAvailable": 0,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 0,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "above_hourly_mono": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 6556,
+   "legsWithNoPrints": 80,
+   "plAvailable": 0,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 0,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "hit_daily_mono": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 1649,
+   "legsWithNoPrints": 79,
+   "plAvailable": 0,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 0,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "hit_weekly_mono": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 2366,
+   "legsWithNoPrints": 77,
+   "plAvailable": 2,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 1,
+   "pmArb": 2,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "hit_monthly_mono": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 431,
+   "legsWithNoPrints": 61,
+   "plAvailable": 6,
+   "pl60Available": 1,
+   "pl60Arb": 0,
+   "plArb": 1,
+   "pmArb": 4,
+   "medianPl60Margin": -0.3786,
+   "examples": [],
+   "p90Pl60Margin": -0.3786
+  },
+  "range_allno": {
+   "sampled": 30,
+   "populationExecOnMidScreen": 590,
+   "legsWithNoPrints": 30,
+   "plAvailable": 0,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 0,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "range_allyes": {
+   "sampled": 27,
+   "populationExecOnMidScreen": 27,
+   "legsWithNoPrints": 25,
+   "plAvailable": 2,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 2,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "above_vs_range": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 1064,
+   "legsWithNoPrints": 77,
+   "plAvailable": 3,
+   "pl60Available": 1,
+   "pl60Arb": 1,
+   "plArb": 1,
+   "pmArb": 2,
+   "medianPl60Margin": 0.001,
+   "examples": [
+    {
+     "id": "bitcoin-above-on-september-25-2026|hi|90000",
+     "t": "2026-09-21T09:31:00.000Z",
+     "prices": [
+      0.917,
+      0.072
+     ],
+     "margin": 0.001,
+     "sizeShares": 10,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.001
+  },
+  "hit_vs_above_daily": {
+   "sampled": 24,
+   "populationExecOnMidScreen": 24,
+   "legsWithNoPrints": 20,
+   "plAvailable": 0,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 1,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "hit_vs_above_weekly": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 295,
+   "legsWithNoPrints": 79,
+   "plAvailable": 0,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 0,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "hit_vs_above_monthly": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 405,
+   "legsWithNoPrints": 79,
+   "plAvailable": 1,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 0,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "hit_nest_wd": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 660,
+   "legsWithNoPrints": 65,
+   "plAvailable": 11,
+   "pl60Available": 4,
+   "pl60Arb": 3,
+   "plArb": 4,
+   "pmArb": 9,
+   "medianPl60Margin": 0.0116,
+   "examples": [
+    {
+     "id": "what-price-will-bitcoin-hit-september-7-13-2026|hit_down76000|what-price-will-bitcoin-hit-on-september-13-2026|76000",
+     "t": "2026-09-14T01:11:00.000Z",
+     "prices": [
+      0.07,
+      0.908
+     ],
+     "margin": 0.0116,
+     "sizeShares": 36,
+     "payoff": 1
+    },
+    {
+     "id": "what-price-will-bitcoin-hit-september-21-27-2026|hit_down84000|what-price-will-bitcoin-hit-on-september-23-2026|84000",
+     "t": "2026-09-23T14:25:00.000Z",
+     "prices": [
+      0.9829,
+      0.01
+     ],
+     "margin": 0.0052,
+     "sizeShares": 69.44,
+     "payoff": 1
+    },
+    {
+     "id": "what-price-will-bitcoin-hit-september-14-20-2026|hit_up80000|what-price-will-bitcoin-hit-on-september-18-2026|80000",
+     "t": "2026-09-18T13:49:00.000Z",
+     "prices": [
+      0.93,
+      0.01
+     ],
+     "margin": 0.0547,
+     "sizeShares": 3,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0547
+  },
+  "hit_nest_md": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 211,
+   "legsWithNoPrints": 70,
+   "plAvailable": 6,
+   "pl60Available": 1,
+   "pl60Arb": 1,
+   "plArb": 2,
+   "pmArb": 5,
+   "medianPl60Margin": 0.0053,
+   "examples": [
+    {
+     "id": "what-price-will-bitcoin-hit-in-september-2026|hit_down80000|what-price-will-bitcoin-hit-on-september-30-2026|80000",
+     "t": "2026-09-30T09:34:00.000Z",
+     "prices": [
+      0.016,
+      0.976
+     ],
+     "margin": 0.0053,
+     "sizeShares": 84.375,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0053
+  },
+  "hit_nest_mw": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 255,
+   "legsWithNoPrints": 74,
+   "plAvailable": 2,
+   "pl60Available": 1,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 4,
+   "medianPl60Margin": -0.0115,
+   "examples": [],
+   "p90Pl60Margin": -0.0115
+  },
+  "daily_ud_vs_above": {
+   "sampled": 20,
+   "populationExecOnMidScreen": 20,
+   "legsWithNoPrints": 13,
+   "plAvailable": 6,
+   "pl60Available": 5,
+   "pl60Arb": 0,
+   "plArb": 1,
+   "pmArb": 6,
+   "medianPl60Margin": -0.0048,
+   "examples": [],
+   "p90Pl60Margin": -0.0003
+  },
+  "hourly_ud_vs_above_hourly": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 482,
+   "legsWithNoPrints": 67,
+   "plAvailable": 5,
+   "pl60Available": 0,
+   "pl60Arb": 0,
+   "plArb": 0,
+   "pmArb": 2,
+   "medianPl60Margin": null,
+   "examples": [],
+   "p90Pl60Margin": null
+  },
+  "nest_cl_15m_5m": {
+   "sampled": 62,
+   "populationExecOnMidScreen": 62,
+   "legsWithNoPrints": 1,
+   "plAvailable": 60,
+   "pl60Available": 60,
+   "pl60Arb": 5,
+   "plArb": 5,
+   "pmArb": 61,
+   "medianPl60Margin": -0.0334,
+   "examples": [
+    {
+     "id": "btc-updown-15m-1788999300|btc-updown-5m-1788999900|d=5.20",
+     "t": "2026-09-10T00:29:30.000Z",
+     "prices": [
+      0.93,
+      0.06
+     ],
+     "margin": 0.0015,
+     "sizeShares": 54,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-15m-1790580600|btc-updown-5m-1790581200|d=-2.59",
+     "t": "2026-09-28T07:41:30.000Z",
+     "prices": [
+      0.28,
+      0.69
+     ],
+     "margin": 0.0009,
+     "sizeShares": 12,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-15m-1790379000|btc-updown-5m-1790379600|d=-1.08",
+     "t": "2026-09-25T23:44:30.000Z",
+     "prices": [
+      0.97,
+      0.02
+     ],
+     "margin": 0.0066,
+     "sizeShares": 11,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-15m-1789126200|btc-updown-5m-1789126800|d=-1.58",
+     "t": "2026-09-11T11:42:30.000Z",
+     "prices": [
+      0.07,
+      0.9
+     ],
+     "margin": 0.0191,
+     "sizeShares": 14,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-15m-1790509500|btc-updown-5m-1790510100|d=1.09",
+     "t": "2026-09-27T11:55:30.000Z",
+     "prices": [
+      0.62,
+      0.34
+     ],
+     "margin": 0.0078,
+     "sizeShares": 20,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": -0.0014
+  },
+  "nest_cl_4h_15m": {
+   "sampled": 13,
+   "populationExecOnMidScreen": 13,
+   "legsWithNoPrints": 2,
+   "plAvailable": 11,
+   "pl60Available": 11,
+   "pl60Arb": 4,
+   "plArb": 4,
+   "pmArb": 10,
+   "medianPl60Margin": -0.0118,
+   "examples": [
+    {
+     "id": "btc-updown-4h-1788062400|btc-updown-15m-1788075900|d=0.21",
+     "t": "2026-08-30T07:55:30.000Z",
+     "prices": [
+      0.23,
+      0.6303
+     ],
+     "margin": 0.111,
+     "sizeShares": 9.58,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-4h-1791892800|btc-updown-15m-1791906300|d=4.30",
+     "t": "2026-10-13T15:58:30.000Z",
+     "prices": [
+      0.82,
+      0.08
+     ],
+     "margin": 0.0845,
+     "sizeShares": 25.71,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-4h-1787630400|btc-updown-15m-1787643900|d=28.75",
+     "t": "2026-08-25T07:49:30.000Z",
+     "prices": [
+      0.03,
+      0.93
+     ],
+     "margin": 0.0334,
+     "sizeShares": 10.107514,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-4h-1789459200|btc-updown-15m-1789472700|d=5.79",
+     "t": "2026-09-15T11:58:30.000Z",
+     "prices": [
+      0.85,
+      0.12
+     ],
+     "margin": 0.0137,
+     "sizeShares": 11,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0845
+  },
+  "nest_cl_4h_5m": {
+   "sampled": 7,
+   "populationExecOnMidScreen": 7,
+   "legsWithNoPrints": 0,
+   "plAvailable": 7,
+   "pl60Available": 7,
+   "pl60Arb": 4,
+   "plArb": 4,
+   "pmArb": 6,
+   "medianPl60Margin": 0.018,
+   "examples": [
+    {
+     "id": "btc-updown-4h-1788897600|btc-updown-5m-1788911700|d=42.05",
+     "t": "2026-09-08T23:55:30.000Z",
+     "prices": [
+      0.42,
+      0.46
+     ],
+     "margin": 0.0856,
+     "sizeShares": 2.173914,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-4h-1788897600|btc-updown-5m-1788911700|d=42.05",
+     "t": "2026-09-08T23:59:30.000Z",
+     "prices": [
+      0.93,
+      0.01
+     ],
+     "margin": 0.0547,
+     "sizeShares": 1.075257,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-4h-1790280000|btc-updown-5m-1790294100|d=24.92",
+     "t": "2026-09-24T23:56:30.000Z",
+     "prices": [
+      0.44,
+      0.5
+     ],
+     "margin": 0.0253,
+     "sizeShares": 6,
+     "payoff": 1
+    },
+    {
+     "id": "btc-updown-4h-1790582400|btc-updown-5m-1790596500|d=-11.11",
+     "t": "2026-09-28T11:55:30.000Z",
+     "prices": [
+      0.33,
+      0.62
+     ],
+     "margin": 0.018,
+     "sizeShares": 1.612904,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0856
+  },
+  "nest_basis_1h_15m": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 527,
+   "legsWithNoPrints": 3,
+   "plAvailable": 71,
+   "pl60Available": 71,
+   "pl60Arb": 59,
+   "plArb": 59,
+   "pmArb": 77,
+   "medianPl60Margin": 0.1093,
+   "examples": [
+    {
+     "id": "bitcoin-up-or-down-august-4-2026-6pm-et|btc-updown-15m-1785883500|d=-26.65",
+     "t": "2026-08-04T22:45:30.000Z",
+     "prices": [
+      0.32,
+      0.52
+     ],
+     "margin": 0.1273,
+     "sizeShares": 5,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-14-2026-2am-et|btc-updown-15m-1791960300|d=-66.41",
+     "t": "2026-10-14T06:45:30.000Z",
+     "prices": [
+      0.38,
+      0.5466
+     ],
+     "margin": 0.0396,
+     "sizeShares": 5.18,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-11-2026-3pm-et|btc-updown-15m-1791747900|d=-46.66",
+     "t": "2026-10-11T19:45:30.000Z",
+     "prices": [
+      0.27,
+      0.5
+     ],
+     "margin": 0.1987,
+     "sizeShares": 3,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-10-2026-5pm-et|btc-updown-15m-1791668700|d=-42.41",
+     "t": "2026-10-10T21:45:30.000Z",
+     "prices": [
+      0.16,
+      0.58
+     ],
+     "margin": 0.2335,
+     "sizeShares": 5,
+     "payoff": 0
+    },
+    {
+     "id": "bitcoin-up-or-down-august-5-2026-7am-et|btc-updown-15m-1785930300|d=-24.86",
+     "t": "2026-08-05T11:45:30.000Z",
+     "prices": [
+      0.59,
+      0.27
+     ],
+     "margin": 0.1093,
+     "sizeShares": 36.94,
+     "payoff": 0
+    }
+   ],
+   "p90Pl60Margin": 0.2584
+  },
+  "nest_basis_1h_5m": {
+   "sampled": 80,
+   "populationExecOnMidScreen": 146,
+   "legsWithNoPrints": 1,
+   "plAvailable": 77,
+   "pl60Available": 77,
+   "pl60Arb": 70,
+   "plArb": 70,
+   "pmArb": 79,
+   "medianPl60Margin": 0.1386,
+   "examples": [
+    {
+     "id": "bitcoin-up-or-down-september-17-2026-12am-et|btc-updown-5m-1789620900|d=-52.44",
+     "t": "2026-09-17T04:55:30.000Z",
+     "prices": [
+      0.31,
+      0.51
+     ],
+     "margin": 0.1475,
+     "sizeShares": 7,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-20-2026-6am-et|btc-updown-5m-1792493700|d=-80.89",
+     "t": "2026-10-20T10:55:30.000Z",
+     "prices": [
+      0.13,
+      0.69
+     ],
+     "margin": 0.1571,
+     "sizeShares": 5,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-17-2026-4pm-et|btc-updown-5m-1792270500|d=-50.93",
+     "t": "2026-10-17T20:55:30.000Z",
+     "prices": [
+      0.06,
+      0.34
+     ],
+     "margin": 0.5803,
+     "sizeShares": 1.81,
+     "payoff": 0
+    },
+    {
+     "id": "bitcoin-up-or-down-october-20-2026-1pm-et|btc-updown-5m-1792518900|d=-11.49",
+     "t": "2026-10-20T17:55:30.000Z",
+     "prices": [
+      0.24,
+      0.21
+     ],
+     "margin": 0.5256,
+     "sizeShares": 4.761905,
+     "payoff": 0
+    },
+    {
+     "id": "bitcoin-up-or-down-october-10-2026-11am-et|btc-updown-5m-1791647700|d=-46.72",
+     "t": "2026-10-10T15:55:30.000Z",
+     "prices": [
+      0.239,
+      0.22
+     ],
+     "margin": 0.5163,
+     "sizeShares": 5.8159,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.5163
+  },
+  "nest_basis_1d_4h": {
+   "sampled": 47,
+   "populationExecOnMidScreen": 47,
+   "legsWithNoPrints": 18,
+   "plAvailable": 17,
+   "pl60Available": 17,
+   "pl60Arb": 11,
+   "plArb": 11,
+   "pmArb": 24,
+   "medianPl60Margin": 0.0072,
+   "examples": [
+    {
+     "id": "bitcoin-up-or-down-on-june-29-2026|btc-updown-4h-1782734400|d=-21.41",
+     "t": "2026-06-29T15:14:30.000Z",
+     "prices": [
+      0.943,
+      0.019
+     ],
+     "margin": 0.0329,
+     "sizeShares": 30,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-on-august-25-2026|btc-updown-4h-1787659200|d=4.12",
+     "t": "2026-08-25T15:46:30.000Z",
+     "prices": [
+      0.92,
+      0.06
+     ],
+     "margin": 0.0109,
+     "sizeShares": 10.869562,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-on-june-29-2026|btc-updown-4h-1782734400|d=-21.41",
+     "t": "2026-06-29T12:00:30.000Z",
+     "prices": [
+      0.39,
+      0.51
+     ],
+     "margin": 0.0659,
+     "sizeShares": 5,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-on-october-10-2026|btc-updown-4h-1791633600|d=-9.97",
+     "t": "2026-10-10T14:01:30.000Z",
+     "prices": [
+      0.42,
+      0.39
+     ],
+     "margin": 0.1563,
+     "sizeShares": 10,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-on-october-10-2026|btc-updown-4h-1791633600|d=-9.97",
+     "t": "2026-10-10T14:32:30.000Z",
+     "prices": [
+      0.29,
+      0.66
+     ],
+     "margin": 0.0199,
+     "sizeShares": 5.72,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0662
+  },
+  "nest_basis_1h_15m_b100": {
+   "sampled": 3,
+   "populationExecOnMidScreen": 3,
+   "legsWithNoPrints": 1,
+   "plAvailable": 2,
+   "pl60Available": 2,
+   "pl60Arb": 1,
+   "plArb": 1,
+   "pmArb": 2,
+   "medianPl60Margin": 0.0058,
+   "examples": [
+    {
+     "id": "bitcoin-up-or-down-october-13-2026-9am-et|btc-updown-15m-1791899100|d=-102.40",
+     "t": "2026-10-13T13:51:30.000Z",
+     "prices": [
+      0.685,
+      0.28
+     ],
+     "margin": 0.0058,
+     "sizeShares": 10,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0058
+  },
+  "nest_basis_1h_5m_b100": {
+   "sampled": 7,
+   "populationExecOnMidScreen": 7,
+   "legsWithNoPrints": 0,
+   "plAvailable": 7,
+   "pl60Available": 7,
+   "pl60Arb": 5,
+   "plArb": 5,
+   "pmArb": 7,
+   "medianPl60Margin": 0.0474,
+   "examples": [
+    {
+     "id": "bitcoin-up-or-down-october-17-2026-5am-et|btc-updown-5m-1792230900|d=-102.72",
+     "t": "2026-10-17T09:55:30.000Z",
+     "prices": [
+      0.37,
+      0.28
+     ],
+     "margin": 0.3196,
+     "sizeShares": 2.702703,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-16-2026-9pm-et|btc-updown-5m-1792202100|d=-108.17",
+     "t": "2026-10-17T01:55:30.000Z",
+     "prices": [
+      0.76,
+      0.17
+     ],
+     "margin": 0.0474,
+     "sizeShares": 1.315787,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-16-2026-4am-et|btc-updown-5m-1792140900|d=-109.99",
+     "t": "2026-10-16T08:59:30.000Z",
+     "prices": [
+      0.9863,
+      0.01
+     ],
+     "margin": 0.0021,
+     "sizeShares": 138.86,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-october-17-2026-9am-et|btc-updown-5m-1792245300|d=-104.84",
+     "t": "2026-10-17T13:56:30.000Z",
+     "prices": [
+      0.48,
+      0.39
+     ],
+     "margin": 0.0959,
+     "sizeShares": 5,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-september-18-2026-1am-et|btc-updown-5m-1789710900|d=-167.93",
+     "t": "2026-09-18T05:55:30.000Z",
+     "prices": [
+      0.38,
+      0.41
+     ],
+     "margin": 0.1766,
+     "sizeShares": 2.631579,
+     "payoff": 2
+    }
+   ],
+   "p90Pl60Margin": 0.3196
+  },
+  "nest_basis_1d_4h_b100": {
+   "sampled": 6,
+   "populationExecOnMidScreen": 6,
+   "legsWithNoPrints": 1,
+   "plAvailable": 2,
+   "pl60Available": 2,
+   "pl60Arb": 2,
+   "plArb": 2,
+   "pmArb": 2,
+   "medianPl60Margin": 0.0085,
+   "examples": [
+    {
+     "id": "bitcoin-up-or-down-on-september-6-2026|btc-updown-4h-1788696000|d=110.65",
+     "t": "2026-09-06T14:57:30.000Z",
+     "prices": [
+      0.19,
+      0.78
+     ],
+     "margin": 0.0072,
+     "sizeShares": 2.1,
+     "payoff": 1
+    },
+    {
+     "id": "bitcoin-up-or-down-on-august-5-2026|btc-updown-4h-1785931200|d=-107.39",
+     "t": "2026-08-05T14:50:30.000Z",
+     "prices": [
+      0.08,
+      0.9
+     ],
+     "margin": 0.0085,
+     "sizeShares": 36.14,
+     "payoff": 1
+    }
+   ],
+   "p90Pl60Margin": 0.0085
+  }
+ },
  "episodeSummary": {
   "above_daily_mono": {
    "episodes": 13456,
@@ -563,23 +1352,23 @@
   }
  },
  "live": {
-  "snapshots": 68,
-  "polls": 66,
+  "snapshots": 117,
+  "polls": 115,
   "from": "2026-10-22T10:12:42.000Z",
-  "to": "2026-10-22T11:27:23.000Z",
-  "hours": 1.2447,
+  "to": "2026-10-22T11:43:44.000Z",
+  "hours": 1.5172,
   "families": {
    "above_daily_mono": {
     "instances": 385,
-    "snapshotEvaluations": 26180,
-    "priced": 22168,
+    "snapshotEvaluations": 45045,
+    "priced": 38142,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0019,
     "marginQuantiles": {
-     "p50": -0.5238,
+     "p50": -0.5247,
      "p90": -0.0265,
-     "p99": -0.0062,
+     "p99": -0.006,
      "max": -0.0019
     },
     "maxProfitUsd": 0,
@@ -588,28 +1377,28 @@
     "medianEpisodeSnapshots": null,
     "usdPerDayUpperBound": 0,
     "makerLegged": {
-     "snapshotInstancesPositive": 153,
+     "snapshotInstancesPositive": 259,
      "instancesPositive": 4,
      "marginQuantiles": {
       "p50": -0.4835,
-      "p90": -0.0146,
+      "p90": -0.0144,
       "p99": -0.0004,
-      "max": 0.0128
+      "max": 0.0138
      }
     }
    },
    "above_hourly_mono": {
-    "instances": 380,
-    "snapshotEvaluations": 12920,
-    "priced": 1733,
+    "instances": 570,
+    "snapshotEvaluations": 23180,
+    "priced": 2267,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
-    "maxMargin": -0.0311,
+    "maxMargin": -0.0098,
     "marginQuantiles": {
-     "p50": -0.5565,
+     "p50": -0.5837,
      "p90": -0.0492,
      "p99": -0.0311,
-     "max": -0.0311
+     "max": -0.0098
     },
     "maxProfitUsd": 0,
     "episodeFirstProfitUsdSum": 0,
@@ -620,22 +1409,22 @@
      "snapshotInstancesPositive": 79,
      "instancesPositive": 30,
      "marginQuantiles": {
-      "p50": -0.4532,
-      "p90": -0.0001,
-      "p99": 0.015,
+      "p50": -0.4807,
+      "p90": -0.0011,
+      "p99": 0.014,
       "max": 0.9489
      }
     }
    },
    "hit_daily_mono": {
     "instances": 49,
-    "snapshotEvaluations": 3332,
-    "priced": 3332,
+    "snapshotEvaluations": 5733,
+    "priced": 5404,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0023,
     "marginQuantiles": {
-     "p50": -0.0525,
+     "p50": -0.0743,
      "p90": -0.0056,
      "p99": -0.0033,
      "max": -0.0023
@@ -646,11 +1435,11 @@
     "medianEpisodeSnapshots": null,
     "usdPerDayUpperBound": 0,
     "makerLegged": {
-     "snapshotInstancesPositive": 67,
+     "snapshotInstancesPositive": 116,
      "instancesPositive": 1,
      "marginQuantiles": {
-      "p50": -0.0451,
-      "p90": -0.0023,
+      "p50": -0.0586,
+      "p90": -0.0024,
       "p99": 0.0007,
       "max": 0.0007
      }
@@ -658,13 +1447,13 @@
    },
    "hit_weekly_mono": {
     "instances": 36,
-    "snapshotEvaluations": 2448,
-    "priced": 2448,
+    "snapshotEvaluations": 4212,
+    "priced": 4212,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0035,
     "marginQuantiles": {
-     "p50": -0.0332,
+     "p50": -0.0342,
      "p90": -0.0092,
      "p99": -0.0035,
      "max": -0.0035
@@ -679,7 +1468,7 @@
      "instancesPositive": 0,
      "marginQuantiles": {
       "p50": -0.0286,
-      "p90": -0.0043,
+      "p90": -0.0046,
       "p99": -0.0021,
       "max": -0.0021
      }
@@ -687,8 +1476,8 @@
    },
    "hit_monthly_mono": {
     "instances": 292,
-    "snapshotEvaluations": 5930,
-    "priced": 5318,
+    "snapshotEvaluations": 9899,
+    "priced": 8846,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0016,
@@ -716,15 +1505,15 @@
    },
    "range_allyes": {
     "instances": 7,
-    "snapshotEvaluations": 476,
-    "priced": 476,
+    "snapshotEvaluations": 819,
+    "priced": 819,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0778,
     "marginQuantiles": {
-     "p50": -0.267,
-     "p90": -0.099,
-     "p99": -0.0851,
+     "p50": -0.2751,
+     "p90": -0.0983,
+     "p99": -0.0848,
      "max": -0.0778
     },
     "maxProfitUsd": 0,
@@ -736,25 +1525,25 @@
      "snapshotInstancesPositive": 0,
      "instancesPositive": 0,
      "marginQuantiles": {
-      "p50": -0.1986,
+      "p50": -0.1978,
       "p90": -0.0481,
-      "p99": -0.0232,
+      "p99": -0.0235,
       "max": -0.0014
      }
     }
    },
    "range_allno": {
     "instances": 7,
-    "snapshotEvaluations": 476,
-    "priced": 340,
+    "snapshotEvaluations": 819,
+    "priced": 585,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
-    "maxMargin": -0.1254,
+    "maxMargin": -0.1235,
     "marginQuantiles": {
-     "p50": -0.1758,
-     "p90": -0.1348,
+     "p50": -0.173,
+     "p90": -0.133,
      "p99": -0.1273,
-     "max": -0.1254
+     "max": -0.1235
     },
     "maxProfitUsd": 0,
     "episodeFirstProfitUsdSum": 0,
@@ -762,25 +1551,25 @@
     "medianEpisodeSnapshots": null,
     "usdPerDayUpperBound": 0,
     "makerLegged": {
-     "snapshotInstancesPositive": 3,
-     "instancesPositive": 2,
+     "snapshotInstancesPositive": 8,
+     "instancesPositive": 4,
      "marginQuantiles": {
       "p50": -0.1073,
-      "p90": -0.0554,
-      "p99": -0.0295,
+      "p90": -0.0483,
+      "p99": 0.2501,
       "max": 0.8157
      }
     }
    },
    "above_vs_range": {
     "instances": 140,
-    "snapshotEvaluations": 9520,
-    "priced": 9180,
+    "snapshotEvaluations": 16380,
+    "priced": 15795,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0001,
     "marginQuantiles": {
-     "p50": -0.1282,
+     "p50": -0.1327,
      "p90": -0.0158,
      "p99": -0.0023,
      "max": -0.0001
@@ -791,20 +1580,20 @@
     "medianEpisodeSnapshots": null,
     "usdPerDayUpperBound": 0,
     "makerLegged": {
-     "snapshotInstancesPositive": 575,
-     "instancesPositive": 17,
+     "snapshotInstancesPositive": 997,
+     "instancesPositive": 21,
      "marginQuantiles": {
-      "p50": -0.0673,
-      "p90": -0.0046,
+      "p50": -0.0698,
+      "p90": -0.0037,
       "p99": 0.0073,
-      "max": 0.0251
+      "max": 0.097
      }
     }
    },
    "hit_vs_above_daily": {
     "instances": 15,
-    "snapshotEvaluations": 1020,
-    "priced": 680,
+    "snapshotEvaluations": 1755,
+    "priced": 1170,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0047,
@@ -832,13 +1621,13 @@
    },
    "hit_vs_above_weekly": {
     "instances": 36,
-    "snapshotEvaluations": 2448,
-    "priced": 1972,
+    "snapshotEvaluations": 4212,
+    "priced": 3393,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0083,
     "marginQuantiles": {
-     "p50": -0.0342,
+     "p50": -0.0351,
      "p90": -0.0108,
      "p99": -0.0083,
      "max": -0.0083
@@ -852,22 +1641,22 @@
      "snapshotInstancesPositive": 2,
      "instancesPositive": 1,
      "marginQuantiles": {
-      "p50": -0.0256,
+      "p50": -0.0266,
       "p90": -0.0038,
-      "p99": -0.0019,
+      "p99": -0.0024,
       "max": 0.006
      }
     }
    },
    "hit_vs_above_monthly": {
     "instances": 49,
-    "snapshotEvaluations": 3332,
-    "priced": 2992,
+    "snapshotEvaluations": 5733,
+    "priced": 5148,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0524,
     "marginQuantiles": {
-     "p50": -0.2463,
+     "p50": -0.2435,
      "p90": -0.0622,
      "p99": -0.0524,
      "max": -0.0524
@@ -881,22 +1670,22 @@
      "snapshotInstancesPositive": 0,
      "instancesPositive": 0,
      "marginQuantiles": {
-      "p50": -0.2235,
+      "p50": -0.2207,
       "p90": -0.0544,
       "p99": -0.0383,
-      "max": -0.034
+      "max": -0.033
      }
     }
    },
    "hit_nest_wd": {
     "instances": 6,
-    "snapshotEvaluations": 408,
-    "priced": 408,
+    "snapshotEvaluations": 702,
+    "priced": 655,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0162,
     "marginQuantiles": {
-     "p50": -0.0388,
+     "p50": -0.0758,
      "p90": -0.0172,
      "p99": -0.0162,
      "max": -0.0162
@@ -910,7 +1699,7 @@
      "snapshotInstancesPositive": 0,
      "instancesPositive": 0,
      "marginQuantiles": {
-      "p50": -0.0346,
+      "p50": -0.0607,
       "p90": -0.0121,
       "p99": -0.0121,
       "max": -0.0121
@@ -919,13 +1708,13 @@
    },
    "hit_nest_md": {
     "instances": 6,
-    "snapshotEvaluations": 408,
-    "priced": 408,
+    "snapshotEvaluations": 702,
+    "priced": 655,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.1159,
     "marginQuantiles": {
-     "p50": -0.2518,
+     "p50": -0.3091,
      "p90": -0.1159,
      "p99": -0.1159,
      "max": -0.1159
@@ -939,7 +1728,7 @@
      "snapshotInstancesPositive": 0,
      "instancesPositive": 0,
      "marginQuantiles": {
-      "p50": -0.2291,
+      "p50": -0.2844,
       "p90": -0.0991,
       "p99": -0.0991,
       "max": -0.0991
@@ -948,8 +1737,8 @@
    },
    "hit_nest_mw": {
     "instances": 10,
-    "snapshotEvaluations": 680,
-    "priced": 680,
+    "snapshotEvaluations": 1170,
+    "priced": 1170,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
     "maxMargin": -0.0195,
@@ -977,45 +1766,45 @@
    },
    "daily_ud_vs_above": {
     "instances": 2,
-    "snapshotEvaluations": 136,
-    "priced": 136,
-    "violatingSnapshotInstances": 4,
+    "snapshotEvaluations": 234,
+    "priced": 234,
+    "violatingSnapshotInstances": 13,
     "violatingInstances": 1,
-    "maxMargin": 0.0018,
+    "maxMargin": 0.0029,
     "marginQuantiles": {
      "p50": -0.0193,
-     "p90": -0.0034,
-     "p99": 0.0009,
-     "max": 0.0018
+     "p90": -0.001,
+     "p99": 0.0019,
+     "max": 0.0029
     },
-    "maxProfitUsd": 0.4094,
+    "maxProfitUsd": 0.765,
     "episodeFirstProfitUsdSum": 0.0851,
-    "episodeMaxProfitUsdSum": 0.4094,
-    "medianEpisodeSnapshots": 4,
-    "usdPerDayUpperBound": 7.8938,
+    "episodeMaxProfitUsdSum": 0.765,
+    "medianEpisodeSnapshots": 13,
+    "usdPerDayUpperBound": 12.1011,
     "makerLegged": {
-     "snapshotInstancesPositive": 58,
+     "snapshotInstancesPositive": 79,
      "instancesPositive": 1,
      "marginQuantiles": {
       "p50": -0.0068,
-      "p90": 0.0023,
-      "p99": 0.0066,
-      "max": 0.0066
+      "p90": 0.0045,
+      "p99": 0.0076,
+      "max": 0.0076
      }
     }
    },
    "hourly_ud_vs_above_hourly": {
     "instances": 4,
-    "snapshotEvaluations": 136,
-    "priced": 136,
+    "snapshotEvaluations": 234,
+    "priced": 234,
     "violatingSnapshotInstances": 0,
     "violatingInstances": 0,
-    "maxMargin": -0.0719,
+    "maxMargin": -0.0283,
     "marginQuantiles": {
-     "p50": -0.1644,
-     "p90": -0.0935,
-     "p99": -0.0735,
-     "max": -0.0719
+     "p50": -0.1545,
+     "p90": -0.0693,
+     "p99": -0.0463,
+     "max": -0.0283
     },
     "maxProfitUsd": 0,
     "episodeFirstProfitUsdSum": 0,
@@ -1023,13 +1812,42 @@
     "medianEpisodeSnapshots": null,
     "usdPerDayUpperBound": 0,
     "makerLegged": {
-     "snapshotInstancesPositive": 3,
+     "snapshotInstancesPositive": 29,
      "instancesPositive": 2,
      "marginQuantiles": {
       "p50": -0.0757,
-      "p90": -0.0208,
-      "p99": 0.0065,
+      "p90": 0.0059,
+      "p99": 0.0421,
       "max": 0.5732
+     }
+    }
+   },
+   "nest_cl_15m_5m": {
+    "instances": 2,
+    "snapshotEvaluations": 30,
+    "priced": 24,
+    "violatingSnapshotInstances": 0,
+    "violatingInstances": 0,
+    "maxMargin": -0.0311,
+    "marginQuantiles": {
+     "p50": -0.5263,
+     "p90": -0.1998,
+     "p99": -0.0311,
+     "max": -0.0311
+    },
+    "maxProfitUsd": 0,
+    "episodeFirstProfitUsdSum": 0,
+    "episodeMaxProfitUsdSum": 0,
+    "medianEpisodeSnapshots": null,
+    "usdPerDayUpperBound": 0,
+    "makerLegged": {
+     "snapshotInstancesPositive": 0,
+     "instancesPositive": 0,
+     "marginQuantiles": {
+      "p50": -0.5031,
+      "p90": -0.1791,
+      "p99": -0.0191,
+      "max": -0.0191
      }
     }
    }
@@ -2057,6 +2875,420 @@
    "bh": true
   },
   {
+   "group": "P",
+   "family": "above_vs_range",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-08-22",
+     "to": "2026-08-28",
+     "theta": 0
+    },
+    {
+     "from": "2026-08-29",
+     "to": "2026-09-09",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-10",
+     "to": "2026-09-20",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-21",
+     "to": "2026-10-08",
+     "theta": 0
+    },
+    {
+     "from": "2026-10-09",
+     "to": "2026-10-20",
+     "theta": 0
+    }
+   ],
+   "oosFrom": "2026-08-22",
+   "oosTo": "2026-10-20",
+   "n": 1,
+   "days": 1,
+   "winRate": 1,
+   "avgCost": 0.999,
+   "avgPayoff": 1,
+   "edgePerTrade": 0.001,
+   "roi": 0.001,
+   "ci": [
+    null,
+    null
+   ],
+   "p": null,
+   "failRate": 0,
+   "capacityUsdPerDay": 0.0011,
+   "sampleScale": 13.3,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "hit_nest_wd",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-09-11",
+     "to": "2026-09-19",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-20",
+     "to": "2026-09-25",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-26",
+     "to": "2026-10-03",
+     "theta": 0
+    },
+    {
+     "from": "2026-10-04",
+     "to": "2026-10-18",
+     "theta": 0
+    },
+    {
+     "from": "2026-10-19",
+     "to": "2026-10-19",
+     "theta": 0
+    }
+   ],
+   "oosFrom": "2026-09-11",
+   "oosTo": "2026-10-19",
+   "n": 3,
+   "days": 3,
+   "winRate": 1,
+   "avgCost": 0.9761,
+   "avgPayoff": 1,
+   "edgePerTrade": 0.0239,
+   "roi": 0.0244,
+   "ci": [
+    0.0074,
+    0.0579
+   ],
+   "p": 0.0004997501249375312,
+   "failRate": 0,
+   "capacityUsdPerDay": 0.0876,
+   "sampleScale": 8.25,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "hit_nest_md",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-08-24",
+     "to": "2026-08-29",
+     "theta": 0
+    },
+    {
+     "from": "2026-08-31",
+     "to": "2026-09-03",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-09",
+     "to": "2026-09-27",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-30",
+     "to": "2026-10-01",
+     "theta": 0
+    }
+   ],
+   "oosFrom": "2026-08-24",
+   "oosTo": "2026-10-01",
+   "n": 1,
+   "days": 1,
+   "winRate": 1,
+   "avgCost": 0.9947,
+   "avgPayoff": 1,
+   "edgePerTrade": 0.0053,
+   "roi": 0.0053,
+   "ci": [
+    null,
+    null
+   ],
+   "p": null,
+   "failRate": 0,
+   "capacityUsdPerDay": 0.0175,
+   "sampleScale": 2.6375,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "nest_cl_15m_5m",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-09-26",
+     "to": "2026-09-29",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-30",
+     "to": "2026-10-04",
+     "theta": 0.005
+    },
+    {
+     "from": "2026-10-05",
+     "to": "2026-10-10",
+     "theta": 0.005
+    },
+    {
+     "from": "2026-10-11",
+     "to": "2026-10-16",
+     "theta": 0.005
+    },
+    {
+     "from": "2026-10-17",
+     "to": "2026-10-20",
+     "theta": 0.005
+    }
+   ],
+   "oosFrom": "2026-09-26",
+   "oosTo": "2026-10-20",
+   "n": 2,
+   "days": 2,
+   "winRate": 1,
+   "avgCost": 0.9956,
+   "avgPayoff": 1,
+   "edgePerTrade": 0.0044,
+   "roi": 0.0044,
+   "ci": [
+    0.0009,
+    0.0079
+   ],
+   "p": 0.0004997501249375312,
+   "failRate": 0,
+   "capacityUsdPerDay": 0.0039,
+   "sampleScale": 1,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "nest_cl_4h_15m",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-08-26",
+     "to": "2026-08-29",
+     "theta": 0
+    },
+    {
+     "from": "2026-08-30",
+     "to": "2026-09-02",
+     "theta": 0
+    },
+    {
+     "from": "2026-09-15",
+     "to": "2026-10-06",
+     "theta": 0
+    },
+    {
+     "from": "2026-10-13",
+     "to": "2026-10-13",
+     "theta": 0
+    }
+   ],
+   "oosFrom": "2026-08-26",
+   "oosTo": "2026-10-13",
+   "n": 3,
+   "days": 3,
+   "winRate": 1,
+   "avgCost": 0.9303,
+   "avgPayoff": 1,
+   "edgePerTrade": 0.0697,
+   "roi": 0.075,
+   "ci": [
+    0.0139,
+    0.1248
+   ],
+   "p": 0.0004997501249375312,
+   "failRate": 0,
+   "capacityUsdPerDay": 0.0326,
+   "sampleScale": 1,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "nest_basis_1h_15m",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-08-03",
+     "to": "2026-08-09",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-08-10",
+     "to": "2026-08-19",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-08-31",
+     "to": "2026-09-22",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-09-27",
+     "to": "2026-10-17",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-10-18",
+     "to": "2026-10-21",
+     "theta": 0.02
+    }
+   ],
+   "oosFrom": "2026-08-03",
+   "oosTo": "2026-10-21",
+   "n": 37,
+   "days": 21,
+   "winRate": 0.7568,
+   "avgCost": 0.8399,
+   "avgPayoff": 0.7568,
+   "edgePerTrade": -0.0831,
+   "roi": -0.099,
+   "ci": [
+    -0.2788,
+    0.0443
+   ],
+   "p": 0.9005497251374313,
+   "failRate": 0.2432,
+   "capacityUsdPerDay": 1.1519,
+   "sampleScale": 6.5875,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "nest_basis_1h_5m",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-09-27",
+     "to": "2026-09-30",
+     "theta": 0
+    },
+    {
+     "from": "2026-10-01",
+     "to": "2026-10-09",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-10-10",
+     "to": "2026-10-13",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-10-14",
+     "to": "2026-10-17",
+     "theta": 0.02
+    },
+    {
+     "from": "2026-10-18",
+     "to": "2026-10-21",
+     "theta": 0.02
+    }
+   ],
+   "oosFrom": "2026-09-27",
+   "oosTo": "2026-10-21",
+   "n": 49,
+   "days": 20,
+   "winRate": 0.7143,
+   "avgCost": 0.7419,
+   "avgPayoff": 0.7143,
+   "edgePerTrade": -0.0276,
+   "roi": -0.0373,
+   "ci": [
+    -0.1858,
+    0.1059
+   ],
+   "p": 0.6786606696651675,
+   "failRate": 0.2857,
+   "capacityUsdPerDay": 6.1351,
+   "sampleScale": 1.825,
+   "bh": false
+  },
+  {
+   "group": "P",
+   "family": "nest_basis_1d_4h",
+   "scenario": "pl60",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "folds": [
+    {
+     "from": "2026-07-07",
+     "to": "2026-07-25",
+     "theta": 0
+    },
+    {
+     "from": "2026-08-05",
+     "to": "2026-08-08",
+     "theta": 0
+    },
+    {
+     "from": "2026-08-13",
+     "to": "2026-08-15",
+     "theta": 0.01
+    },
+    {
+     "from": "2026-08-25",
+     "to": "2026-09-06",
+     "theta": 0.01
+    },
+    {
+     "from": "2026-10-10",
+     "to": "2026-10-10",
+     "theta": 0.02
+    }
+   ],
+   "oosFrom": "2026-07-07",
+   "oosTo": "2026-10-10",
+   "n": 5,
+   "days": 4,
+   "winRate": 1,
+   "avgCost": 0.9508,
+   "avgPayoff": 1,
+   "edgePerTrade": 0.0492,
+   "roi": 0.0517,
+   "ci": [
+    0.0057,
+    0.1069
+   ],
+   "p": 0.0004997501249375312,
+   "failRate": 0,
+   "capacityUsdPerDay": 0.0143,
+   "sampleScale": 1,
+   "bh": true
+  },
+  {
    "group": "I",
    "family": "implied_15m_5m_outer",
    "scenario": "hc1",
@@ -2630,6 +3862,132 @@
    ],
    "printChecked": 3,
    "printRoi": 0.1555,
+   "bh": false
+  },
+  {
+   "group": "I",
+   "family": "implied_15m_5m_outer",
+   "scenario": "print_pl",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "n": 1342,
+   "days": 28,
+   "winRate": 0.3823,
+   "avgCost": 0.3824,
+   "roi": -0.0004,
+   "ci": [
+    -0.056,
+    0.0535
+   ],
+   "p": 0.4867566216891554,
+   "slipVsAssumed": 0.0528,
+   "midRoiSameSubset": 0.1598,
+   "bh": false
+  },
+  {
+   "group": "I",
+   "family": "implied_15m_5m_outer",
+   "scenario": "print_pn",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "n": 1278,
+   "days": 28,
+   "winRate": 0.3881,
+   "avgCost": 0.3797,
+   "roi": 0.0223,
+   "ci": [
+    -0.0376,
+    0.0786
+   ],
+   "p": 0.21489255372313842,
+   "slipVsAssumed": 0.0471,
+   "midRoiSameSubset": 0.1671,
+   "bh": false
+  },
+  {
+   "group": "I",
+   "family": "implied_4h_15m_outer",
+   "scenario": "print_pl",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "n": 67,
+   "days": 46,
+   "winRate": 0.3731,
+   "avgCost": 0.3997,
+   "roi": -0.0665,
+   "ci": [
+    -0.3256,
+    0.1662
+   ],
+   "p": 0.7116441779110445,
+   "slipVsAssumed": 0.0606,
+   "midRoiSameSubset": 0.1002,
+   "bh": false
+  },
+  {
+   "group": "I",
+   "family": "implied_4h_15m_outer",
+   "scenario": "print_pn",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "n": 53,
+   "days": 39,
+   "winRate": 0.3585,
+   "avgCost": 0.3338,
+   "roi": 0.074,
+   "ci": [
+    -0.1915,
+    0.3335
+   ],
+   "p": 0.2913543228385807,
+   "slipVsAssumed": 0.0441,
+   "midRoiSameSubset": 0.2375,
+   "bh": false
+  },
+  {
+   "group": "I",
+   "family": "implied_4h_5m_outer",
+   "scenario": "print_pl",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "n": 8,
+   "days": 5,
+   "winRate": 0.625,
+   "avgCost": 0.5593,
+   "roi": 0.1175,
+   "ci": [
+    -0.7606,
+    1.2949
+   ],
+   "p": 0.3918040979510245,
+   "slipVsAssumed": 0.1108,
+   "midRoiSameSubset": 0.3938,
+   "bh": false
+  },
+  {
+   "group": "I",
+   "family": "implied_4h_5m_outer",
+   "scenario": "print_pn",
+   "fee": "docs_always",
+   "theta": "WF",
+   "mode": "walk-forward",
+   "n": 11,
+   "days": 9,
+   "winRate": 0.6364,
+   "avgCost": 0.4484,
+   "roi": 0.4192,
+   "ci": [
+    -0.3333,
+    1.6175
+   ],
+   "p": 0.16491754122938532,
+   "slipVsAssumed": 0.1056,
+   "midRoiSameSubset": 0.8566,
    "bh": false
   }
  ]

@@ -191,7 +191,9 @@ export function buildMarketRows(market, startTs, pricesByToken, tape, opts, coun
   const { conditionId, outcomes, tokenIds, winnerIndex } = market;
   const sport = market.sport ? String(market.sport).toLowerCase() : null;
   const marketType = classifyMarketType(market.question, sport);
-  const eventKey = market.eventSlug || conditionId;
+  // Cluster = the real game. gamma splits one game across several events (main, player props,
+  // inning winners, more markets ...), so collect.js records gameKey; older records fall back.
+  const eventKey = market.gameKey || market.eventSlug || conditionId;
   const settleTs = parseTime(market.times?.closedTime);
   if (Array.isArray(tape)) tape = { trades: tape, ...tapeCoverage(null, tape.length ? tape[0].t : null) };
   counters.featureNulls ||= {};

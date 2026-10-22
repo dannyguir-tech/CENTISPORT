@@ -51,7 +51,9 @@ function walkForward(rowsByTheta, allDays, { minTrain = 5, defTheta = 0.01 } = {
 // ------------------------------------------------------------------ M: mid-screen
 const M = new Map(); // family|s|fm -> Map(theta -> rows)
 const famDays = new Map();
-const rl = readline.createInterface({ input: fs.createReadStream(path.join(HIST, 'trades.jsonl')) });
+import zlib from 'node:zlib';
+const tradesFile = fs.existsSync(path.join(HIST, 'trades.jsonl')) ? path.join(HIST, 'trades.jsonl') : path.join(HIST, 'trades.jsonl.gz');
+const rl = readline.createInterface({ input: tradesFile.endsWith('.gz') ? fs.createReadStream(tradesFile).pipe(zlib.createGunzip()) : fs.createReadStream(tradesFile) });
 for await (const line of rl) {
   if (!line) continue;
   const x = JSON.parse(line);

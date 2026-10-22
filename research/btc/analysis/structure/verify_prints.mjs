@@ -27,7 +27,7 @@ const BLOCK = 600;
 
 // ------------------------------------------------------------------ sample episodes
 const byFam = new Map();
-const rl = readline.createInterface({ input: fs.createReadStream(path.join(HIST, 'episodes_exec.jsonl')) });
+const rl = readline.createInterface({ input: (fs.existsSync(path.join(HIST, 'episodes_exec.jsonl')) ? fs.createReadStream(path.join(HIST, 'episodes_exec.jsonl')) : fs.createReadStream(path.join(HIST, 'episodes_exec.jsonl.gz')).pipe((await import('node:zlib')).createGunzip())) });
 for await (const line of rl) { if (!line) continue; const e = JSON.parse(line); if (!byFam.has(e.family)) byFam.set(e.family, []); byFam.get(e.family).push(e); }
 const sample = [];
 const population = {};

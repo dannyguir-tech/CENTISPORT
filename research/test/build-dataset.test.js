@@ -426,3 +426,22 @@ test('provenance groups collect.js runs by runId; a crashed run with overridden 
   assert.equal(p.syntheticRuns, 1);
   assert.ok(p.reasons.some((r) => /non-default API bases \(http:\/\/replay-proxy:9000\)/.test(r)));
 });
+
+// Real gamma data splits one game across several events (main, player props, inning winners ...).
+// They must share one bootstrap cluster, so eventKey prefers the collector's gameKey.
+test('eventKey is the gameKey when the collector recorded one, else the event slug', async () => {
+  const dir = tmpDir('game-key');
+  const times = { gameStartTime: '2025-01-10 00:00:00+00', closedTime: '2025-01-10 03:30:00+00' };
+  writeJsonl(path.join(dir, 'markets.jsonl'), [
+    market({ conditionId: 'g1', question: 'Brewers vs. Dodgers', eventSlug: 'mlb-mil-lad-2025-01-09', gameKey: 'mlb-mil-lad-2025-01-09', tokenIds: ['g1a', 'g1b'], times }),
+    market({ conditionId: 'g2', question: 'Inning 1 winner', eventSlug: 'mlb-mil-lad-2025-01-09-inning-1-winner', gameKey: 'mlb-mil-lad-2025-01-09', tokenIds: ['g2a', 'g2b'], times }),
+    market({ conditionId: 'g3', question: 'Old record', eventSlug: 'nba-lal-bos-2025-01-09', tokenIds: ['g3a', 'g3b'], times }),
+  ]);
+  for (const tok of ['g1a', 'g1b', 'g2a', 'g2b', 'g3a', 'g3b']) writePrices(dir, tok, [{ t: S - 2 * H, p: 0.5 }]);
+  await buildDataset({ dataDir: dir, offsets: [1] });
+  const rows = readRows(path.join(dir, 'dataset.jsonl'));
+  const key = (cid) => new Set(rows.filter((r) => r.conditionId === cid).map((r) => r.eventKey));
+  assert.deepEqual([...key('g1')], ['mlb-mil-lad-2025-01-09']);
+  assert.deepEqual([...key('g2')], ['mlb-mil-lad-2025-01-09']);
+  assert.deepEqual([...key('g3')], ['nba-lal-bos-2025-01-09']);
+});

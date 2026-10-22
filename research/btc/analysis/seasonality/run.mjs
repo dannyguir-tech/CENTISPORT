@@ -135,31 +135,6 @@ function tapeIndex(tf) {
   if (tf === '5m' || tf === '15m') for (const tp of loadTrades(tf)) m.set(tp.conditionId, tp);
   return (tapeIdx[tf] = m);
 }
-function firstBuyFill(tape, tok, t, wait = 20) {
-  const tr = tape.trades; let lo = 0, hi = tr.length;
-  while (lo < hi) { const m = (lo + hi) >> 1; if (tr[m].t >= t) hi = m; else lo = m + 1; }
-  for (let j = lo; j < tr.length && tr[j].t <= t + wait; j++) if (tr[j].side === 'B' && tr[j].o === tok) return tr[j];
-  return null;
-}
-function tapeCrossCheck(trades, tf, action) {
-  const idx = tapeIndex(tf); if (!idx.size) return null;
-  const rows = [];
-  for (const tr of trades) {
-    const tape = idx.get(tr.conditionId); if (!tape) continue;
-    const f = firstBuyFill(tape, tr.tok, tr.t); if (!f) continue;
-    const won = tr.won ? 1 : 0;
-    const snapCost = costOf(tr.q, tr.fee, COST_MODELS.headline, tf, action);
-    const fillCost = Math.min(0.999, f.p) + fees.takerFeePerShare(f.p, tr.fee, 'docs');
-    rows.push({ day: tr.day, won, snapCost, fillCost, slip: f.p - tr.q });
-  }
-  if (!rows.length) return { n: 0 };
-  return {
-    n: rows.length, days: new Set(rows.map((r) => r.day)).size, winRate: fmt(mean(rows.map((r) => r.won))),
-    edgeSnapHeadline: fmt(mean(rows.map((r) => r.won - r.snapCost))), edgeFill: fmt(mean(rows.map((r) => r.won - r.fillCost))),
-    roiFill: fmt(mean(rows.map((r) => r.won / r.fillCost - 1))), meanSlipVsSnapshot: fmt(mean(rows.map((r) => r.slip))), medianSlip: fmt(median(rows.map((r) => r.slip))),
-  };
-}
-
 // liquidity per decision: taker notional within +-30 s of the decision time on the 5m/15m tapes
 function tapeLiquidity(tf) {
   const res = {};

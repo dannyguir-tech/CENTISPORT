@@ -1,0 +1,110 @@
+{
+ "population": {
+  "above_daily_mono": {
+   "execEpisodes": 2089,
+   "sampled": 80
+  },
+  "above_hourly_mono": {
+   "execEpisodes": 6556,
+   "sampled": 80
+  },
+  "hit_daily_mono": {
+   "execEpisodes": 1649,
+   "sampled": 80
+  },
+  "hit_weekly_mono": {
+   "execEpisodes": 2366,
+   "sampled": 80
+  },
+  "hit_monthly_mono": {
+   "execEpisodes": 431,
+   "sampled": 80
+  },
+  "range_allno": {
+   "execEpisodes": 590,
+   "sampled": 30
+  },
+  "range_allyes": {
+   "execEpisodes": 27,
+   "sampled": 27
+  },
+  "above_vs_range": {
+   "execEpisodes": 1064,
+   "sampled": 80
+  },
+  "hit_vs_above_daily": {
+   "execEpisodes": 24,
+   "sampled": 24
+  },
+  "hit_vs_above_weekly": {
+   "execEpisodes": 295,
+   "sampled": 80
+  },
+  "hit_vs_above_monthly": {
+   "execEpisodes": 405,
+   "sampled": 80
+  },
+  "hit_nest_wd": {
+   "execEpisodes": 660,
+   "sampled": 80
+  },
+  "hit_nest_md": {
+   "execEpisodes": 211,
+   "sampled": 80
+  },
+  "hit_nest_mw": {
+   "execEpisodes": 255,
+   "sampled": 80
+  },
+  "daily_ud_vs_above": {
+   "execEpisodes": 20,
+   "sampled": 20
+  },
+  "hourly_ud_vs_above_hourly": {
+   "execEpisodes": 482,
+   "sampled": 80
+  },
+  "nest_cl_15m_5m": {
+   "execEpisodes": 62,
+   "sampled": 62
+  },
+  "nest_cl_4h_15m": {
+   "execEpisodes": 13,
+   "sampled": 13
+  },
+  "nest_cl_4h_5m": {
+   "execEpisodes": 7,
+   "sampled": 7
+  },
+  "nest_basis_1h_15m": {
+   "execEpisodes": 527,
+   "sampled": 80
+  },
+  "nest_basis_1h_5m": {
+   "execEpisodes": 146,
+   "sampled": 80
+  },
+  "nest_basis_1d_4h": {
+   "execEpisodes": 47,
+   "sampled": 47
+  },
+  "nest_basis_1h_15m_b100": {
+   "execEpisodes": 3,
+   "sampled": 3
+  },
+  "nest_basis_1h_5m_b100": {
+   "execEpisodes": 7,
+   "sampled": 7
+  },
+  "nest_basis_1d_4h_b100": {
+   "execEpisodes": 6,
+   "sampled": 6
+  }
+ },
+ "errors": 0,
+ "errorSample": [],
+ "requests": 6422,
+ "cacheHits": 0,
+ "failures": 0,
+ "outOfRange": 0
+}
