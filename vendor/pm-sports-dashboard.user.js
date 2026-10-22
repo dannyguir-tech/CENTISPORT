@@ -1,15 +1,29 @@
 // ==UserScript==
-// @name         Polymarket Sports Money Dashboard (2.36.0)
+// @name         Polymarket Sports Money Dashboard (2.37.0)
 // @namespace    pm-sports-dashboard
 // @match        https://polymarket.com/*
 // @grant        none
 // @run-at       document-idle
-// @version      2.36.0
+// @version      2.37.0
 // ==/UserScript==
 // >>> KEEP IN SYNC: bump SCRIPT_VERSION (~line 528 in the IIFE) whenever @version above changes.
 // >>> SCRIPT_VERSION drives the button label, dashboard header, and loading caption — Tampermonkey
 // >>> reads @version, but the in-page UI reads SCRIPT_VERSION. Drifting these two confuses the user.
 // Changelog
+// v2.37.0 — Live API repair, found by running every call against live Polymarket. Several data
+//        sources the model depends on had silently died:
+//          - lb-api.polymarket.com is retired (410) → every wallet scored pnl/volume = 0, so no
+//            wallet could be elite/sharp, and the 410 storm pinned concurrency at the floor
+//            (live: 1,176 failed calls, 35.8s scan). Now data-api /v2/leaderboard (3 calls, not 4).
+//          - market.startDate is the LISTING time; game start is gameStartTime / event.startTime.
+//          - prices-history interval=1h returned 2 points → explicit startTs/endTs window.
+//          - POST /books {params:[]} → 400; raw array body, matched by asset_id (order differs).
+//          - /oi returns one row → per-market oi?market=a,b. activity?market= → 400 → exits read
+//            the trades tape (now paged to 72h). comments?market= → 422 → event-level comments.
+//          - Sports markets are feeType "zero_fees"; the 1% fee fallback understated every edge.
+//        Plus: only 429/5xx/network throttle concurrency; holders fetched by a 12-wide pool;
+//        HOT wallet cache bumped to v2 so cached zero-PnL wallets are ignored.
+//        Live result on a 55-market NBA game: 35.8s → ~15s, 1,176 → 0 failed calls.
 // v2.36.0 — Audit release: speed, data correctness, and a closed feedback loop for win rate.
 //        Full notes live in VERSION_HISTORY. Summary:
 //        WALLET-SKIP BUG (v2.13–v2.35): the wave loop advanced `i += currentBatch` AFTER
@@ -1084,13 +1098,14 @@
   // >>> otherwise Tampermonkey says "v2.18" while the page shows "v2.17" (this is what
   // >>> caused v2.18.1's hotfix). SPORTGPT detection looks for an external layer that may
   // >>> attach window.SPORTGPT_VERSION / window.sportGPTVersion / window.SPORTGPT.version.
-  const SCRIPT_VERSION = '2.36.0';
+  const SCRIPT_VERSION = '2.37.0';
   // v2.18.1: confirm version in devtools immediately on page load — independent of UI render.
   try { console.log('[PM Sports] script loaded · v' + SCRIPT_VERSION + ' on ' + location.href); } catch(_){}
   // v2.21: surfaced inside the 📊 Grade modal under a "📜 Version history" collapsible.
   // Dates intentionally stay short labels — git-log dates aren't reliably available at runtime
   // and embedding them here would rot. Rolling 3-row window per spec.
   const VERSION_HISTORY = [
+    { version: '2.37.0', date: 'recent', weightDeltas: 'none', tuningSummary: 'Live API repair: retired lb-api replaced, real game start time, working books/OI/prices/exits/comments, zero-fee schedule. Restores inputs the model had silently lost.', notes: 'Every endpoint was exercised against live Polymarket (NBA game, 55 markets). (1) lb-api.polymarket.com retired (HTTP 410 "use data-api /v2/leaderboard"): pnlAll/pnl30d/pnl7d/volume were 0 for every wallet, so isEliteFn and every PnL-gated archetype were impossible; now /v2/leaderboard?timePeriod=all|month|week (pnl + volume per call; 3 calls instead of 4). "month"/"week" replace the old 30d/7d windows. (2) The 410s counted as a >20% failure rate and pinned the wallet phase at the minimum batch: bumpFail now feeds the endWave throttle only for 429/5xx/network. (3) market.startDate is the listing time; gameStartSecOf() reads gameStartTime ("YYYY-MM-DD HH:MM:SS+00") or event.startTime for time decay, insider window, pre-game share, CLV reference and DataQuality. (4) prices-history interval=1h returned only the last hour; now startTs/endTs = 72h ending at min(now, game start), so the last point is the true closing line. (5) POST /books with {params:[...]} answered 400 (silently forcing one GET per token, also in the 20s live loop); body is now a raw array and books are matched by asset_id because the response order differs from the request. (6) bare /oi returns a single row; oi?market=<cids> per 20 markets restores oiFactor. (7) activity?market= requires a user (400): exit detection now reads the trades tape, which pages up to TRADES_MAX_PAGES×500 to cover 72h and is cached as compact rows. (8) comments?market= answers 422; comments are fetched once per event (parent_entity_type=Event). (9) Markets with feeType "zero_fees" / feeSchedule.rate 0 / feesEnabled false price at 0 fee instead of the 1% fallback. (10) Holders load through a HOLDERS_CONCURRENCY=12 pool, processed in market order. (11) HOT wallet cache entries are versioned (v2) so entries cached with zero PnL/volume are ignored. Live: 35.8s → ~15s cold, failed calls 1,176 → 0, DataQuality 0.39 → 0.76. Model math (weights, ALPHA, components, softmax, confidence, gates, grades) is unchanged, but its INPUTS change substantially — elite/sharp/consistency/holderProfit/exit/insider/oiFactor can now fire, and time decay uses the real game time — so predictions will differ from v2.36.0 by design.' },
     { version: '2.36.0', date: 'recent', weightDeltas: 'none', tuningSummary: 'Audit release: fixes the wallet-skip bug (~22% of holders never loaded), worker-pool wallet phase, data-correctness fixes, self-filling grader (settlement reconcile + ROI/grade/market-type breakdown + weight preview).', notes: 'HEADLINE — (0) Wallet-skip bug, present since v2.13 dynamic batching: the wave loop ran `i += currentBatch` after endWave() had already ramped currentBatch, so each ramp-up skipped (new − old) wallets. Skipped holders were never fetched and scored as zero-skill neutrals in elite/public/insider shares, walletEdge and sharp counts. With the v2.35 +6 turbo ramp a 134-wallet test event loaded only 104 (22% lost); predictions moved up to ~7pp once all wallets loaded and one Top Pick changed. Ramp-downs did the opposite (re-loaded overlapping wallets). Speed, no math change: (1) wallet phase runs as a rolling worker pool sized by currentBatch instead of fixed waves, so one slow wallet no longer stalls the next wave; endWave still adapts concurrency every currentBatch completions. (2) The extra activity?sortDirection=ASC call per heavy wallet is skipped when the 500-row window already spans 7+ days — isNew is unchanged because the true first activity can only be older. (3) Exit detection (with its PnL backfill, now one parallel pass) runs alongside the wallet phase instead of after it — it only reads non-holder wallets, which the wallet phase never loads, so the old ordering was unnecessary. Data, no math change: (4) HOLDER_TTL_NO_DATA 3min→60s. (5) The single-market /markets?slug fallback is never cached (it undercounts multi-market events). (6) Loading-screen holder-row and wallet counters render (they referenced block-scoped variables and never showed). (7) Popup-blocked path releases the scan controller. (8) Consistency panel compares "Spread: <team> (-x)" against that team\'s own moneyline price instead of a first-capitalized-word guess. (9) News badges fill in when the deferred comments fetch completes after render. (9b) Superseded scans (re-click, Top-N change) stop at the next checkpoint. Before, their aborted fetches resolved to null, so every in-flight wallet looked "all failed" and got a 15-min fail cooldown that blanked it for the NEW scan, and the stale scan still overwrote pmSportsBotExport / live state and wrote junk rows into the prediction log. (9c) The error page HTML-escapes the message. Win-rate tooling: (10) prediction-log rows carry v, grade, action, marketType, sport, topPick. (11) reconcilePendingPredictions() resolves pending rows against gamma settlement in the background (max once per RECONCILE_MIN_INTERVAL_MS, ≤ RECONCILE_MAX_MARKETS markets) so SLOG grows without revisiting events. (12) Grader adds flat-stake ROI and per-grade / action / market-type / version splits, plus a proposed-weights preview (≥ GRADER_MIN_ROWS_FOR_WEIGHTS settled rows, ±25% per component, renormalized) printed paste-ready but never applied. Model-input bug fixes, each with a TUNING kill-switch (default ON): (13) EXCLUDE_MISSING_WALLET_DATA — wallets whose stats failed to load are left out of the elite/public/insider share denominators and walletEdge, instead of counting as zero-skill holders; liquidity totals still include them. (14) FLOW_SKIP_FUTURE_TRADES — flow24h ignores trades stamped more than TRADE_CLOCK_SKEW_TOLERANCE_SEC (5 min) in the future (the v2.28.1 pressure fix, applied to flow); pressure now uses the same tolerance so a lagging local clock no longer drops the freshest trades. (15) INSIDER_WINDOW_PER_MARKET — insider timing uses the per-market profile window (15min on props) that the archetype reason text already reported. Experimental, default OFF: (16) EDGE_FILL_SIZE_USD > 0 prices edge at the depth-weighted ask fill for that stake (scan and live loop). Collector hooks: (17) window.pmSportsRun() and window.pmSportsLastScanStatus {status, reason, at}. Unchanged: TUNING.WEIGHTS, ALPHA, K1/K2/K3, softmax, confidence formula, classifyAction, gradeSide, Top Picks gates/ranking, Tail Winners, alert types/dedup/thresholds, DOM click matching, settlement equality, tokenId, conditionId, sideKey, schemaVersion (1). Verification: with the three kill-switches false, predictions are identical to v2.35.0 once its wallet-skip bug is corrected (offline harness, 0 diffs) — i.e. every other change here is math-neutral. The skip-bug fix itself has no switch; reintroducing data loss is not a supported revert. Grades can additionally differ in rare clock-skew cases via the pressure tolerance.' },
     { version: '2.35.0', date: 'recent', weightDeltas: 'none', tuningSummary: 'Scan-speed phase 6: adaptive turbo concurrency 48 with fail429 auto-rollback. Transport-only, no math/decision changes.', notes: 'Pure transport-layer change. (1) MAX_DYNAMIC_BATCH 32→48 (TURBO_MAX_DYNAMIC_BATCH); SAFE_MAX_DYNAMIC_BATCH=32 (known-good v2.33.0 ceiling); TURBO_FAIL429_ROLLBACK=true (master switch). HOLDER_FETCH_SPACING_MS stays 0; HOLDER_FETCH_BATCH floor stays 6. (2) endWave ramp accelerated when network is quiet: rate===0 AND mon.fail429===0 → currentBatch += 6 (was +3); rate<0.02 → +3 (was +2); rate<0.05 → +1 (unchanged). Drop deepened: rate>0.20 → -4 (was -2), floored at HOLDER_FETCH_BATCH. (3) One-shot fail429 auto-rollback: as soon as mon.fail429>0 during a scan, the effective ceiling collapses to SAFE_MAX_DYNAMIC_BATCH=32 for the rest of that scan, currentBatch is clamped immediately if above, and a single "[PM Sports] Turbo rollback: fail429 detected, capping batch to 32" line is logged. Per-endpoint 429 cooldown (v2.30.0) remains the independent secondary safety net. (4) New diagnostics in end-of-run log: maxBatchReached, turboRollbackTriggered, fail429, realFails, totalScanMs. Surfaced both in the [PM Sports] timings line and the [PM Sports] v2.13 perf object. No changes to: prediction math, modelProb, p.probability, p.confidence, p.score, TUNING.WEIGHTS, TUNING.ALPHA, K1/K2/K3, softmax, gradeSide thresholds, GRADE_* knobs, classifyAction, classifyMarketType, marketEdgeFor, Top Picks selection, Top Picks ranking, alert types, alert dedup keys, alert thresholds, buildBotExport schema, schemaVersion (stays 1), tokenId, conditionId, sideKey, wallet scoring, archetype classification, elite detection, fetch URL construction, request bodies, cache keys/TTLs/semantics, DERIVE_WINDOW_PNL (stays false), TopN (stays 200 for Deep), wallet-notional filtering (not introduced). Single-line revert path: MAX_DYNAMIC_BATCH 48→32 + endWave deltas back to +3/+2/+1 / -2 if turboRollback fires routinely.' },
     { version: '2.34.1', date: 'recent', weightDeltas: 'none', tuningSummary: 'classifyMarketType bug fix: dota-2 sportKey + Game-N esports_map detection', notes: 'Two targeted classifier fixes inside classifyMarketType() only. (1) Add "dota-2" (Polymarket slug format) to the ESPORTS set alongside existing "dota" and "dota2". (2) Extend the esports_map regex to catch per-game series sub-units — "\\bgame\\s*[1-5]\\b", "\\bgame\\s*(one|two|three|four|five)\\b", and "game\\s*\\d\\s+winner" — so "Game 1 Winner" / "Game 2 Winner" / "Game 3 Winner" markets in LoL / CS2 / Dota2 series classify as esports_map (and inherit the v2.34.0 GRADE_CAP_MAP = B cap) instead of being miscategorized as esports_match (which could earn A+/A). Pure classifier-string fix; no impact on modelProb, p.probability, p.confidence, p.score, components, weights, ALPHA, K1/K2/K3, softmax, Top Picks ranking, alert thresholds, alert dedup keys, action logic, gradeSide thresholds, schemaVersion (stays 1), or any fetch/cache/wallet-scoring/transport behavior.' },
@@ -1552,6 +1567,8 @@
     RECONCILE_MAX_MARKETS:       60,
     RECONCILE_MIN_AGE_SEC:       2 * 3600,
     GRADER_MIN_ROWS_FOR_WEIGHTS: 50,     // proposed-weights preview needs this many settled rows
+    TRADES_MAX_PAGES:            3,      // v2.37.0: ≤1,500 trades per market, stopping once 72h is covered
+    HOLDERS_CONCURRENCY:         12,     // v2.37.0: parallel /holders calls (was serial batches of 6)
     // v2.21: stale-alert dimming thresholds. Live toasts go stale faster than the history panel
     // because the toast is meant to drive immediate action; once it's been on screen for 3+ min
     // the price has almost certainly moved. History rows tolerate up to 5 min before dimming.
@@ -1801,7 +1818,8 @@
       // Event-level facts.
       const eventTitle  = (ev && ev.title) || slug || null;
       const marketCount = (ev && Array.isArray(ev.markets)) ? ev.markets.length : 0;
-      const startTime   = (ev && ev.markets && ev.markets[0] && ev.markets[0].startDate) || null;
+      // v2.37.0: game start, not the listing time that market.startDate holds.
+      const startTime   = (ev && ev.markets && ev.markets[0] && ev.markets[0].gameStartTime) || (ev && ev.startTime) || null;
       // topPicks — keep compact + reuse marketEdgeFor / classifyAction (read-only).
       const topPicksOut = topPicks.map(tp => {
         if (!tp) return null;
@@ -3453,25 +3471,31 @@
   async function fetchBooksLive(tokenIds){
     const out = {};
     if (!tokenIds || !tokenIds.length) return out;
-    let arr = null;
+    let byAsset = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
+        // v2.37.0: the CLOB wants a raw array body ({params:[...]} is rejected with 400) and
+        // returns books in its own order, so they are matched back by asset_id.
         const r = await fetch('https://clob.polymarket.com/books', {
           method:'POST',
           headers:{'content-type':'application/json'},
-          body: JSON.stringify({ params: tokenIds.map(t => ({token_id: t})) })
+          body: JSON.stringify(tokenIds.map(t => ({token_id: t})))
         });
         if (!r.ok) throw new Error('books ' + r.status);
         const j = await r.json();
-        if (Array.isArray(j) && j.length === tokenIds.length) { arr = j; break; }
+        if (Array.isArray(j)) {
+          byAsset = {};
+          j.forEach(b => { if (b && b.asset_id) byAsset[b.asset_id] = b; });
+          break;
+        }
         throw new Error('books shape mismatch');
       } catch(_) {
         if (attempt < 1) await new Promise(r => setTimeout(r, 600 + Math.random()*400));
       }
     }
-    if (arr) {
-      tokenIds.forEach((tid, i) => {
-        const book = arr[i];
+    if (byAsset) {
+      tokenIds.forEach((tid) => {
+        const book = byAsset[tid];
         if (!book) { out[tid] = null; return; }
         const bids = (book.bids||[]).map(l=>({price:Number(l.price), size:Number(l.size)})).filter(l=>l.size>0).sort((a,b)=>b.price-a.price);
         const asks = (book.asks||[]).map(l=>({price:Number(l.price), size:Number(l.size)})).filter(l=>l.size>0).sort((a,b)=>a.price-b.price);
@@ -3655,13 +3679,16 @@
         return false;
       }
     }
+    // v2.37.0: HOT entries written while lb-api was retired hold pnl/volume = 0. Version 2
+    // ignores them so nobody keeps scoring cached zero-skill wallets for up to WALLET_HOT_TTL.
+    const HOT_CACHE_VERSION = 2;
     function cacheGet(addr){
       try{
         const h = JSON.parse(localStorage.getItem(HOT_PREFIX+addr));
         // v2.22: HOT gates the cache hit (4h). If HOT is stale, force the consumer to re-fetch
         // even if COLD is still fresh — derived stats are what the prediction layer reads, and
         // shipping a HOT/COLD age skew where COLD is newer would be confusing.
-        if(!h || h.v!==1 || Date.now()-h.cachedAt >= WALLET_HOT_TTL) return null;
+        if(!h || h.v!==HOT_CACHE_VERSION || Date.now()-h.cachedAt >= WALLET_HOT_TTL) return null;
         let positions=null, activity=null;
         try{
           const c = JSON.parse(localStorage.getItem(COLD_PREFIX+addr));
@@ -3677,7 +3704,7 @@
       }catch{ return null; }
     }
     function cacheSet(addr, derived, positions, activity){
-      safeSet(HOT_PREFIX+addr, {...derived, v:1, cachedAt: Date.now()});
+      safeSet(HOT_PREFIX+addr, {...derived, v:HOT_CACHE_VERSION, cachedAt: Date.now()});
       const pos = Array.isArray(positions) ? positions.slice(0, TUNING.COLD_CACHE_SLICE) : [];
       const act = Array.isArray(activity) ? activity.slice(0, TUNING.COLD_CACHE_SLICE) : [];
       safeSet(COLD_PREFIX+addr, {positions: pos, activity: act, v:1, cachedAt: Date.now()});
@@ -3774,8 +3801,17 @@
         return u.host + path;
       } catch { return 'unknown'; }
     }
+    // v2.37.0: lb-api.polymarket.com is retired (HTTP 410 "use data-api /v2/leaderboard").
+    // A /v2/leaderboard call returns {data:{pnl, volume, ...}} for timePeriod all|month|week|day.
+    const leaderboardUrl = (addr, period) => 'https://data-api.polymarket.com/v2/leaderboard?timePeriod='+period+'&user='+addr;
+    function leaderboardStat(resp, key){
+      const row = resp && !Array.isArray(resp) && resp.data ? resp.data : (Array.isArray(resp) ? resp[0] : null);
+      if (!row) return null;
+      const n = Number(key === 'volume' ? (row.volume != null ? row.volume : row.vol) : row.pnl);
+      return Number.isFinite(n) ? n : null;
+    }
     function bumpFail(url, status){
-      mon.fails++; mon.waveFails++;
+      mon.fails++;
       const k = endpointKey(url);
       mon.failsByEndpoint[k] = (mon.failsByEndpoint[k] || 0) + 1;
       // v2.13: normalize the status key. safeFetch's catch block passes 'retryable 429' /
@@ -3783,6 +3819,11 @@
       let s = String(status == null ? 'unknown' : status);
       const retryMatch = s.match(/^retryable\s+(\d+)/);
       if (retryMatch) s = retryMatch[1];
+      // v2.37.0: only backpressure (429 / 5xx / network) throttles concurrency. A permanently
+      // failing endpoint (the retired lb-api answered 410 for every wallet) used to look like a
+      // >20% failure storm and pinned the wallet phase at the minimum batch for the whole scan.
+      const code = Number(s);
+      if (!Number.isFinite(code) || code === 429 || code >= 500) mon.waveFails++;
       mon.failsByStatus[s] = (mon.failsByStatus[s] || 0) + 1;
       // v2.13: split 429 from realFails so we can distinguish rate-limit storms from
       // genuine server errors / network issues.
@@ -4291,6 +4332,19 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       try { console.time('[PM Sports] fetchEvent'); } catch(_){}
       const ev=await fetchEvent(slug);
       try { console.timeEnd('[PM Sports] fetchEvent'); } catch(_){}
+      // v2.37.0: market.startDate is when the market was LISTED (days before the game); the
+      // tip-off lives in market.gameStartTime ("2026-10-22 23:00:00+00") or event.startTime.
+      // Every "time to game" input (time decay, insider window, pre-game share, CLV reference
+      // point) was anchored to the listing time before this.
+      function gameStartSecOf(m){
+        const raw = (m && m.gameStartTime) || (ev && ev.startTime) || null;
+        if (!raw) return null;
+        let s = String(raw).trim();
+        if (/^\d{4}-\d{2}-\d{2} \d/.test(s)) s = s.replace(' ', 'T');
+        if (/[+-]\d{2}$/.test(s)) s += ':00';
+        const t = Date.parse(s);
+        return Number.isFinite(t) ? Math.floor(t / 1000) : null;
+      }
       if(!ev||!ev.markets||!ev.markets.length){setScanStatus('error','unsupported_market');d.body.innerHTML='<h1 style="color:#f88">Unsupported market type — please report this URL</h1><pre style="color:#f88">'+esc(location.href)+'</pre>';return;}
       setStep(2, 'Loading markets ('+ev.markets.length+')…', 5);
       // v2.3: event-volume quality gate. Thinly-traded events produce noise predictions because the
@@ -4424,10 +4478,28 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         clob:     typeof m.clobTokenIds==='string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds,
         prices:   parseOutcomePrices(m)
       }));
-      for (let i = 0; i < parsedMarkets.length; i += TUNING.HOLDER_FETCH_BATCH) {
-        const batch = parsedMarkets.slice(i, i + TUNING.HOLDER_FETCH_BATCH);
-        const results = await Promise.all(batch.map(p => fetchHoldersCached(p.m.conditionId, topN)));
-        results.forEach((res, k) => {
+      // v2.37.0: rolling pool instead of serial batches of HOLDER_FETCH_BATCH (a 55-market game
+      // took ~3s in 10 back-to-back waves). Results are stored by index and processed in market
+      // order so `markets` — and everything keyed off its order — is identical to before.
+      const holderResults = new Array(parsedMarkets.length);
+      await new Promise(resolve => {
+        let next = 0, inFlight = 0;
+        if (!parsedMarkets.length) { resolve(); return; }
+        const pump = () => {
+          while (inFlight < TUNING.HOLDERS_CONCURRENCY && next < parsedMarkets.length) {
+            const idx = next++;
+            inFlight++;
+            fetchHoldersCached(parsedMarkets[idx].m.conditionId, topN)
+              .catch(e => ({ holders: null, status: (e && e.message) || 'network' }))
+              .then(res => { holderResults[idx] = res; })
+              .finally(() => { inFlight--; if (inFlight === 0 && next >= parsedMarkets.length) resolve(); else pump(); });
+          }
+        };
+        pump();
+      });
+      {
+        const batch = parsedMarkets;
+        holderResults.forEach((res, k) => {
           const p = batch[k];
           if (res.holders && res.holders.length) {
             markets.push({m:p.m, outcomes:p.outcomes, clob:p.clob, prices:p.prices, hr:res.holders});
@@ -4438,7 +4510,6 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             noDataMarkets.push({conditionId:p.m.conditionId, question:p.m.question, status:res.status});
           }
         });
-        if (i + TUNING.HOLDER_FETCH_BATCH < parsedMarkets.length) await new Promise(r => setTimeout(r, TUNING.HOLDER_FETCH_SPACING_MS));
       }
       // v2.14: retry pass only runs when there are TRULY-retryable markets. Markets that returned
       // no data on first pass are already in noDataMarkets and will not waste a retry slot.
@@ -4587,12 +4658,13 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         // /profit?window=30d + /profit?window=7d. Saves 2 calls per wallet (8 → 6 parallel).
         // pAll (window=all) stays as ground-truth lifetime PnL. Gated by TUNING.DERIVE_WINDOW_PNL.
         const deriveWin = !!TUNING.DERIVE_WINDOW_PNL;
-        const [valueR, pAll, p30, p7, volR, positions, activity, closedPositions] = await Promise.all([
+        // v2.37.0: lb-api is retired (410). One /v2/leaderboard call returns pnl AND volume for
+        // a period, so 4 lb-api calls become 3 (all / month / week).
+        const [valueR, lbAll, lbMonth, lbWeek, positions, activity, closedPositions] = await Promise.all([
           safeFetch('https://data-api.polymarket.com/value?user='+ww),
-          safeFetch('https://lb-api.polymarket.com/profit?window=all&limit=1&address='+ww),
-          deriveWin ? Promise.resolve(null) : safeFetch('https://lb-api.polymarket.com/profit?window=30d&limit=1&address='+ww),
-          deriveWin ? Promise.resolve(null) : safeFetch('https://lb-api.polymarket.com/profit?window=7d&limit=1&address='+ww),
-          safeFetch('https://lb-api.polymarket.com/volume?window=all&limit=1&address='+ww),
+          safeFetch(leaderboardUrl(ww, 'all')),
+          deriveWin ? Promise.resolve(null) : safeFetch(leaderboardUrl(ww, 'month')),
+          deriveWin ? Promise.resolve(null) : safeFetch(leaderboardUrl(ww, 'week')),
           safeFetch('https://data-api.polymarket.com/positions?user='+ww+'&limit=500'),
           safeFetch('https://data-api.polymarket.com/activity?user='+ww+'&limit=500'),
           // v2.30.1: skip when no market is resolved — closedArr would be empty anyway and
@@ -4632,11 +4704,11 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         let pnl30dDerived, pnl7dDerived;
         if (deriveWin && actArr.length === 500) {
           const [p30Fb, p7Fb] = await Promise.all([
-            safeFetch('https://lb-api.polymarket.com/profit?window=30d&limit=1&address='+ww),
-            safeFetch('https://lb-api.polymarket.com/profit?window=7d&limit=1&address='+ww)
+            safeFetch(leaderboardUrl(ww, 'month')),
+            safeFetch(leaderboardUrl(ww, 'week'))
           ]);
-          pnl30dDerived = p30Fb && p30Fb[0] ? (Number(p30Fb[0].amount)||0) : 0;
-          pnl7dDerived  = p7Fb  && p7Fb[0]  ? (Number(p7Fb[0].amount) ||0) : 0;
+          pnl30dDerived = leaderboardStat(p30Fb, 'pnl') || 0;
+          pnl7dDerived  = leaderboardStat(p7Fb,  'pnl') || 0;
         } else if (deriveWin) {
           const nowSec = Math.floor(Date.now()/1000);
           const cutoff30 = nowSec - 30*86400;
@@ -4652,15 +4724,16 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           pnl30dDerived = s30;
           pnl7dDerived  = s7;
         } else {
-          pnl30dDerived = p30 && p30[0] ? (Number(p30[0].amount)||0) : 0;
-          pnl7dDerived  = p7  && p7[0]  ? (Number(p7[0].amount) ||0) : 0;
+          // v2.37.0: leaderboard "month"/"week" periods replace lb-api's 30d/7d windows.
+          pnl30dDerived = leaderboardStat(lbMonth, 'pnl') || 0;
+          pnl7dDerived  = leaderboardStat(lbWeek,  'pnl') || 0;
         }
         const derived = {
           value: valueR && valueR[0] ? (Number(valueR[0].value)||0) : 0,
-          pnlAll: pAll && pAll[0] ? (Number(pAll[0].amount)||0) : 0,
+          pnlAll: leaderboardStat(lbAll, 'pnl') || 0,
           pnl30d: pnl30dDerived,
           pnl7d: pnl7dDerived,
-          volume: volR && volR[0] ? (Number(volR[0].amount)||0) : 0,
+          volume: leaderboardStat(lbAll, 'volume') || 0,
           winRate,
           earliestActivity,
           winRateSampled,
@@ -4687,7 +4760,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         // wallet in fail-cooldown (15min) and SKIP cacheSet so the next scan hits the
         // fail-cooldown gate above instead of an empty HOT cache entry. Partial successes
         // still cacheSet normally so a single bad endpoint doesn't poison the wallet.
-        const allFailed = valueR == null && pAll == null && volR == null && positions == null && activity == null && closedPositions == null;
+        const allFailed = valueR == null && lbAll == null && positions == null && activity == null && closedPositions == null;
         if (allFailed) {
           derived.dataMissing = true;   // v2.36.0: never cached — only marks this run's row
           mon.walletsMissingData++;
@@ -4776,8 +4849,8 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         allExitRows.forEach(x=>{if(!uniqueByWallet[x.w] || x.ts > uniqueByWallet[x.w].ts) uniqueByWallet[x.w] = x;});
         const unknownExits = Object.values(uniqueByWallet).filter(c=>c.pnl==null).sort((a,b)=>b.sold-a.sold).slice(0,50);
         const pnlByWallet = {};
-        const exitPnlResps = await Promise.all(unknownExits.map(c=>safeFetch('https://lb-api.polymarket.com/profit?window=all&limit=1&address='+c.w)));
-        unknownExits.forEach((c,k)=>{const resp=exitPnlResps[k]; if(resp && resp[0] && typeof resp[0].amount==='number') pnlByWallet[c.w] = resp[0].amount;});
+        const exitPnlResps = await Promise.all(unknownExits.map(c=>safeFetch(leaderboardUrl(c.w, 'all'))));
+        unknownExits.forEach((c,k)=>{const pnl = leaderboardStat(exitPnlResps[k], 'pnl'); if (pnl != null) pnlByWallet[c.w] = pnl;});
         // v2.0: exits are now quality-weighted instead of binary pnl>$5k counts.
         // score = Σ over unique (wallet, token) of: walletQuality × netSold × timeWeight
         //   walletQuality = tanh(pnlAll/$50k) × winRate  ∈ [0, 1]
@@ -4817,12 +4890,29 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
               // sums a 24h trade window so 60s of drift is negligible to modelProb. Only
               // cache on a successful (non-null) fetch.
               const cached = cacheGetShort(TRADES_PREFIX, r.m.conditionId, TRADES_TTL);
-              if (cached) { mon.tradesCacheHits++; return { conditionId: r.m.conditionId, trades: cached }; }
-              const raw = await safeFetch('https://data-api.polymarket.com/trades?market='+r.m.conditionId+'&limit=500');
-              const trades = Array.isArray(raw) ? raw : [];
-              if (raw != null) cacheSetShort(TRADES_PREFIX, r.m.conditionId, trades);
-              return { conditionId: r.m.conditionId, trades };
+              if (cached) { mon.tradesCacheHits++; return { r, conditionId: r.m.conditionId, trades: cached }; }
+              // v2.37.0: page back until the tape covers the 72h exit window (busy markets were
+              // truncated at the newest 500 trades), and cache compact rows instead of raw objects.
+              const trades = [];
+              let ok = false;
+              const oldestNeeded = Math.floor(Date.now()/1000) - 72*3600;
+              for (let page = 0; page < TUNING.TRADES_MAX_PAGES; page++) {
+                const raw = await safeFetch('https://data-api.polymarket.com/trades?market='+r.m.conditionId+'&limit=500&offset='+(page*500));
+                if (!Array.isArray(raw)) break;
+                ok = true;
+                raw.forEach(t => { if (t) trades.push({ asset: t.asset, side: t.side, size: t.size, price: t.price, timestamp: t.timestamp, proxyWallet: t.proxyWallet || t.maker || t.taker || null }); });
+                const oldest = raw.reduce((m, t) => Math.min(m, Number(t && t.timestamp) || Infinity), Infinity);
+                if (raw.length < 500 || oldest < oldestNeeded) break;
+              }
+              if (ok) cacheSetShort(TRADES_PREFIX, r.m.conditionId, trades);
+              return { r, conditionId: r.m.conditionId, trades };
             }));
+            // v2.37.0: activity?market= now requires a user (HTTP 400), so exit detection reads
+            // the trades tape — the same BUY/SELL rows with wallet / token / size / timestamp.
+            allMarketActResults = tradesResults.map(({r, trades}) => ({
+              r, acts: trades.map(t => ({ proxyWallet: t.proxyWallet, asset: t.asset, side: t.side, size: t.size, timestamp: Number(t.timestamp) || 0 }))
+            }));
+            try { await computeExits(); } catch(e) { try { console.warn('[PM Sports] exit detection failed:', e && e.message); } catch(_){} }
             tradesResults.forEach(({conditionId, trades}) => {
               tradeCountByMarket[conditionId] = trades.length;
               trades.forEach(t => {
@@ -4846,17 +4936,23 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             // v2.30.0: 30s cache on the /oi snapshot. /oi returns ALL markets in one call so
             // we cache the raw response keyed by sportKey (each scan's union-keyed parse below
             // is the same shape). oiFactor formula unchanged.
-            let oiResp = cacheGetShort(OI_PREFIX, sportKey, OI_TTL);
-            if (oiResp) { mon.oiCacheHits++; }
+            // v2.37.0: bare /oi now returns a single row, so oiByCid stayed empty and oiFactor was
+            // always 1. Ask per market (comma-separated, 20 per call); rows are {market, value}.
+            let arr = cacheGetShort(OI_PREFIX, slug, OI_TTL);
+            if (arr) { mon.oiCacheHits++; }
             else {
-              oiResp = await safeFetch('https://data-api.polymarket.com/oi');
-              if (oiResp != null) cacheSetShort(OI_PREFIX, sportKey, oiResp);
+              const cids = markets.map(r => r.m.conditionId);
+              const chunks = [];
+              for (let i = 0; i < cids.length; i += 20) chunks.push(cids.slice(i, i + 20));
+              const resps = await Promise.all(chunks.map(c => safeFetch('https://data-api.polymarket.com/oi?market=' + c.join(','))));
+              arr = [];
+              resps.forEach(resp => { if (Array.isArray(resp)) arr.push(...resp); });
+              if (arr.length) cacheSetShort(OI_PREFIX, slug, arr);
             }
-            const arr = Array.isArray(oiResp) ? oiResp : (oiResp && Array.isArray(oiResp.data) ? oiResp.data : []);
             arr.forEach(row => {
-              const cid = row && (row.conditionId || row.condition_id || row.market);
-              const oi = row && Number(row.oi != null ? row.oi : (row.openInterest != null ? row.openInterest : 0));
-              if (cid && !isNaN(oi)) oiByCid[cid] = oi;
+              const cid = row && (row.market || row.conditionId || row.condition_id);
+              const oi = row && Number(row.value != null ? row.value : (row.oi != null ? row.oi : row.openInterest));
+              if (cid && Number.isFinite(oi)) oiByCid[cid] = oi;
             });
           } catch(e) { /* OI optional */ }
         })(),
@@ -4877,11 +4973,18 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           if (missingTokens.length === 0) { markPhase('books'); return; }
           let bookResults = null;
           try {
-            const batchBody = { params: missingTokens.map(t => ({token_id: t})) };
-            const batchResp = await safePost('https://clob.polymarket.com/books', batchBody);
-            if (Array.isArray(batchResp) && batchResp.length === missingTokens.length) {
-              bookResults = missingTokens.map((tokenId, i) => ({tokenId, book: batchResp[i]}));
+            // v2.37.0: raw-array body ({params:[...]} → 400, which silently forced one GET per
+            // token) and match by asset_id — the CLOB does not preserve request order.
+            const byAsset = {};
+            let answered = false;
+            for (let i = 0; i < missingTokens.length; i += 50) {
+              const chunk = missingTokens.slice(i, i + 50);
+              const batchResp = await safePost('https://clob.polymarket.com/books', chunk.map(t => ({token_id: t})));
+              if (!Array.isArray(batchResp)) { answered = false; break; }
+              answered = true;
+              batchResp.forEach(b => { if (b && b.asset_id) byAsset[b.asset_id] = b; });
             }
+            if (answered) bookResults = missingTokens.map(tokenId => ({tokenId, book: byAsset[tokenId] || null}));
           } catch(e) { /* fall through to per-token */ }
           if (!bookResults) {
             bookResults = await Promise.all(missingTokens.map(async tokenId => {
@@ -4913,8 +5016,8 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         (async () => {
           const startByCid = {};
           markets.forEach(r => {
-            const sd = r.m.startDate ? Math.floor(Date.parse(r.m.startDate)/1000) : null;
-            if (sd != null && !isNaN(sd)) startByCid[r.m.conditionId] = sd;
+            const sd = gameStartSecOf(r.m);
+            if (sd != null) startByCid[r.m.conditionId] = sd;
           });
           const cidByToken = {};
           markets.forEach(r => r.hr.forEach(tok => { if (tok.token) cidByToken[tok.token] = r.m.conditionId; }));
@@ -4928,7 +5031,12 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             }
             const cid = cidByToken[tokenId];
             const startSec = cid && startByCid[cid] != null ? startByCid[cid] : null;
-            const hist = await safeFetch('https://clob.polymarket.com/prices-history?market='+tokenId+'&interval=1h&fidelity=60');
+            // v2.37.0: interval=1h returns only the last hour (2 points), so the reference price
+            // "N hours before start" was never in the series. Ask for an explicit window ending
+            // at game start (or now, if earlier): the last point is then the true closing line.
+            const nowS = Math.floor(Date.now()/1000);
+            const endTs = startSec != null ? Math.min(nowS, startSec) : nowS;
+            const hist = await safeFetch('https://clob.polymarket.com/prices-history?market='+tokenId+'&startTs='+(endTs - 72*3600)+'&endTs='+endTs+'&fidelity=60');
             return {tokenId, startSec, hist};
           }));
           const nowSec = Math.floor(Date.now()/1000);
@@ -4962,26 +5070,9 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             });
           });
           markPhase('prices-history');
-        })(),
-        // ── Market activity (v2.31.0) ──
-        // /activity?market=<cid>&limit=500 per market, run in parallel here so it overlaps
-        // with the wallet phase instead of executing serially after wallets finish (where
-        // it used to live as a for…of loop). Only the FETCH stage moves; the
-        // exit-detection processing remains post-wallet because it reads userStats[w]
-        // populated by loadWallet.
-        (async () => {
-          try {
-            allMarketActResults = await Promise.all(markets.map(async r => {
-              const cached = cacheGetShort(MARKET_ACTIVITY_PREFIX, r.m.conditionId, MARKET_ACTIVITY_TTL);
-              if (cached) { mon.marketActivityCacheHits++; return { r, acts: cached }; }
-              const raw = await safeFetch('https://data-api.polymarket.com/activity?market='+r.m.conditionId+'&limit=500');
-              const acts = Array.isArray(raw) ? raw : [];
-              if (raw != null) cacheSetShort(MARKET_ACTIVITY_PREFIX, r.m.conditionId, acts);
-              return { r, acts };
-            }));
-          } catch(e) { /* market-activity optional — computeExits guards against null */ }
-          try { await computeExits(); } catch(e) { try { console.warn('[PM Sports] exit detection failed:', e && e.message); } catch(_){} }
         })()
+        // v2.37.0: the per-market /activity?market= fetch is gone — it now 400s without a user.
+        // Exit detection runs off the trades tape inside the trades block above.
       ];
       // v2.32.0: comments DEFERRED — populates display-only alertsByCid in the background.
       // Removed from subfetchPromises[] so the prediction build does NOT block on a slow
@@ -4991,13 +5082,16 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       commentsBackgroundPromise = (async () => {
         try {
           const ALERT_KEYWORDS = ['injur','ruled out','questionable','doubtful','starting','lineup','weather','rain','confirmed','scratched','gtd','out for','active','inactive'];
-          const commentsResults = await Promise.all(markets.map(async r => {
-            const cached = cacheGetShort(COMMENTS_PREFIX, r.m.conditionId, COMMENTS_TTL);
-            if (cached) { mon.commentsCacheHits++; return { cid: r.m.conditionId, comments: cached }; }
-            const comments = await safeFetch('https://gamma-api.polymarket.com/comments?market='+r.m.conditionId+'&limit=100');
-            if (comments != null) cacheSetShort(COMMENTS_PREFIX, r.m.conditionId, comments);
-            return {cid: r.m.conditionId, comments};
-          }));
+          // v2.37.0: gamma comments are keyed by parent entity now (?market= answers 422).
+          // Comments live on the event, so one call covers every market; hits apply to all.
+          const evKey = ev && ev.id != null ? String(ev.id) : null;
+          let evComments = evKey ? cacheGetShort(COMMENTS_PREFIX, 'ev' + evKey, COMMENTS_TTL) : null;
+          if (evComments) mon.commentsCacheHits++;
+          else if (evKey) {
+            evComments = await safeFetch('https://gamma-api.polymarket.com/comments?parent_entity_type=Event&parent_entity_id='+encodeURIComponent(evKey)+'&limit=100');
+            if (evComments != null) cacheSetShort(COMMENTS_PREFIX, 'ev' + evKey, evComments);
+          }
+          const commentsResults = markets.map(r => ({ cid: r.m.conditionId, comments: evComments }));
           commentsResults.forEach(({cid, comments}) => {
             const arr = Array.isArray(comments) ? comments : (comments && Array.isArray(comments.data) ? comments.data : []);
             if (!arr.length) return;
@@ -5149,7 +5243,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       const sides={};
       const multiMarketEvent = markets.length > 1;
       markets.forEach(r=>{
-        const marketStartSec = r.m.startDate ? Math.floor(new Date(r.m.startDate).getTime()/1000) : (r.m.createdAt ? Math.floor(new Date(r.m.createdAt).getTime()/1000) : null);
+        const marketStartSec = gameStartSecOf(r.m);
         const marketAgeShort = marketStartSec != null && (now - marketStartSec) < 86400;
         const marketResolved = isResolved(r.m);
         const marketWinner = marketResolved ? winnerOf(r.m, r.outcomes) : null;
@@ -5275,7 +5369,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       const dq_truncationRate = walletList.length ? walletList.filter(w=>userStats[w] && userStats[w].positionsSampled).length / walletList.length : 0;
       const dq_coverage = Math.min(walletList.length/Math.max(topN,1), 1);
       let DataQuality = (1-dq_failureRate) * (1-dq_truncationRate) * dq_coverage;
-      const anyStartExposed = markets.some(r=>r.m.startDate || r.m.createdAt);
+      const anyStartExposed = markets.some(r => gameStartSecOf(r.m) != null);
       if (!anyStartExposed) DataQuality *= 0.7;  // insider window unavailable
       DataQuality = Math.max(0, Math.min(1, DataQuality));
       // Raw per-side metrics used by the component computations
@@ -5648,8 +5742,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           }
           // v2.0: time decay on time-sensitive components. flow24h and insiderTiming lose
           // relevance as the game approaches and the lines firm up. Half-life = 6h by default.
-          const startStr = sides[label].market && sides[label].market.startDate;
-          const startSec = startStr ? Math.floor(Date.parse(startStr)/1000) : null;
+          const startSec = gameStartSecOf(sides[label].market);
           if (startSec != null && !isNaN(startSec)) {
             const hoursToEvent = Math.max(0, (startSec - now) / 3600);
             const timeDecay = 1 / (1 + hoursToEvent / TUNING.TIME_DECAY_HALF_LIFE_HRS);
@@ -6181,7 +6274,12 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         else if (feeRaw >= 0.5) feeRaw = feeRaw / 100;     // percent (1 = 1%, 1.5 = 1.5%, 5 = 5%)
         // else: ≤0.5, presumed already decimal (0.01 = 1%, 0.025 = 2.5%)
         if (feeRaw > 0.05) feeRaw = 0.01;                  // still weird, fall back to default
-        const fee = feeRaw;
+        // v2.37.0: markets now publish an explicit fee schedule. Sports markets report
+        // feeType "zero_fees" / feeSchedule.rate 0 while takerBaseFee still reads 1000 (→ the
+        // 1% fallback above), so every edge was understated by a fee nobody pays.
+        const fsched = s.market && s.market.feeSchedule;
+        const zeroFee = !!s.market && (s.market.feeType === 'zero_fees' || s.market.feesEnabled === false || (fsched && Number(fsched.rate) === 0));
+        const fee = zeroFee ? 0 : feeRaw;
         const effectiveCost = Math.min(1, rawPrice * (1 + fee));
         return {edge: p.probability - effectiveCost, effectiveCost, rawPrice, fee};
       }
