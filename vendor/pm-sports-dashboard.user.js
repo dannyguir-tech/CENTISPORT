@@ -1,15 +1,42 @@
 // ==UserScript==
-// @name         Polymarket Sports Money Dashboard (2.35.0)
+// @name         Polymarket Sports Money Dashboard (2.36.0)
 // @namespace    pm-sports-dashboard
 // @match        https://polymarket.com/*
 // @grant        none
 // @run-at       document-idle
-// @version      2.35.0
+// @version      2.36.0
 // ==/UserScript==
 // >>> KEEP IN SYNC: bump SCRIPT_VERSION (~line 528 in the IIFE) whenever @version above changes.
 // >>> SCRIPT_VERSION drives the button label, dashboard header, and loading caption — Tampermonkey
 // >>> reads @version, but the in-page UI reads SCRIPT_VERSION. Drifting these two confuses the user.
 // Changelog
+// v2.36.0 — Audit release: speed, data correctness, and a closed feedback loop for win rate.
+//        Full notes live in VERSION_HISTORY. Summary:
+//        WALLET-SKIP BUG (v2.13–v2.35): the wave loop advanced `i += currentBatch` AFTER
+//          endWave() had ramped currentBatch, so every ramp-up skipped the difference. Those
+//          holders were never loaded and scored as zero-skill neutrals in every share metric.
+//          With the v2.35 +6 turbo ramp ~22% of wallets were skipped (104/134 on a test event).
+//        Speed (no math change): wallet phase is a rolling worker pool instead of fixed
+//          waves (one slow wallet no longer stalls the whole wave — and it loads every wallet,
+//          which fixes the skip bug); the extra "earliest activity" call is skipped when the
+//          500-row activity window already spans 7+ days (isNew is identical); exit detection
+//          runs alongside the wallet phase with its PnL backfill in one parallel pass.
+//        Superseded scans (re-click / Top-N change) stop instead of fail-cooling every in-flight
+//          wallet for 15 min and writing junk rows into the prediction log.
+//        Data (no math change): HOLDER_TTL_NO_DATA 3min→60s; the single-market gamma
+//          fallback is never cached; loading-screen holder/wallet counters actually render;
+//          popup-blocked path releases the scan controller; consistency panel matches
+//          "Spread: <team> (-x)" against that team's moneyline price; news badges fill in
+//          when the deferred comments fetch lands after render.
+//        Win-rate tooling: every prediction-log row records version/grade/action/marketType/
+//          topPick; pending rows are reconciled against gamma settlement in the background so
+//          the grader fills itself; the grader reports flat-stake ROI and splits results by
+//          grade, action, market type and version, and previews data-driven weights (never
+//          auto-applied).
+//        Bug fixes that touch model inputs (each behind a TUNING kill-switch, default ON):
+//          EXCLUDE_MISSING_WALLET_DATA, FLOW_SKIP_FUTURE_TRADES, INSIDER_WINDOW_PER_MARKET.
+//        Experimental (default OFF): EDGE_FILL_SIZE_USD prices edge at the depth-weighted fill.
+//        Collector hooks: window.pmSportsRun() and window.pmSportsLastScanStatus.
 // v2.30.0 — Scan-speed optimization layer. Display + transport only. NO prediction math,
 //        weights, modelProb, p.probability, p.confidence, p.score, Top Picks ranking, Tail
 //        Winners, alert thresholds, action logic, tokenId, or conditionId changes. NO new
@@ -1057,13 +1084,14 @@
   // >>> otherwise Tampermonkey says "v2.18" while the page shows "v2.17" (this is what
   // >>> caused v2.18.1's hotfix). SPORTGPT detection looks for an external layer that may
   // >>> attach window.SPORTGPT_VERSION / window.sportGPTVersion / window.SPORTGPT.version.
-  const SCRIPT_VERSION = '2.35.0';
+  const SCRIPT_VERSION = '2.36.0';
   // v2.18.1: confirm version in devtools immediately on page load — independent of UI render.
   try { console.log('[PM Sports] script loaded · v' + SCRIPT_VERSION + ' on ' + location.href); } catch(_){}
   // v2.21: surfaced inside the 📊 Grade modal under a "📜 Version history" collapsible.
   // Dates intentionally stay short labels — git-log dates aren't reliably available at runtime
   // and embedding them here would rot. Rolling 3-row window per spec.
   const VERSION_HISTORY = [
+    { version: '2.36.0', date: 'recent', weightDeltas: 'none', tuningSummary: 'Audit release: fixes the wallet-skip bug (~22% of holders never loaded), worker-pool wallet phase, data-correctness fixes, self-filling grader (settlement reconcile + ROI/grade/market-type breakdown + weight preview).', notes: 'HEADLINE — (0) Wallet-skip bug, present since v2.13 dynamic batching: the wave loop ran `i += currentBatch` after endWave() had already ramped currentBatch, so each ramp-up skipped (new − old) wallets. Skipped holders were never fetched and scored as zero-skill neutrals in elite/public/insider shares, walletEdge and sharp counts. With the v2.35 +6 turbo ramp a 134-wallet test event loaded only 104 (22% lost); predictions moved up to ~7pp once all wallets loaded and one Top Pick changed. Ramp-downs did the opposite (re-loaded overlapping wallets). Speed, no math change: (1) wallet phase runs as a rolling worker pool sized by currentBatch instead of fixed waves, so one slow wallet no longer stalls the next wave; endWave still adapts concurrency every currentBatch completions. (2) The extra activity?sortDirection=ASC call per heavy wallet is skipped when the 500-row window already spans 7+ days — isNew is unchanged because the true first activity can only be older. (3) Exit detection (with its PnL backfill, now one parallel pass) runs alongside the wallet phase instead of after it — it only reads non-holder wallets, which the wallet phase never loads, so the old ordering was unnecessary. Data, no math change: (4) HOLDER_TTL_NO_DATA 3min→60s. (5) The single-market /markets?slug fallback is never cached (it undercounts multi-market events). (6) Loading-screen holder-row and wallet counters render (they referenced block-scoped variables and never showed). (7) Popup-blocked path releases the scan controller. (8) Consistency panel compares "Spread: <team> (-x)" against that team\'s own moneyline price instead of a first-capitalized-word guess. (9) News badges fill in when the deferred comments fetch completes after render. (9b) Superseded scans (re-click, Top-N change) stop at the next checkpoint. Before, their aborted fetches resolved to null, so every in-flight wallet looked "all failed" and got a 15-min fail cooldown that blanked it for the NEW scan, and the stale scan still overwrote pmSportsBotExport / live state and wrote junk rows into the prediction log. (9c) The error page HTML-escapes the message. Win-rate tooling: (10) prediction-log rows carry v, grade, action, marketType, sport, topPick. (11) reconcilePendingPredictions() resolves pending rows against gamma settlement in the background (max once per RECONCILE_MIN_INTERVAL_MS, ≤ RECONCILE_MAX_MARKETS markets) so SLOG grows without revisiting events. (12) Grader adds flat-stake ROI and per-grade / action / market-type / version splits, plus a proposed-weights preview (≥ GRADER_MIN_ROWS_FOR_WEIGHTS settled rows, ±25% per component, renormalized) printed paste-ready but never applied. Model-input bug fixes, each with a TUNING kill-switch (default ON): (13) EXCLUDE_MISSING_WALLET_DATA — wallets whose stats failed to load are left out of the elite/public/insider share denominators and walletEdge, instead of counting as zero-skill holders; liquidity totals still include them. (14) FLOW_SKIP_FUTURE_TRADES — flow24h ignores trades stamped more than TRADE_CLOCK_SKEW_TOLERANCE_SEC (5 min) in the future (the v2.28.1 pressure fix, applied to flow); pressure now uses the same tolerance so a lagging local clock no longer drops the freshest trades. (15) INSIDER_WINDOW_PER_MARKET — insider timing uses the per-market profile window (15min on props) that the archetype reason text already reported. Experimental, default OFF: (16) EDGE_FILL_SIZE_USD > 0 prices edge at the depth-weighted ask fill for that stake (scan and live loop). Collector hooks: (17) window.pmSportsRun() and window.pmSportsLastScanStatus {status, reason, at}. Unchanged: TUNING.WEIGHTS, ALPHA, K1/K2/K3, softmax, confidence formula, classifyAction, gradeSide, Top Picks gates/ranking, Tail Winners, alert types/dedup/thresholds, DOM click matching, settlement equality, tokenId, conditionId, sideKey, schemaVersion (1). Verification: with the three kill-switches false, predictions are identical to v2.35.0 once its wallet-skip bug is corrected (offline harness, 0 diffs) — i.e. every other change here is math-neutral. The skip-bug fix itself has no switch; reintroducing data loss is not a supported revert. Grades can additionally differ in rare clock-skew cases via the pressure tolerance.' },
     { version: '2.35.0', date: 'recent', weightDeltas: 'none', tuningSummary: 'Scan-speed phase 6: adaptive turbo concurrency 48 with fail429 auto-rollback. Transport-only, no math/decision changes.', notes: 'Pure transport-layer change. (1) MAX_DYNAMIC_BATCH 32→48 (TURBO_MAX_DYNAMIC_BATCH); SAFE_MAX_DYNAMIC_BATCH=32 (known-good v2.33.0 ceiling); TURBO_FAIL429_ROLLBACK=true (master switch). HOLDER_FETCH_SPACING_MS stays 0; HOLDER_FETCH_BATCH floor stays 6. (2) endWave ramp accelerated when network is quiet: rate===0 AND mon.fail429===0 → currentBatch += 6 (was +3); rate<0.02 → +3 (was +2); rate<0.05 → +1 (unchanged). Drop deepened: rate>0.20 → -4 (was -2), floored at HOLDER_FETCH_BATCH. (3) One-shot fail429 auto-rollback: as soon as mon.fail429>0 during a scan, the effective ceiling collapses to SAFE_MAX_DYNAMIC_BATCH=32 for the rest of that scan, currentBatch is clamped immediately if above, and a single "[PM Sports] Turbo rollback: fail429 detected, capping batch to 32" line is logged. Per-endpoint 429 cooldown (v2.30.0) remains the independent secondary safety net. (4) New diagnostics in end-of-run log: maxBatchReached, turboRollbackTriggered, fail429, realFails, totalScanMs. Surfaced both in the [PM Sports] timings line and the [PM Sports] v2.13 perf object. No changes to: prediction math, modelProb, p.probability, p.confidence, p.score, TUNING.WEIGHTS, TUNING.ALPHA, K1/K2/K3, softmax, gradeSide thresholds, GRADE_* knobs, classifyAction, classifyMarketType, marketEdgeFor, Top Picks selection, Top Picks ranking, alert types, alert dedup keys, alert thresholds, buildBotExport schema, schemaVersion (stays 1), tokenId, conditionId, sideKey, wallet scoring, archetype classification, elite detection, fetch URL construction, request bodies, cache keys/TTLs/semantics, DERIVE_WINDOW_PNL (stays false), TopN (stays 200 for Deep), wallet-notional filtering (not introduced). Single-line revert path: MAX_DYNAMIC_BATCH 48→32 + endWave deltas back to +3/+2/+1 / -2 if turboRollback fires routinely.' },
     { version: '2.34.1', date: 'recent', weightDeltas: 'none', tuningSummary: 'classifyMarketType bug fix: dota-2 sportKey + Game-N esports_map detection', notes: 'Two targeted classifier fixes inside classifyMarketType() only. (1) Add "dota-2" (Polymarket slug format) to the ESPORTS set alongside existing "dota" and "dota2". (2) Extend the esports_map regex to catch per-game series sub-units — "\\bgame\\s*[1-5]\\b", "\\bgame\\s*(one|two|three|four|five)\\b", and "game\\s*\\d\\s+winner" — so "Game 1 Winner" / "Game 2 Winner" / "Game 3 Winner" markets in LoL / CS2 / Dota2 series classify as esports_map (and inherit the v2.34.0 GRADE_CAP_MAP = B cap) instead of being miscategorized as esports_match (which could earn A+/A). Pure classifier-string fix; no impact on modelProb, p.probability, p.confidence, p.score, components, weights, ALPHA, K1/K2/K3, softmax, Top Picks ranking, alert thresholds, alert dedup keys, action logic, gradeSide thresholds, schemaVersion (stays 1), or any fetch/cache/wallet-scoring/transport behavior.' },
     { version: '2.34.0', date: 'recent', weightDeltas: 'none', tuningSummary: 'Decision Grades: scan-time letter grade (A+/A/B/C/PASS) layered on top of the v2.2 BET/LEAN/PASS/FADE action classifier', notes: 'New execution-layer dimension that complements (does not replace) the existing classifyAction. Pure display + bot-export field; does NOT touch modelProb, p.probability, p.confidence, p.score, components, weights, Top Picks ranking formula, Tail Winners scoring, alert thresholds, alert dedup keys, action logic, tokenId, conditionId, sideKey, or schemaVersion (stays 1; grade/gradeReasons are additive). New gradeSide({...}) function consumes already-computed per-side signals — action, edge, confidence, modelProb, totalNotional, holderCount, marketType, tailScore, extensionRatio, exitSignal, smartMoneyDumping — and emits a letter grade plus a reasons[] array explaining downgrades. Grade is scan-time only (uses the full liquidity / holder / market-type context); live-tick grade deferred to a future minor to keep dashboard and live-state consistent. New TUNING knobs (all execution-layer, no prediction-math impact): GRADE_NOTIONAL_A_PLUS (75k), GRADE_NOTIONAL_A (40k), GRADE_NOTIONAL_B (20k), GRADE_HOLDERS_A_PLUS (40), GRADE_HOLDERS_A (25), GRADE_HOLDERS_B (12), GRADE_TAIL_A_PLUS (65), GRADE_TAIL_A (50; matches TAIL_MIN_SCORE), GRADE_PROB_FLOOR (0.10), GRADE_PROB_CEIL (0.92), GRADE_PROB_A_PLUS_FLOOR (0.20), GRADE_PROB_A_PLUS_CEIL (0.85), GRADE_CAP_PROP (B), GRADE_CAP_MAP (B), GRADE_CONFLICT_BLOCKS_A_PLUS (true). EVENT DECISION banner in the dashboard header now highlights only A+/A picks (the previous "N actionable bets" pill counted every LEAN spot, which over-spotlighted thin-liquidity LEANs). LEAN action always caps at grade B regardless of other signals. FADE / PASS / weird-price (modelProb outside [0.10, 0.92]) auto-grade PASS. Rollup table rows gain a small grade badge in the Side cell. Bot export topPicks[].grade, topPicks[].gradeReasons, sides[].grade, sides[].gradeReasons added; decisionSummary gains aPlusCount, aCount, bCount, cCount, passCount aggregates. No changes to: classifyAction, gradePredictions (backtest grader, separate concern), Top Picks selection gates (still edge×conf ≥ 0.08, notional ≥ 25k, tail ≥ 50), alert types, alert dedup keys, modelProb math, weights, ALPHA, or schemaVersion (stays 1).' },
@@ -1216,6 +1244,9 @@
   inject();
   setTimeout(inject, 500);
   setTimeout(inject, 2000);
+  // v2.36.0: headless collectors start a scan directly; completion is signalled by a fresh
+  // window.pmSportsBotExport and window.pmSportsLastScanStatus.status === 'ok'.
+  try { window.pmSportsRun = run; } catch(_){}
 
   // v2.23: shared 0..1 clamp used by the Phase-1 cluster qualityScore sub-scores. Not a
   // refactor of existing ad-hoc Math.max(0,Math.min(1,…)) call sites — keeping the diff
@@ -1506,6 +1537,21 @@
     GRADE_CAP_PROP:         'B',     // v2.34.0: _prop markets capped at this grade ('A+' disables the cap)
     GRADE_CAP_MAP:          'B',     // v2.34.0: _esports_map capped at this grade
     GRADE_CONFLICT_BLOCKS_A_PLUS: true,  // v2.34.0: smartMoneyDumping=true on the picked side blocks A+ (caps at B)
+    // v2.36.0: model-input bug fixes. All three false = v2.35.0 math (minus its wallet-skip bug).
+    EXCLUDE_MISSING_WALLET_DATA: true,   // wallets whose stats failed to load stay out of share denominators
+    FLOW_SKIP_FUTURE_TRADES:     true,   // flow24h ignores future-stamped trades (clock skew)
+    TRADE_CLOCK_SKEW_TOLERANCE_SEC: 300, // trades up to 5 min "in the future" are treated as current
+    INSIDER_WINDOW_PER_MARKET:   true,   // insider timing uses the per-market profile window (props: 15min)
+    // v2.36.0: experimental, default OFF. >0 prices edge at the depth-weighted ask fill for a
+    // stake of this many dollars instead of the top-of-book ask. Suggested trial: 150.
+    EDGE_FILL_SIZE_USD:          0,
+    // v2.36.0: background settlement reconcile — resolves pending prediction-log rows so the
+    // grader fills itself without revisiting settled events.
+    RECONCILE_ENABLED:           true,
+    RECONCILE_MIN_INTERVAL_MS:   20 * 60 * 1000,
+    RECONCILE_MAX_MARKETS:       60,
+    RECONCILE_MIN_AGE_SEC:       2 * 3600,
+    GRADER_MIN_ROWS_FOR_WEIGHTS: 50,     // proposed-weights preview needs this many settled rows
     // v2.21: stale-alert dimming thresholds. Live toasts go stale faster than the history panel
     // because the toast is meant to drive immediate action; once it's been on screen for 3+ min
     // the price has almost certainly moved. History rows tolerate up to 5 min before dimming.
@@ -1634,7 +1680,8 @@
       // `> lookbackSec` check trivially, and be included against intent.
       if (!t.timestamp) return;
       const age = nowSec - t.timestamp;
-      if (age < 0 || age > lookbackSec) return;
+      // v2.36.0: tolerate normal clock skew — a lagging local clock otherwise dropped the freshest trades.
+      if (age < -TUNING.TRADE_CLOCK_SKEW_TOLERANCE_SEC || age > lookbackSec) return;
       const bucket = bucketByWallet.get(String(t.wallet || '').toLowerCase()) || 'other';
       const notional = t.size * t.price;
       const a = acc[bucket];
@@ -1994,7 +2041,8 @@
           expectedNoData:  mon.expectedNoData  || 0,
           uniqueWallets:   walletCount,
           totalHolderRows: totalHolderRows,
-          dataQuality:     dataQuality
+          dataQuality:     dataQuality,
+          walletsMissingData: mon.walletsMissingData || 0   // v2.36.0 (additive)
         }
       };
     } catch (e) {
@@ -2118,6 +2166,50 @@
       if (corr != null) components.push({ component:k, n:xs.length, corr:Number(corr.toFixed(3)) });
     });
     components.sort((a,b) => Math.abs(b.corr) - Math.abs(a.corr));
+    // v2.36.0: money metric + "where does the model actually win" splits, computed on the bets
+    // you'd take (edge > 0). ROI is flat-stake: a win at cost c returns 1/c − 1, a loss −1.
+    const roiOf = rows => {
+      const xs = rows.filter(o => { const p = entryPrice(o); return p > 0 && p < 1; });
+      return xs.length ? xs.reduce((s, o) => s + (o.outcome ? (1 / entryPrice(o) - 1) : -1), 0) / xs.length : null;
+    };
+    const segment = keyFn => {
+      const groups = {};
+      posEdge.forEach(o => { const k = keyFn(o.r) || 'n/a'; (groups[k] = groups[k] || []).push(o); });
+      return Object.entries(groups).map(([k, rows]) => {
+        const m = rows.length;
+        const wr = rows.reduce((s, o) => s + o.outcome, 0) / m;
+        const avgEntry = rows.reduce((s, o) => s + entryPrice(o), 0) / m;
+        const roi = roiOf(rows);
+        return { segment: k, n: m, winRate: Number(wr.toFixed(3)), avgEntry: Number(avgEntry.toFixed(3)),
+                 edgeCaptured: Number((wr - avgEntry).toFixed(3)), roi: roi != null ? Number(roi.toFixed(3)) : null };
+      }).sort((a, b) => b.n - a.n);
+    };
+    const posEdgeRoi = roiOf(posEdge);
+    const segments = {
+      byGrade:      segment(r => r.grade),
+      byAction:     segment(r => r.action),
+      byMarketType: segment(r => r.marketType ? String(r.marketType).replace(/^[^_]*_/, '') : null),
+      byTopPick:    segment(r => r.topPick === true ? 'top pick' : r.topPick === false ? 'not top pick' : null),
+      byVersion:    segment(r => r.v)
+    };
+    // v2.36.0: data-driven weight PREVIEW — never applied automatically. Each weight moves by at
+    // most ±25% in the direction of its outcome correlation, then everything is renormalized
+    // to sum to 1. Copy the logged object into TUNING.WEIGHTS only if it looks sane.
+    let proposedWeights = null;
+    if (n >= TUNING.GRADER_MIN_ROWS_FOR_WEIGHTS) {
+      const corrBy = {};
+      components.forEach(c => { if (c.n >= TUNING.GRADER_MIN_ROWS_FOR_WEIGHTS) corrBy[c.component] = c.corr; });
+      const raw = {};
+      Object.keys(TUNING.WEIGHTS).forEach(k => {
+        const r = corrBy[k];
+        raw[k] = TUNING.WEIGHTS[k] * (r == null ? 1 : 1 + Math.max(-0.25, Math.min(0.25, r * 2.5)));
+      });
+      const total = Object.values(raw).reduce((a, b) => a + b, 0);
+      if (total > 0) {
+        proposedWeights = {};
+        Object.keys(raw).forEach(k => { proposedWeights[k] = Number((raw[k] / total).toFixed(3)); });
+      }
+    }
     const summary = {
       n,
       brier: Number(brier.toFixed(4)),
@@ -2135,12 +2227,98 @@
       modelClaimedWinRate: modelClaimed!=null ? Number(modelClaimed.toFixed(3)) : null,
       componentSeparation,                                                                       // v2.11
       verdict,
-      components
+      components,
+      posEdgeRoi: posEdgeRoi != null ? Number(posEdgeRoi.toFixed(3)) : null,                    // v2.36.0 — flat-stake ROI
+      segments,                                                                                  // v2.36.0
+      proposedWeights                                                                            // v2.36.0 — preview only
     };
-    try { console.log('[PM Sports grade]', summary); if (components.length) console.table(components); } catch(_){}
+    try {
+      console.log('[PM Sports grade]', summary);
+      if (components.length) console.table(components);
+      if (proposedWeights) console.log('[PM Sports grade] proposed TUNING.WEIGHTS (preview only — not applied):', JSON.stringify(proposedWeights));
+    } catch(_){}
     return summary;
   }
   try { if (typeof window !== 'undefined') window.pmsportsGrade = gradePredictions; } catch(_){}
+
+  // v2.36.0: settles pending prediction-log rows against gamma so the grader fills itself.
+  // Before this, a row only became gradable if its event was re-opened after settlement, so the
+  // settled log stayed tiny and every tuning decision rested on a handful of rows. Read-only,
+  // throttled (RECONCILE_MIN_INTERVAL_MS), bounded (RECONCILE_MAX_MARKETS, 20 per call), and
+  // never blocks a scan. fetchJson(url) must resolve to parsed JSON or null.
+  const RECONCILE_AT_KEY = 'pmsports_reconcile_at_v1';
+  async function reconcilePendingPredictions(fetchJson, opts){
+    opts = opts || {};
+    const nowMs = Date.now();
+    if (!opts.force) {
+      try { if (nowMs - Number(localStorage.getItem(RECONCILE_AT_KEY) || 0) < TUNING.RECONCILE_MIN_INTERVAL_MS) return null; } catch(_) {}
+    }
+    let plog;
+    try { plog = JSON.parse(localStorage.getItem('pmsports_predlog_v1') || '[]'); } catch { plog = []; }
+    if (!Array.isArray(plog) || !plog.length) return null;
+    const nowS = Math.floor(nowMs / 1000);
+    const pendingCids = [];
+    const seen = new Set();
+    for (let i = plog.length - 1; i >= 0 && pendingCids.length < TUNING.RECONCILE_MAX_MARKETS; i--) {
+      const r = plog[i];
+      if (!r || r.resolved === true || !r.cid || seen.has(r.cid)) continue;
+      if (r.t && nowS - r.t < TUNING.RECONCILE_MIN_AGE_SEC) continue;
+      seen.add(r.cid);
+      pendingCids.push(r.cid);
+    }
+    if (!pendingCids.length) return { checked: 0, resolvedMarkets: 0, resolvedRows: 0 };
+    const winners = {};
+    let answered = false;
+    for (let i = 0; i < pendingCids.length; i += 20) {
+      const batch = pendingCids.slice(i, i + 20);
+      const qs = batch.map(c => 'condition_ids=' + encodeURIComponent(c)).join('&');
+      const resp = await fetchJson('https://gamma-api.polymarket.com/markets?closed=true&limit=' + batch.length + '&' + qs);
+      if (resp == null) continue;
+      answered = true;
+      const arr = Array.isArray(resp) ? resp : (Array.isArray(resp.data) ? resp.data : []);
+      arr.forEach(m => {
+        // Guard against the API ignoring the filter: only accept markets we asked about.
+        if (!m || !m.conditionId || batch.indexOf(m.conditionId) < 0 || m.closed !== true) return;
+        let outcomes = m.outcomes;
+        try { if (typeof outcomes === 'string') outcomes = JSON.parse(outcomes); } catch { outcomes = null; }
+        if (!Array.isArray(outcomes)) return;
+        const wnr = winnerOf(m, outcomes);
+        if (wnr) winners[m.conditionId] = wnr;
+      });
+    }
+    if (answered) { try { localStorage.setItem(RECONCILE_AT_KEY, String(nowMs)); } catch(_) {} }
+    const resolvedCids = Object.keys(winners);
+    if (!resolvedCids.length) return { checked: pendingCids.length, resolvedMarkets: 0, resolvedRows: 0 };
+    let resolvedRows = 0;
+    plog.forEach(r => {
+      if (r && r.resolved !== true && winners[r.cid] != null) {
+        r.resolved = true; r.winner = winners[r.cid]; r.settledVia = 'reconcile'; resolvedRows++;
+      }
+    });
+    try { localStorage.setItem('pmsports_predlog_v1', JSON.stringify(plog)); } catch(_) {}
+    // Promote into SLOG with the same (cid,label) latest-snapshot-wins merge the scan uses.
+    try {
+      const priorS = JSON.parse(localStorage.getItem('pmsports_settled_v1') || '[]');
+      const arr = Array.isArray(priorS) ? priorS.slice() : [];
+      const idx = new Map();
+      arr.forEach((r, i) => { if (r && r.cid && r.label) idx.set(r.cid + '|' + r.label, i); });
+      plog.forEach(r => {
+        if (!r || r.resolved !== true || r.winner == null || r.label == null || winners[r.cid] == null) return;
+        const k = r.cid + '|' + r.label;
+        if (idx.has(k)) arr[idx.get(k)] = r; else { idx.set(k, arr.length); arr.push(r); }
+      });
+      localStorage.setItem('pmsports_settled_v1', JSON.stringify(arr.slice(-5000)));
+    } catch(_) {}
+    return { checked: pendingCids.length, resolvedMarkets: resolvedCids.length, resolvedRows };
+  }
+  try {
+    if (typeof window !== 'undefined') {
+      // Console: await pmsportsReconcile()  — forces a reconcile pass outside the throttle.
+      window.pmsportsReconcile = () => reconcilePendingPredictions(async (u) => {
+        try { const r = await fetch(u); return r.ok ? await r.json() : null; } catch(_) { return null; }
+      }, { force: true });
+    }
+  } catch(_){}
 
   // Resolved-market helpers — detect settlement state and name the winner.
   function isResolved(m){
@@ -2192,11 +2370,44 @@
       let team=null;
       const words = q.match(/\b[A-Z][a-zA-Z0-9_]{1,}\b/g) || [];
       for(const w of words){ if(!STOP.has(w)){ team=w; break; } }
-      return { m, q, probs, pYes: probs?probs[0]:null, pNo: probs&&probs.length>=2?probs[1]:null, spreadVal, totalKind, totalLine, team };
+      // v2.36.0: "Spread: <team> (-x)" names the favorite explicitly. Keep the parsed outcomes
+      // so the handicap check can compare that team's cover price with its own moneyline price.
+      let outcomesArr = null;
+      try { outcomesArr = typeof m.outcomes === 'string' ? JSON.parse(m.outcomes) : m.outcomes; } catch(_) {}
+      const spreadTeamM = q.match(/spread:\s*(.+?)\s*\(\s*[-−]\s*\d/i);
+      const spreadTeam = spreadTeamM ? spreadTeamM[1].trim() : null;
+      if (spreadTeam) team = spreadTeam;
+      return { m, q, probs, pYes: probs?probs[0]:null, pNo: probs&&probs.length>=2?probs[1]:null, spreadVal, totalKind, totalLine, team, spreadTeam, outcomesArr };
     });
     const findings=[];
+    const outcomeIdx = (x, name) => Array.isArray(x.outcomesArr) ? x.outcomesArr.findIndex(o => normalizeName(o) === normalizeName(name)) : -1;
     // (1) handicap ≤ moneyline
     subs.filter(x=>x.spreadVal!=null && x.team && x.pYes!=null).forEach(h=>{
+      // v2.36.0: covering -x implies winning, so P(team covers) can't exceed P(team wins).
+      if (h.spreadTeam) {
+        const hi = outcomeIdx(h, h.spreadTeam);
+        if (hi < 0 || !h.probs) return;
+        const pCover = h.probs[hi];
+        const ml = subs.find(x => x !== h && x.spreadVal == null && x.totalKind == null && x.probs && outcomeIdx(x, h.spreadTeam) >= 0);
+        if (!ml) return;
+        const pWin = ml.probs[outcomeIdx(ml, h.spreadTeam)];
+        const gap = pCover - pWin;
+        const label = h.spreadTeam+' −'+h.spreadVal;
+        if (gap > 0.02) {
+          findings.push({
+            severity:'error', kind:'handicap_exceeds_moneyline',
+            message:'P('+label+' covers) = '+Math.round(pCover*100)+'¢ > P('+h.spreadTeam+' wins) = '+Math.round(pWin*100)+'¢ (impossible — violation by '+Math.round(gap*100)+'¢)',
+            markets:[h.m.conditionId, ml.m.conditionId]
+          });
+        } else if (Math.abs(gap) < 0.02) {
+          findings.push({
+            severity:'info', kind:'handicap_near_parity',
+            message:'P('+label+' covers) = '+Math.round(pCover*100)+'¢ ≈ P('+h.spreadTeam+' wins) = '+Math.round(pWin*100)+'¢ (gap '+Math.round(gap*100)+'¢, thin edge)',
+            markets:[h.m.conditionId, ml.m.conditionId]
+          });
+        }
+        return;
+      }
       const moneyline = subs.find(x=>
         x!==h && x.team && x.team.toLowerCase()===h.team.toLowerCase()
         && x.spreadVal==null && x.totalKind==null && x.pYes!=null
@@ -2988,6 +3199,25 @@
     livePillTimerId = setTimeout(() => collapseAlertsToPill(), LIVE_PILL_COLLAPSE_MS);
   }
 
+  // v2.36.0: average price per share to buy `usd` dollars walking the ask ladder (best first,
+  // levels as [price, size]). If visible depth runs out, the remainder is charged at the worst
+  // visible level — conservative on thin books. Null when there's no usable ask.
+  function fillPriceForUsd(asks, usd){
+    if (!Array.isArray(asks) || !asks.length || !(usd > 0)) return null;
+    let remaining = usd, cost = 0, shares = 0, last = null;
+    for (const lvl of asks) {
+      const price = Number(lvl && lvl[0]), size = Number(lvl && lvl[1]);
+      if (!(price > 0) || !(size > 0)) continue;
+      last = price;
+      const take = Math.min(remaining, price * size);
+      cost += take; shares += take / price; remaining -= take;
+      if (remaining <= 1e-9) break;
+    }
+    if (last == null) return null;
+    if (remaining > 1e-9) { cost += remaining; shares += remaining / last; }
+    return shares > 0 ? cost / shares : null;
+  }
+
   // BET / LEAN / PASS / FADE matches the prediction-table classifier semantics already
   // used at line ~2900 area (TABLE_BET_EDGE / TABLE_LEAN_EDGE / TABLE_FADE_EDGE thresholds).
   function classifyAction(edge, confidence){
@@ -3139,7 +3369,8 @@
   function recomputeSideLight(label, book, meta, modelProb, confidence){
     if (!meta) return null;
     const fee = meta.fee != null ? meta.fee : 0.01;
-    const bestAsk = book && book.bestAsk != null ? book.bestAsk : null;
+    const fill = TUNING.EDGE_FILL_SIZE_USD > 0 && book ? fillPriceForUsd(book.asks, TUNING.EDGE_FILL_SIZE_USD) : null;
+    const bestAsk = fill != null ? fill : (book && book.bestAsk != null ? book.bestAsk : null);
     const bestBid = book && book.bestBid != null ? book.bestBid : null;
     const rawPrice = bestAsk != null ? bestAsk
                    : bestBid != null ? Math.min(1, bestBid + 0.01)   // small spread buffer
@@ -3244,7 +3475,7 @@
         if (!book) { out[tid] = null; return; }
         const bids = (book.bids||[]).map(l=>({price:Number(l.price), size:Number(l.size)})).filter(l=>l.size>0).sort((a,b)=>b.price-a.price);
         const asks = (book.asks||[]).map(l=>({price:Number(l.price), size:Number(l.size)})).filter(l=>l.size>0).sort((a,b)=>a.price-b.price);
-        out[tid] = { bestBid: bids.length ? bids[0].price : null, bestAsk: asks.length ? asks[0].price : null };
+        out[tid] = { bestBid: bids.length ? bids[0].price : null, bestAsk: asks.length ? asks[0].price : null, asks: asks.slice(0, 5).map(l => [l.price, l.size]) };
       });
       return out;
     }
@@ -3256,7 +3487,7 @@
         const book = await r.json();
         const bids = (book.bids||[]).map(l=>({price:Number(l.price), size:Number(l.size)})).filter(l=>l.size>0).sort((a,b)=>b.price-a.price);
         const asks = (book.asks||[]).map(l=>({price:Number(l.price), size:Number(l.size)})).filter(l=>l.size>0).sort((a,b)=>a.price-b.price);
-        out[tid] = { bestBid: bids.length ? bids[0].price : null, bestAsk: asks.length ? asks[0].price : null };
+        out[tid] = { bestBid: bids.length ? bids[0].price : null, bestAsk: asks.length ? asks[0].price : null, asks: asks.slice(0, 5).map(l => [l.price, l.size]) };
       } catch(_) { out[tid] = null; }
     }));
     return out;
@@ -3341,6 +3572,13 @@
     const myAbortController = new AbortController();
     activeScanController = myAbortController;
     const slug = location.pathname.split('/').pop();
+    // v2.36.0: headless collectors poll this to fail fast instead of waiting out a timeout
+    // when a scan ends without producing pmSportsBotExport (thin event, no holders, error).
+    const setScanStatus = (status, reason) => {
+      if (myAbortController.signal.aborted) return;   // a superseded scan must not overwrite the live one's status
+      try { window.pmSportsLastScanStatus = { status, reason: reason || null, slug, at: Date.now() }; } catch(_){}
+    };
+    setScanStatus('running');
     const parts = location.pathname.split('/').filter(Boolean);
     const sportKey = (parts[1] || 'default').toLowerCase();
     const PROFILE = SPORTS_PROFILES[sportKey] || SPORTS_PROFILES.default;
@@ -3364,7 +3602,7 @@
     const HOLDER_PREFIX = 'pmsports_holders_';
     const EVENT_TTL          = 3 * 60 * 1000;   // 3 min
     const HOLDER_TTL_OK      = 10 * 60 * 1000;  // 10 min — non-empty holder array
-    const HOLDER_TTL_NO_DATA = 3 * 60 * 1000;   // 3 min — 4xx silent or empty array
+    const HOLDER_TTL_NO_DATA = 60 * 1000;       // v2.36.0: 3min→60s so markets that open right after a scan un-stall fast
     // v2.30.0: subfetch short-TTL caches. Trades / books / prices-history / OI feed prediction
     // components (Flow24h, bookTilt, CLV, oiFactor); TTLs are sub-minute so rapid re-scans
     // reuse the snapshot and cold loads still re-fetch fresh. Comments are display-only.
@@ -3507,7 +3745,9 @@
       // this scan; turboRollbackTriggered flips true on the first fail429 (one-shot, capped at
       // SAFE_MAX_DYNAMIC_BATCH for the rest of the run); turboRollbackAtCall records mon.calls at
       // the rollback moment so the end-of-run log can show how deep we got before backing off.
-      maxBatchReached: TUNING.HOLDER_FETCH_BATCH || 6, turboRollbackTriggered: false, turboRollbackAtCall: null };
+      maxBatchReached: TUNING.HOLDER_FETCH_BATCH || 6, turboRollbackTriggered: false, turboRollbackAtCall: null,
+      // v2.36.0: audit-release diagnostics.
+      walletsMissingData: 0, earliestActivitySkips: 0, missingWalletRowsExcluded: 0, futureTradesSkipped: 0 };
     // v2.30.0: per-endpoint 429 cooldown — session-only Map of host+path → expireMs. Populated
     // by safeFetch/safePost catch handlers when 429 retries exhaust; checked at the top of
     // those wrappers to fast-return null instead of paying another 3×exponential backoff.
@@ -3767,14 +4007,22 @@
       const cached = cacheGetEvent(slug);
       if (cached) { mon.eventCacheHits++; return cached; }
       let ev = null;
+      let singleMarketFallback = false;
       try { const r = await fetch('https://gamma-api.polymarket.com/events/slug/'+slug); if (r.ok){ const j = await r.json(); if (j && j.markets && j.markets.length) ev = j; } } catch {}
       if (!ev) { try { const r = await fetch('https://gamma-api.polymarket.com/events?slug='+slug); if (r.ok){ const j = await r.json(); const e = Array.isArray(j) ? j[0] : j; if (e && e.markets && e.markets.length) ev = e; } } catch {} }
-      if (!ev) { try { const r = await fetch('https://gamma-api.polymarket.com/markets?slug='+slug); if (r.ok){ const j = await r.json(); const m = Array.isArray(j) ? j[0] : j; if (m && m.conditionId) ev = { title: m.question || slug, markets: [m] }; } } catch {} }
-      if (ev) cacheSetEvent(slug, ev);
+      if (!ev) { try { const r = await fetch('https://gamma-api.polymarket.com/markets?slug='+slug); if (r.ok){ const j = await r.json(); const m = Array.isArray(j) ? j[0] : j; if (m && m.conditionId) { ev = { title: m.question || slug, markets: [m] }; singleMarketFallback = true; } } } catch {} }
+      // v2.36.0: the /markets?slug fallback returns one market even on multi-market events, so
+      // caching it would hide the other markets for EVENT_TTL. Only cache event-shaped responses.
+      if (ev && !singleMarketFallback) cacheSetEvent(slug, ev);
       return ev;
     }
     const w = window.open('about:blank','_blank');
-    if(!w){ alert('Popup blocked'); return; }
+    if(!w){
+      setScanStatus('error', 'popup_blocked');
+      if (activeScanController === myAbortController) activeScanController = null;
+      alert('Popup blocked');
+      return;
+    }
     const d = w.document;
     d.write(`<!doctype html><html><head><title>PM Dashboard · ${slug}</title><style>
 *{box-sizing:border-box}body{font-family:ui-sans-serif,system-ui,sans-serif;background:#0a0a0e;color:#e8e8ee;margin:0;padding:20px;min-width:1400px}
@@ -3992,10 +4240,21 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
     function setStep(stepNum, label, pct){
       try { setS('[Step '+stepNum+'/6] '+label, pct); } catch(_){}
     }
+    // v2.36.0: a newer scan aborted this one. Aborted fetches resolve to null, so continuing
+    // would build predictions from empty wallets, overwrite pmSportsBotExport and the live
+    // state, and log junk rows into the prediction log the grader reads. Stop instead.
+    function scanSuperseded(){
+      if (!myAbortController.signal.aborted) return false;
+      try { console.log('[PM Sports] scan superseded by a newer scan — discarding partial results'); } catch(_){}
+      try { d.body.innerHTML = '<div style="max-width:560px;margin:60px auto;color:#aaa;font-family:system-ui,sans-serif">This scan was replaced by a newer one. You can close this window.</div>'; } catch(_){}
+      return true;
+    }
     function updateCounts(){
       if (!$counts) return;
-      const totalHolderRows = (typeof sides === 'object' && sides) ? Object.values(sides).reduce((s, sd) => s + (sd && sd.rows ? sd.rows.length : 0), 0) : null;
-      const uniqueWallets = (typeof walletList === 'object' && walletList) ? walletList.length : null;
+      // v2.36.0: `sides` / `walletList` are block-scoped inside the scan's try{} and invisible
+      // here, so these lines never rendered. Read run-scope counters set once wallets are known.
+      const totalHolderRows = progressHolderRows;
+      const uniqueWallets = progressWalletCount;
       const cacheHits = walletCacheHits || 0;
       const cacheMiss = uniqueWallets != null ? Math.max(0, uniqueWallets - cacheHits) : null;
       const realFails = mon.realFails || 0;
@@ -4018,6 +4277,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
     const tStart = (typeof performance!=='undefined' && performance.now) ? performance.now() : Date.now();
     let tPhase = tStart;
     let walletCacheHits = 0;
+    let progressHolderRows = null, progressWalletCount = null;   // v2.36.0: loading-screen counters
     const markPhase = (name) => {
       const now = (typeof performance!=='undefined' && performance.now) ? performance.now() : Date.now();
       timings[name] = Math.round(now - tPhase);
@@ -4031,7 +4291,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       try { console.time('[PM Sports] fetchEvent'); } catch(_){}
       const ev=await fetchEvent(slug);
       try { console.timeEnd('[PM Sports] fetchEvent'); } catch(_){}
-      if(!ev||!ev.markets||!ev.markets.length){d.body.innerHTML='<h1 style="color:#f88">Unsupported market type — please report this URL</h1><pre style="color:#f88">'+esc(location.href)+'</pre>';return;}
+      if(!ev||!ev.markets||!ev.markets.length){setScanStatus('error','unsupported_market');d.body.innerHTML='<h1 style="color:#f88">Unsupported market type — please report this URL</h1><pre style="color:#f88">'+esc(location.href)+'</pre>';return;}
       setStep(2, 'Loading markets ('+ev.markets.length+')…', 5);
       // v2.3: event-volume quality gate. Thinly-traded events produce noise predictions because the
       // top-N holders barely have enough notional to differentiate the components. Skip early with a
@@ -4045,6 +4305,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           +'<div style="color:#888;font-size:12px">Predictor signal is unreliable below this volume — top holders don\'t have enough notional to differentiate informed flow from noise. Skipping analysis to avoid false-confidence picks.</div>'
           +'<div style="color:#666;font-size:11px;margin-top:12px">Override: lower TUNING.MIN_EVENT_VOLUME if you want to force analysis on a thinner event.</div>'
           +'</div>';
+        setScanStatus('skipped', 'thin_event');
         return;
       }
       markPhase('event');
@@ -4207,16 +4468,20 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       }
       markPhase('holders');
       try { console.timeEnd('[PM Sports] fetchHolders'); console.time('[PM Sports] loadWallets'); } catch(_){}
+      if (scanSuperseded()) return;
       if(!markets.length){
         const failParts = [];
         if (failedMarkets.length) failParts.push(failedMarkets.length+' rate-limited/server-failed after retry');
         if (noDataMarkets.length) failParts.push(noDataMarkets.length+' had no holder data');
         d.body.innerHTML='<h1 style="color:#f88">No markets loaded</h1><pre style="color:#f88">'+esc(failParts.join(' · ') || 'unknown')+'</pre>';
+        setScanStatus('error', 'no_markets_loaded');
         return;
       }
       const walletSet=new Set();
       markets.forEach(r=>r.hr.forEach(tok=>tok.holders.forEach(h=>walletSet.add(h.proxyWallet))));
       const walletList=[...walletSet];
+      progressWalletCount = walletList.length;
+      progressHolderRows = markets.reduce((s, r) => s + r.hr.reduce((t, tok) => t + (tok.holders ? tok.holders.length : 0), 0), 0);
       const userStats={},positionsByWallet={},activityByWallet={};
       const total=walletList.length;
       let done=0;
@@ -4310,7 +4575,9 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         // avoid burning the 8 calls again. Counted in mon.walletFailSkips.
         if (walletFailCooldownActive(ww)) {
           mon.walletFailSkips++;
-          userStats[ww] = {value:0, pnlAll:0, pnl30d:0, pnl7d:0, volume:0, winRate:0, earliestActivity:null, winRateSampled:false, positionsSampled:false, tradeIntervalStdDev:null, tradeCount:0, entryQuality:0, leagueFocus:null};
+          mon.walletsMissingData++;
+          // v2.36.0: dataMissing lets rawMetrics treat this holder as unknown rather than zero-skill.
+          userStats[ww] = {value:0, pnlAll:0, pnl30d:0, pnl7d:0, volume:0, winRate:0, earliestActivity:null, winRateSampled:false, positionsSampled:false, tradeIntervalStdDev:null, tradeCount:0, entryQuality:0, leagueFocus:null, dataMissing:true};
           positionsByWallet[ww] = [];
           activityByWallet[ww] = [];
           done++; setStep(4, 'Loading wallets '+done+'/'+total+' · market data fetching in parallel', 8+Math.round(done/total*84)); updateCounts();
@@ -4336,6 +4603,10 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             : Promise.resolve(null)
         ]);
         if (!eventHasResolved) mon.closedPositionsSkips++;
+        // v2.36.0: aborted fetches return null — without this guard every in-flight wallet of a
+        // superseded scan looked "all failed" and got a 15-min fail cooldown, so the NEW scan
+        // treated them as empty wallets.
+        if (myAbortController.signal.aborted) return;
         const actArr = Array.isArray(activity) ? activity : [];
         const posArr = Array.isArray(positions) ? positions : [];
         const closedArr = Array.isArray(closedPositions) ? closedPositions : [];
@@ -4399,7 +4670,13 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           entryQuality,
           leagueFocus
         };
-        if (actArr.length === 500) {
+        // v2.36.0: earliestActivity only feeds isNew (first activity < 7 days ago). When the
+        // newest-500 window already reaches back 7+ days, the true first activity is older
+        // still and isNew must be false — the extra serial round-trip can't change the answer.
+        const activityWindowSpansWeek = earliestActivity != null && (Math.floor(Date.now()/1000) - earliestActivity) >= 7*86400;
+        if (actArr.length === 500 && activityWindowSpansWeek) {
+          mon.earliestActivitySkips++;
+        } else if (actArr.length === 500) {
           const firstAct = await safeFetch('https://data-api.polymarket.com/activity?user='+ww+'&limit=1&sortDirection=ASC');
           if (firstAct && firstAct[0] && firstAct[0].timestamp) derived.earliestActivity = firstAct[0].timestamp;
         }
@@ -4412,6 +4689,8 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         // still cacheSet normally so a single bad endpoint doesn't poison the wallet.
         const allFailed = valueR == null && pAll == null && volR == null && positions == null && activity == null && closedPositions == null;
         if (allFailed) {
+          derived.dataMissing = true;   // v2.36.0: never cached — only marks this run's row
+          mon.walletsMissingData++;
           markWalletFailed(ww);
         } else {
           cacheSet(ww, derived, posArr, actArr);
@@ -4443,6 +4722,89 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       // v2.32.0: comments deferred — fire-and-forget assignment lives just after the
       // subfetchPromises[] array close. alertsByCid is display-only; no prediction component reads it.
       let commentsBackgroundPromise = Promise.resolve();
+      // v2.36.0: exit detection now runs alongside the wallet phase. It only considers wallets
+      // that are NOT current holders (currentHolders filter below) while userStats only ever
+      // holds current holders, so it never actually depended on the wallet phase (the v2.22
+      // note assumed it did). PnL comes from the HOT cache or the parallel backfill call.
+      const exitsByToken = {}; // token (asset) -> [{w,ts,sold,netSold,pnl,tier,age,market}]
+      const exitsCandidates = []; // full rendering list (post-dedupe)
+      const profitableExitsByToken = {};   // token → count (display only)
+      const exitQualityByToken = {};        // token → quality-weighted score (predictor input)
+      const currentHolders = new Set();
+      markets.forEach(r=>r.hr.forEach(tok=>tok.holders.forEach(h=>currentHolders.add(h.proxyWallet))));
+      async function computeExits(){
+        const now = Math.floor(Date.now()/1000);
+        if (!allMarketActResults) allMarketActResults = [];
+        for(const {r, acts} of allMarketActResults){
+          if (!acts.length) continue;
+          // Group last action per (wallet, asset/token) pair; also track sell/buy sums per token.
+          const lastByWalletToken = {};  // key: w|token -> activity
+          const sellSum = {}, buySum = {};
+          acts.forEach(a=>{
+            if(!a) return;
+            const w = a.proxyWallet || a.user;
+            if(!w) return;
+            const token = a.asset;
+            if(!token) return;
+            const key = w+'|'+token;
+            if(!lastByWalletToken[key] || (a.timestamp||0) > lastByWalletToken[key].timestamp) lastByWalletToken[key] = a;
+            const side = (a.side||'').toUpperCase();
+            const sz = Number(a.size)||0;
+            if(side==='SELL') sellSum[key] = (sellSum[key]||0) + sz;
+            else if(side==='BUY') buySum[key] = (buySum[key]||0) + sz;
+          });
+          Object.entries(lastByWalletToken).forEach(([key,a])=>{
+            const [w, token] = key.split('|');
+            if(currentHolders.has(w)) return;
+            if((a.side||'').toUpperCase()!=='SELL') return;
+            const age = now - (a.timestamp||0);
+            if(age > 72*3600) return;
+            const sold = sellSum[key]||0;
+            if(sold <= 0) return;
+            const bought = buySum[key]||0;
+            const netSold = Math.max(sold-bought, 0);
+            const tier = age <= 24*3600 ? 'fresh' : 'recent';
+            const cached = userStats[w] || cacheGet(w) || null;
+            const pnl = cached && typeof cached.pnlAll==='number' ? cached.pnlAll : null;
+            (exitsByToken[token] = exitsByToken[token] || []).push({w,ts:a.timestamp,token,sold,netSold,pnl,tier,age,market:r.m.question||r.m.conditionId.slice(0,10)});
+          });
+        }
+        // Backfill pnlAll for unknown exit candidates (top by sold volume, capped at 50).
+        // v2.36.0: one parallel pass instead of 5 serial batches of 10.
+        const allExitRows = Object.values(exitsByToken).flat();
+        const uniqueByWallet = {};
+        allExitRows.forEach(x=>{if(!uniqueByWallet[x.w] || x.ts > uniqueByWallet[x.w].ts) uniqueByWallet[x.w] = x;});
+        const unknownExits = Object.values(uniqueByWallet).filter(c=>c.pnl==null).sort((a,b)=>b.sold-a.sold).slice(0,50);
+        const pnlByWallet = {};
+        const exitPnlResps = await Promise.all(unknownExits.map(c=>safeFetch('https://lb-api.polymarket.com/profit?window=all&limit=1&address='+c.w)));
+        unknownExits.forEach((c,k)=>{const resp=exitPnlResps[k]; if(resp && resp[0] && typeof resp[0].amount==='number') pnlByWallet[c.w] = resp[0].amount;});
+        // v2.0: exits are now quality-weighted instead of binary pnl>$5k counts.
+        // score = Σ over unique (wallet, token) of: walletQuality × netSold × timeWeight
+        //   walletQuality = tanh(pnlAll/$50k) × winRate  ∈ [0, 1]
+        //   timeWeight    = 1.0 if age ≤ 24h, 0.5 if 24–72h, 0 otherwise
+        // Still kept `profitableExitsByToken` as a raw count for UI display continuity.
+        Object.entries(exitsByToken).forEach(([token, arr])=>{
+          const byW = {};
+          arr.forEach(x=>{
+            const pnl = x.pnl!=null ? x.pnl : pnlByWallet[x.w];
+            if(typeof pnl !== 'number' || pnl <= 5000) return;
+            if(!byW[x.w] || x.ts > byW[x.w].ts) byW[x.w] = {...x, pnl};
+          });
+          profitableExitsByToken[token] = Object.keys(byW).length;
+          let qualityScore = 0;
+          Object.values(byW).forEach(x=>{
+            const u = userStats[x.w] || cacheGet(x.w) || null;
+            const wr = (u && typeof u.winRate === 'number') ? u.winRate : 0.5;
+            const walletQuality = Math.tanh((x.pnl||0) / 50000) * wr;
+            const ageHours = x.age / 3600;
+            const timeWeight = ageHours <= 24 ? 1.0 : (ageHours <= 72 ? 0.5 : 0);
+            qualityScore += walletQuality * x.netSold * timeWeight;
+            exitsCandidates.push(x);
+          });
+          exitQualityByToken[token] = qualityScore;
+        });
+        markPhase('exits');
+      }
       const subfetchPromises = [
         // ── Trade tapes ──
         // Per-market /trades?market=<cid>&limit=500 captures every trade regardless of current
@@ -4539,7 +4901,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             const depthMid = totalSize>0 ? totalVol/totalSize : null;
             const bestBid = bids.length ? bids[0].price : null;
             const bestAsk = asks.length ? asks[0].price : null;
-            bookByToken[tokenId] = {tilt, bidVol, askVol, depthMid, bestBid, bestAsk};
+            bookByToken[tokenId] = {tilt, bidVol, askVol, depthMid, bestBid, bestAsk, asks: asks.map(l => [l.price, l.size])};  // v2.36.0: asks for EDGE_FILL_SIZE_USD
             // v2.30.0: only cache when we actually got a book (not the empty fallback).
             cacheSetShort(BOOKS_PREFIX, tokenId, bookByToken[tokenId]);
           });
@@ -4617,7 +4979,8 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
               if (raw != null) cacheSetShort(MARKET_ACTIVITY_PREFIX, r.m.conditionId, acts);
               return { r, acts };
             }));
-          } catch(e) { /* market-activity optional — post-wallet loop guards against null */ }
+          } catch(e) { /* market-activity optional — computeExits guards against null */ }
+          try { await computeExits(); } catch(e) { try { console.warn('[PM Sports] exit detection failed:', e && e.message); } catch(_){} }
         })()
       ];
       // v2.32.0: comments DEFERRED — populates display-only alertsByCid in the background.
@@ -4650,12 +5013,31 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           markPhase('comments');
         } catch(e) { /* comments optional */ }
       })();
-      // Wallet phase — ramps currentBatch in [HOLDER_FETCH_BATCH=6, MAX_DYNAMIC_BATCH=32].
-      for(let i=0;i<walletList.length;i+=currentBatch){
-        await Promise.all(walletList.slice(i,i+currentBatch).map(loadWallet));
-        endWave();
-        await new Promise(r=>setTimeout(r,0));   // v2.33.0: 50→0 (event-loop yield only; endpoint 429 cooldown absorbs spikes)
-      }
+      // Wallet phase — ramps currentBatch in [HOLDER_FETCH_BATCH=6, MAX_DYNAMIC_BATCH].
+      // v2.36.0: rolling worker pool instead of fixed waves. The wave loop waited for the
+      // slowest wallet before starting the next wave, so one slow wallet idled every other
+      // slot. Here up to currentBatch wallets stay in flight; endWave() still runs after every
+      // currentBatch completions, so the ramp / -4 drop / turbo rollback behave as before.
+      await new Promise(resolve => {
+        let next = 0, inFlight = 0, sinceWave = 0;
+        if (!walletList.length) { resolve(); return; }
+        const pump = () => {
+          while (inFlight < currentBatch && next < walletList.length && !myAbortController.signal.aborted) {
+            const ww = walletList[next++];
+            inFlight++;
+            loadWallet(ww)
+              .catch(e => { try { console.warn('[PM Sports] wallet load failed:', ww, e && e.message); } catch(_){} })
+              .finally(() => {
+                inFlight--; sinceWave++;
+                if (sinceWave >= currentBatch) { endWave(); sinceWave = 0; }
+                if (inFlight === 0 && (next >= walletList.length || myAbortController.signal.aborted)) { endWave(); resolve(); }
+                else pump();
+              });
+          }
+        };
+        pump();
+      });
+      if (scanSuperseded()) return;
       markPhase('wallets');
       try { console.timeEnd('[PM Sports] loadWallets'); console.time('[PM Sports] subfetchAwait'); } catch(_){}
       // v2.22: most or all sub-fetches will already be settled by the time wallets finish;
@@ -4663,93 +5045,12 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       setStep(5, 'Awaiting market data (books · trades · prices · OI · comments)…', 92);
       await Promise.allSettled(subfetchPromises);
       try { console.timeEnd('[PM Sports] subfetchAwait'); console.time('[PM Sports] renderUI'); } catch(_){}
-      setStep(5, 'Building predictions · exits…', 95);
+      if (scanSuperseded()) return;
+      setStep(5, 'Building predictions…', 95);
       const now=Math.floor(Date.now()/1000);
-      // Pre-render exit collection, so per-side profitable-exit counts are available to the predictor.
-      // For each market: fetch recent activity, bucket per token (side), find wallets whose latest action
-      // on that token was a SELL within 72h AND lifetime pnl > $5k.
-      const exitsByToken = {}; // token (asset) -> [{w,ts,sold,netSold,pnl,tier,age,market}]
-      const exitsCandidates = []; // full rendering list (post-dedupe)
-      const currentHolders = new Set();
-      markets.forEach(r=>r.hr.forEach(tok=>tok.holders.forEach(h=>currentHolders.add(h.proxyWallet))));
-      // v2.31.0: market-activity was pre-fetched in parallel inside subfetchPromises[]
-      // above. allMarketActResults is an array of {r, acts} pairs; guard handles a
-      // thrown/never-run IIFE. Body below is byte-identical to the prior for…of body.
-      if (!allMarketActResults) allMarketActResults = [];
-      for(const {r, acts} of allMarketActResults){
-        if (!acts.length) continue;
-        // Group last action per (wallet, asset/token) pair; also track sell/buy sums per token.
-        const lastByWalletToken = {};  // key: w|token -> activity
-        const sellSum = {}, buySum = {};
-        acts.forEach(a=>{
-          if(!a) return;
-          const w = a.proxyWallet || a.user;
-          if(!w) return;
-          const token = a.asset;
-          if(!token) return;
-          const key = w+'|'+token;
-          if(!lastByWalletToken[key] || (a.timestamp||0) > lastByWalletToken[key].timestamp) lastByWalletToken[key] = a;
-          const side = (a.side||'').toUpperCase();
-          const sz = Number(a.size)||0;
-          if(side==='SELL') sellSum[key] = (sellSum[key]||0) + sz;
-          else if(side==='BUY') buySum[key] = (buySum[key]||0) + sz;
-        });
-        Object.entries(lastByWalletToken).forEach(([key,a])=>{
-          const [w, token] = key.split('|');
-          if(currentHolders.has(w)) return;
-          if((a.side||'').toUpperCase()!=='SELL') return;
-          const age = now - (a.timestamp||0);
-          if(age > 72*3600) return;
-          const sold = sellSum[key]||0;
-          if(sold <= 0) return;
-          const bought = buySum[key]||0;
-          const netSold = Math.max(sold-bought, 0);
-          const tier = age <= 24*3600 ? 'fresh' : 'recent';
-          const cached = userStats[w] || cacheGet(w) || null;
-          const pnl = cached && typeof cached.pnlAll==='number' ? cached.pnlAll : null;
-          (exitsByToken[token] = exitsByToken[token] || []).push({w,ts:a.timestamp,token,sold,netSold,pnl,tier,age,market:r.m.question||r.m.conditionId.slice(0,10)});
-        });
-      }
-      // Backfill pnlAll for unknown exit candidates (top by sold volume, capped at 50)
-      const allExitRows = Object.values(exitsByToken).flat();
-      const uniqueByWallet = {};
-      allExitRows.forEach(x=>{if(!uniqueByWallet[x.w] || x.ts > uniqueByWallet[x.w].ts) uniqueByWallet[x.w] = x;});
-      const unknownExits = Object.values(uniqueByWallet).filter(c=>c.pnl==null).sort((a,b)=>b.sold-a.sold).slice(0,50);
-      const pnlByWallet = {};
-      for(let i=0;i<unknownExits.length;i+=10){
-        const batch = unknownExits.slice(i,i+10);
-        const arr = await Promise.all(batch.map(c=>safeFetch('https://lb-api.polymarket.com/profit?window=all&limit=1&address='+c.w)));
-        batch.forEach((c,k)=>{const resp=arr[k]; if(resp && resp[0] && typeof resp[0].amount==='number') pnlByWallet[c.w] = resp[0].amount;});
-        await new Promise(r=>setTimeout(r,0));   // v2.33.0: 50→0 (event-loop yield only; endpoint 429 cooldown absorbs spikes)
-      }
-      // v2.0: exits are now quality-weighted instead of binary pnl>$5k counts.
-      // score = Σ over unique (wallet, token) of: walletQuality × netSold × timeWeight
-      //   walletQuality = tanh(pnlAll/$50k) × winRate  ∈ [0, 1]
-      //   timeWeight    = 1.0 if age ≤ 24h, 0.5 if 24–72h, 0 otherwise
-      // Still kept `profitableExitsByToken` as a raw count for UI display continuity.
-      const profitableExitsByToken = {};   // token → count (display only)
-      const exitQualityByToken = {};        // token → quality-weighted score (predictor input)
-      Object.entries(exitsByToken).forEach(([token, arr])=>{
-        const byW = {};
-        arr.forEach(x=>{
-          const pnl = x.pnl!=null ? x.pnl : pnlByWallet[x.w];
-          if(typeof pnl !== 'number' || pnl <= 5000) return;
-          if(!byW[x.w] || x.ts > byW[x.w].ts) byW[x.w] = {...x, pnl};
-        });
-        profitableExitsByToken[token] = Object.keys(byW).length;
-        let qualityScore = 0;
-        Object.values(byW).forEach(x=>{
-          const u = userStats[x.w] || cacheGet(x.w) || null;
-          const wr = (u && typeof u.winRate === 'number') ? u.winRate : 0.5;
-          const walletQuality = Math.tanh((x.pnl||0) / 50000) * wr;
-          const ageHours = x.age / 3600;
-          const timeWeight = ageHours <= 24 ? 1.0 : (ageHours <= 72 ? 0.5 : 0);
-          qualityScore += walletQuality * x.netSold * timeWeight;
-          exitsCandidates.push(x);
-        });
-        exitQualityByToken[token] = qualityScore;
-      });
-      markPhase('exits');
+      // v2.36.0: exit detection (exitsByToken / exitQualityByToken / profitableExitsByToken /
+      // exitsCandidates) ran inside the market-activity subfetch via computeExits() and is
+      // settled by the Promise.allSettled above.
       setStep(6, 'Rendering dashboard…', 97); updateCounts();
       const mmSet=new Set();
       markets.forEach(r=>{
@@ -4854,6 +5155,9 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         const marketWinner = marketResolved ? winnerOf(r.m, r.outcomes) : null;
         // v2.3: per-market profile (looser sharp gates on props / derivatives)
         const marketProfile = getMarketProfile(r.m.question || '', sportKey);
+        // v2.36.0: the insider_like archetype reports "bet within <marketProfile window>" but the
+        // flag was computed with the event-wide PROFILE window (30min vs 15min on props).
+        const insiderWindowSec = TUNING.INSIDER_WINDOW_PER_MARKET ? marketProfile.insiderWindow : PROFILE.insiderWindow;
         r.hr.forEach(tok=>{
           const idx=r.clob.indexOf(tok.token);
           const label=r.outcomes[idx]||('Outcome '+idx);
@@ -4900,7 +5204,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
                 if(a.type && a.type!=='TRADE') return;
                 if((a.side||'').toUpperCase()!=='BUY') return;
                 const t=Number(a.timestamp)||0;
-                if(t>0 && t<marketStartSec && (marketStartSec-t)<=PROFILE.insiderWindow) tradeInInsiderWindow=true;
+                if(t>0 && t<marketStartSec && (marketStartSec-t)<=insiderWindowSec) tradeInInsiderWindow=true;
               });
             }
             const hold=firstInMarket?now-firstInMarket:null;
@@ -4991,11 +5295,17 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         const sharpWinRates=[];
         const tokenId = rows[0] ? rows[0].tokenId : null;
         const refPrice = tokenId ? refPriceByToken[tokenId] : null;
+        let knownNotional = 0;   // v2.36.0: share denominator; equals totalNotional unless rows were excluded
         rows.forEach(r=>{
           const curPrice = r.price || sidePrice;
           const amount = r.h.amount || 0;
           const notional = amount * curPrice;
           totalNotional += notional;
+          // v2.36.0: a holder whose wallet stats failed to load is unknown, not a zero-skill
+          // neutral. Keep it in totalNotional (liquidity is real) but out of the elite/public/
+          // insider share denominators and the walletEdge average, where its zeros diluted signal.
+          if (TUNING.EXCLUDE_MISSING_WALLET_DATA && r.u && r.u.dataMissing) { mon.missingWalletRowsExcluded++; return; }
+          knownNotional += notional;
           // v1.9: sharpEdge orthogonalized — count only `sharp` archetype. insider_like and late_edge
           // are measured by insiderTiming and winRate (via consistency) respectively.
           if (r.archetype==='sharp') { sharpNotional += notional; sharpCount++; }
@@ -5056,14 +5366,14 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         const publicAvgUnrealizedRoi = publicRoiWeightSum > 0 ? publicRoiWeightedSum / publicRoiWeightSum : null;
         const walletEdgeSide = edgeWeightSum>0 ? edgeWeightedSum/edgeWeightSum : 0;
         const trueClvSide = trueClvWeightSum > 0 ? trueClvWeightedSum/trueClvWeightSum : null;
-        const insiderShare = totalNotional>0 ? insiderNotional/totalNotional : 0;
-        const eliteShare      = totalNotional>0 ? eliteNotional      /totalNotional : 0;  // v2.10
-        const eliteShareNiche = totalNotional>0 ? eliteNotionalNiche /totalNotional : 0;  // v2.11
+        const insiderShare = knownNotional>0 ? insiderNotional/knownNotional : 0;
+        const eliteShare      = knownNotional>0 ? eliteNotional      /knownNotional : 0;  // v2.10
+        const eliteShareNiche = knownNotional>0 ? eliteNotionalNiche /knownNotional : 0;  // v2.11
         const eliteAvgPnlAll  = eliteCount > 0 ? eliteSumPnlAll  / eliteCount : null;
         const eliteAvgWinRate = eliteCount > 0 ? eliteSumWinRate / eliteCount : null;
         const eliteAvgRoi     = eliteRoiWeightSum > 0 ? eliteRoiWeightedSum / eliteRoiWeightSum : null;
         const eliteAvgEntry   = eliteAmountSum   > 0 ? eliteEntryWeightedSum / eliteAmountSum   : null;  // v2.12
-        const publicShare  = totalNotional>0 ? publicNotional /totalNotional : 0;
+        const publicShare  = knownNotional>0 ? publicNotional /knownNotional : 0;
         const avgWinRateSharp = sharpWinRates.length ? sharpWinRates.reduce((a,b)=>a+b,0)/sharpWinRates.length : null;
         const exitQuality = tokenId ? (exitQualityByToken[tokenId]||0) : 0;  // v2.0: quality-weighted
         const exitsCount = tokenId ? (profitableExitsByToken[tokenId]||0) : 0;  // kept for UI display
@@ -5073,6 +5383,9 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         if (tokenId && tradesByToken[tokenId]) {
           tradesByToken[tokenId].forEach(t=>{
             if (now - t.timestamp > 86400) return;
+            // v2.36.0: drop future-stamped trades beyond normal clock skew (same intent as the
+            // v2.28.1 pressure fix). The tolerance keeps fresh trades when the local clock lags.
+            if (TUNING.FLOW_SKIP_FUTURE_TRADES && t.timestamp - now > TUNING.TRADE_CLOCK_SKEW_TOLERANCE_SEC) { mon.futureTradesSkipped++; return; }
             trades24hCount++;
             const usd = t.size * t.price;
             if (t.side === 'BUY') net24USD += usd;
@@ -5844,7 +6157,10 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         const tokenId = s.rows[0] ? s.rows[0].tokenId : null;
         const book = tokenId ? bookByToken[tokenId] : null;
         const lastTrade = s.market && s.market.lastTradePrice != null ? Number(s.market.lastTradePrice) : null;
-        const rawPrice = (book && book.bestAsk != null) ? book.bestAsk
+        // v2.36.0: experimental — price edge at the depth-weighted fill for a realistic stake.
+        const fill = (TUNING.EDGE_FILL_SIZE_USD > 0 && book) ? fillPriceForUsd(book.asks, TUNING.EDGE_FILL_SIZE_USD) : null;
+        const rawPrice = fill != null ? fill
+                       : (book && book.bestAsk != null) ? book.bestAsk
                        : (lastTrade != null && !isNaN(lastTrade)) ? lastTrade
                        : (s.price != null) ? s.price
                        : 0.5;
@@ -6570,7 +6886,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           } else {
             tailHtml = '<div class=tailNa>Tail: n/a (no elite cohort detected — using legacy ranking)</div>';
           }
-          return '<div class="pickCard'+marginal+'">'
+          return '<div class="pickCard'+marginal+'" data-cid="'+esc(tp.s.market.conditionId)+'">'
             +'<div class=pick>#'+(i+1)+' · BET '+esc(label.toUpperCase())+'</div>'
             +'<div class=mkt>'+esc((tp.s.marketQuestion||'').slice(0,80))+'</div>'
             +alertBadge
@@ -6800,6 +7116,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         // crossing window.opener. Popup may have closed already — silent if so.
         try { if (w && !w.closed) { w.pmSportsBotExport = botExport; w.pmSportsGetExport = function(){ return w.pmSportsBotExport; }; } } catch(_){}
         try { console.log('[PM Sports bot export]', botExport); } catch(_){}
+        setScanStatus('ok');
       } catch(e) {
         try { console.warn('[PM Sports bot export] wrapper failed:', e); } catch(_){}
       }
@@ -6827,6 +7144,19 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
       d.getElementById('app').innerHTML=app;
       d.getElementById('app').style.display='block';
       d.getElementById('loading').style.display='none';
+      // v2.36.0: comments load off the critical path (v2.32.0). When they land after render,
+      // add the news badge to any Top Pick card that rendered without one.
+      commentsBackgroundPromise.then(() => {
+        try {
+          d.querySelectorAll('.pickCard[data-cid]').forEach(card => {
+            if (card.querySelector('.newsAlert')) return;
+            const a = alertsByCid[card.getAttribute('data-cid')];
+            const mkt = card.querySelector('.mkt');
+            if (!a || !mkt) return;
+            mkt.insertAdjacentHTML('afterend', '<div class=newsAlert>📢 '+a.total+' news mention'+(a.total>1?'s':'')+' in comments ('+esc(Object.keys(a.hits).slice(0,3).join(', '))+')</div>');
+          });
+        } catch(_){}
+      });
       markPhase('render');
       try { console.timeEnd('[PM Sports] renderUI'); } catch(_){}
       const _total = Math.round(((typeof performance!=='undefined' && performance.now) ? performance.now() : Date.now()) - tStart);
@@ -6910,6 +7240,18 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
         endpoint429Skips:     mon.endpoint429Skips || 0,
         endpoints429Cooled:   endpoint429Until.size,
         closedPositionsSkips: mon.closedPositionsSkips || 0   // v2.30.1
+      });
+      console.log('[PM Sports] v2.36 audit:', {
+        walletsMissingData:        mon.walletsMissingData || 0,
+        missingWalletRowsExcluded: mon.missingWalletRowsExcluded || 0,
+        earliestActivitySkips:     mon.earliestActivitySkips || 0,
+        futureTradesSkipped:       mon.futureTradesSkipped || 0,
+        flags: {
+          EXCLUDE_MISSING_WALLET_DATA: TUNING.EXCLUDE_MISSING_WALLET_DATA,
+          FLOW_SKIP_FUTURE_TRADES:     TUNING.FLOW_SKIP_FUTURE_TRADES,
+          INSIDER_WINDOW_PER_MARKET:   TUNING.INSIDER_WINDOW_PER_MARKET,
+          EDGE_FILL_SIZE_USD:          TUNING.EDGE_FILL_SIZE_USD
+        }
       });
       if (slowest.length) {
         console.log('[PM Sports] v2.30 top-'+slowest.length+' slowest requests:');
@@ -7042,6 +7384,12 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           return {
             t: Math.round(Date.now()/1000),
             slug, cid: s.market.conditionId, label: s.displayLabel||k,
+            // v2.36.0: segment keys the grader splits results by.
+            v: SCRIPT_VERSION, sport: sportKey,
+            marketType: classifyMarketType(s.marketQuestion || s.market.question || '', sportKey),
+            action: me ? classifyAction(me.edge, p.confidence) : null,
+            grade: gradesBySide[k] ? gradesBySide[k].grade : null,
+            topPick: pickedLabels.has(k),
             marketQuestion: s.marketQuestion || s.market.question || '',
             resolved: !!s.resolved, winner: s.winner||null,
             modelProb: roundC(p.probability),
@@ -7093,6 +7441,12 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           localStorage.setItem(SLOG_KEY, JSON.stringify(arr.slice(-5000)));
         }
       } catch(e) { console.warn('[PM Sports] pred log failed:', e); }
+      // v2.36.0: settle older pending prediction-log rows in the background (throttled; never blocks).
+      if (TUNING.RECONCILE_ENABLED) {
+        reconcilePendingPredictions(safeFetch)
+          .then(res => { if (res) { try { console.log('[PM Sports reconcile]', res); } catch(_){} } })
+          .catch(e => { try { console.warn('[PM Sports reconcile] failed:', e && e.message); } catch(_){} });
+      }
       // v2.12: zero-signal toggle — flips body.showZero so the .zeroSignalCard CSS rule reveals them.
       if (TUNING.SHOW_ZERO_SIGNAL_CARDS) d.body.classList.add('showZero');
       const showZeroBtn = d.getElementById('showZeroBtn');
@@ -7112,7 +7466,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           const pct = v => (v == null ? '—' : (v*100).toFixed(1)+'%');
           let body;
           if (!g || g.n === 0) {
-            body = '<div class=empty>No settled predictions in the log yet.<br>Open events with resolved markets to populate.</div>';
+            body = '<div class=empty>No settled predictions in the log yet.<br>Pending picks settle automatically in the background after each scan (run <code>await pmsportsReconcile()</code> in the console to force one).</div>';
           } else {
             // v2.11: signed pct (shows + or − prefix). Used for edgeCaptured + calibrationGap.
             const spct = v => v == null ? '—' : ((v>=0?'+':'')+(v*100).toFixed(1)+'pp');
@@ -7127,7 +7481,8 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
               ['Avg model prob', pct(g.avgModelProb)],
               ['Calibration gap', spct(g.calibrationGap)],
               ['Avg confidence', pct(g.avgConfidence)],
-              ['Avg edge', pct(g.avgEdge)]
+              ['Avg edge', pct(g.avgEdge)],
+              ['+Edge ROI (flat)', g.posEdgeRoi == null ? '—' : ((g.posEdgeRoi>=0?'+':'')+(g.posEdgeRoi*100).toFixed(1)+'%')]   // v2.36.0
             ].map(([k,v]) => '<div class=cell><span>'+esc(k)+'</span><b>'+esc(String(v))+'</b></div>').join('');
             // v2.11: per-component winners-vs-losers separation table — does the component
             // actually distinguish settled winners from losers?
@@ -7148,7 +7503,33 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
             const compTable = compRows
               ? '<h3 style="font-size:13px;color:#aaa;margin:16px 0 4px;font-weight:500">Component correlations with outcome</h3><table><thead><tr><th>Component</th><th>N</th><th>Pearson r</th></tr></thead><tbody>'+compRows+'</tbody></table>'
               : '';
-            body = '<div class=verdict>'+esc(g.verdict||'')+'</div><div class=statGrid>'+statCells+'</div>'+sepTable+compTable;
+            // v2.36.0: where the model actually wins — split by grade / action / market type /
+            // top pick / version — plus the data-driven weight preview.
+            const sroi = v => v == null ? '—' : ((v>=0?'+':'')+(v*100).toFixed(1)+'%');
+            const sgn = v => v == null ? '' : (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+            const h3 = t => '<h3 style="font-size:13px;color:#aaa;margin:16px 0 4px;font-weight:500">'+esc(t)+'</h3>';
+            const segTable = (title, rows) => (rows && rows.length)
+              ? h3(title)+'<table><thead><tr><th>Segment</th><th>N</th><th>Win</th><th>Avg cost</th><th>Edge captured</th><th>ROI</th></tr></thead><tbody>'
+                + rows.map(s => '<tr><td>'+esc(s.segment)+'</td><td>'+s.n+'</td><td>'+pct(s.winRate)+'</td><td>'+pct(s.avgEntry)+'</td><td class="'+sgn(s.edgeCaptured)+'">'+spct(s.edgeCaptured)+'</td><td class="'+sgn(s.roi)+'">'+sroi(s.roi)+'</td></tr>').join('')
+                + '</tbody></table>'
+              : '';
+            const seg = g.segments || {};
+            const segHtml = segTable('By grade (positive-edge picks)', seg.byGrade)
+              + segTable('By action', seg.byAction)
+              + segTable('By market type', seg.byMarketType)
+              + segTable('Top Picks vs the rest', seg.byTopPick)
+              + segTable('By script version', seg.byVersion);
+            const pw = g.proposedWeights;
+            const weightsHtml = pw
+              ? h3('Proposed weights — preview only, not applied')
+                + '<table><thead><tr><th>Component</th><th>Current</th><th>Proposed</th><th>Δ</th></tr></thead><tbody>'
+                + Object.keys(pw).map(k => {
+                    const cur = TUNING.WEIGHTS[k] || 0, d2 = pw[k] - cur;
+                    return '<tr><td>'+esc(k)+'</td><td>'+cur.toFixed(3)+'</td><td>'+pw[k].toFixed(3)+'</td><td class="'+sgn(d2)+'">'+(d2>=0?'+':'')+d2.toFixed(3)+'</td></tr>';
+                  }).join('')
+                + '</tbody></table><div class=mute style="font-size:11px;margin-top:4px">Paste-ready object is in the console ("proposed TUNING.WEIGHTS"). Review before copying it into TUNING.WEIGHTS.</div>'
+              : '<div class=mute style="font-size:11px;margin-top:12px">Weight preview unlocks at '+TUNING.GRADER_MIN_ROWS_FOR_WEIGHTS+' settled rows ('+g.n+' so far). Pending rows settle automatically in the background.</div>';
+            body = '<div class=verdict>'+esc(g.verdict||'')+'</div><div class=statGrid>'+statCells+'</div>'+segHtml+sepTable+compTable+weightsHtml;
           }
           // v2.21: version history surfaced beneath the grade body. Always rendered, even
           // when the log is empty — useful for confirming installed version + recent changes.
@@ -7378,7 +7759,7 @@ tr.rowToggle button.showHidden:hover{background:#22222d;color:#ddd}
           if(streakNode){streakNode.innerHTML='<summary style="color:#888">Recurring series · timed out</summary>';streakNode.style.display='block';}
         }
       })();
-    }catch(e){d.body.innerHTML='<h1 style="color:#f88">Error</h1><pre style="color:#f88;white-space:pre-wrap">'+(e.stack||e.message)+'</pre>';}
+    }catch(e){setScanStatus('error', (e && e.message) || String(e));d.body.innerHTML='<h1 style="color:#f88">Error</h1><pre style="color:#f88;white-space:pre-wrap">'+esc(e.stack||e.message)+'</pre>';}
     finally{if(activeScanController===myAbortController)activeScanController=null;}   // v2.32.0
   }
 })();
