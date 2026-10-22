@@ -127,3 +127,22 @@ export function logisticFit(X, y, { iters = 25, ridge = 1e-6 } = {}) {
 }
 export const logit = (p, eps = 0.01) => { const q = Math.min(1 - eps, Math.max(eps, p)); return Math.log(q / (1 - q)); };
 export const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+/**
+ * Poisson-binomial tails for k successes out of independent trials with probabilities ps.
+ * Returns { upper: P(W >= k), lower: P(W <= k) }. Exact DP for n <= 15000, else normal approx with continuity correction.
+ * Used for (a) calibration bins (H0: P(win_i) = price_i) and (b) rule edges (H0: P(win_i) = all-in cost_i, i.e. break-even).
+ */
+export function poissonBinomialTails(ps, k) {
+  const n = ps.length; if (!n) return { upper: 1, lower: 1 };
+  const q = ps.map((p) => Math.min(1 - 1e-9, Math.max(1e-9, p)));
+  if (n <= 15000) {
+    let dist = new Float64Array(n + 1); dist[0] = 1;
+    for (let i = 0; i < n; i++) { const p = q[i]; for (let j = i + 1; j >= 1; j--) dist[j] = dist[j] * (1 - p) + dist[j - 1] * p; dist[0] *= 1 - p; }
+    let up = 0, lo = 0; for (let j = 0; j <= n; j++) { if (j >= k) up += dist[j]; if (j <= k) lo += dist[j]; }
+    return { upper: Math.min(1, up), lower: Math.min(1, lo) };
+  }
+  let mu = 0, v = 0; for (const p of q) { mu += p; v += p * (1 - p); }
+  const sd = Math.sqrt(v);
+  return { upper: 1 - normCdf((k - 0.5 - mu) / sd), lower: normCdf((k + 0.5 - mu) / sd) };
+}
