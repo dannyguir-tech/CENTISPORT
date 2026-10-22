@@ -86,6 +86,14 @@ npm run research:backtest -- --source-label "real: Polymarket gamma/clob/data-ap
 
 The report lands in `research/reports/backtest-<UTC timestamp>.md` (with a matching `.json`).
 
+**Sampling over time (recommended for real runs).** Polymarket's sports listings grew from about 20 settled markets a day in 2024 to about 22,000 a day in late 2026, so a newest-first collection of tens of thousands of markets covers only the last day or two (and the newest end-date windows hold only table tennis and tennis, whose `endDate` is start + 7 days). `--window-hours H --max-markets-per-window N --max-markets-per-game K` walks end-date windows of H hours from `--until` (+8 days) back to `--since`, reads each window until it holds 4N markets (or ends), and accepts at most N of them, round-robin over sports in a fixed per-window shuffle, first game of each sport first, at most K markets per game in gamma's order. The order uses only listing fields (sport, slug, gameId), never prices, volume or outcomes. The first real run used:
+
+```sh
+npm run research:collect -- --since 2024-01-01 --window-hours 6 --max-markets-per-window 18 --max-markets-per-game 4 --page-size 50 --max-markets 200000 --rps 14 --concurrency 12
+```
+
+Markets skipped by the caps are counted as `sampled_out_window` / `sampled_out_game` (only for the pages that were read). Each record carries `gameKey` (the event slug up to its date, else gamma's `gameId`): gamma splits one game across several events (main, player props, inning winners, more markets), and the dataset clusters on the game.
+
 **If discovery finds nothing.** The gamma filter parameters could not be checked from the sandbox, so the collector fails loudly with hints instead of returning an empty dataset. Strategies to try, in order:
 
 ```sh
@@ -196,7 +204,7 @@ Options: `--events 2500 --seeds 1,2,3 --worlds null,planted,stress --jobs 2 --bo
 
 ## Known limitations
 
-- **The live API is unverified.** It was not reachable from where this was built. The gamma filter parameters (`tag_slug`, `tag_id`, `series_id`, `end_date_min/max`, `order`), the clob range and fidelity limits, and the data-api paging caps are inferred from the userscript and are not confirmed. The collector adapts to page caps and "interval too long" errors, and stops with hints when discovery returns nothing. Markets whose game time sits in another field are dropped as `no_game_start`; check the skip counts.
+- **Live API, as checked on 2026-10-22.** `tag_slug=sports`, `closed`, `order=endDate&ascending=false` and `end_date_min/max` (both inclusive) work on gamma `/events`; `limit` is capped at 100 and `offset` above 2000 is rejected with HTTP 422 ("use /events/keyset"), so the collector then continues with `end_date_max` as a date cursor. Markets carry `gameStartTime` as `"YYYY-MM-DD HH:MM:SS+00"`; events carry `sport.sport` (league key), `gameId` and `series`. clob `/prices-history` answers an 80 h window at 15-minute fidelity for markets back to 2024. Fees changed over the sample: sports markets ending up to about March 2026 have `feesEnabled: false` and no `feeType`; by May 2026 they carry `sports_fees_v2` (`feeSchedule` rate 0.03, exponent 1, taker only), by August `sports_fees_v3` (rate 0.05) and some NFL/CFB markets `sports_fees_nfl_cfb_oct26` (rate 0.03). The kit's fee is a flat proportional `--fee`, not those schedules, and the collector does not record `feeType`. Markets whose game time sits in another field are dropped as `no_game_start`; check the skip counts.
 - **Trades can be truncated.** `/trades` has no time filter and is paged newest-first, so very busy markets can hit `--max-trade-pages` (in-game trades still have to be paged through) or `--max-trades-per-market` (pre-game trades) before reaching the start of the window. `tradesInfo.coverageFromT` records how far back the tape is complete, and the builder nulls trade features for windows it does not cover (counted in the build summary). Whether a market is cut short still depends on how much it traded after the decision, so trade hypotheses are tested on a slightly selected subset when many rows are nulled; raise the caps if the count is large.
 - **Discovery cache.** Only discovery responses whose markets are all final (closed with a clean winner, or a 50-50 void) are cached in `raw/`; pages with an open or not-yet-resolved market, empty pages and 404s are re-read on every run, so resumed runs make a few listing requests even when nothing is new.
 - **Classification is regex-based** (ported from the userscript). For example, "over 220.5 points" without "O/U" is classified as a prop rather than a total.

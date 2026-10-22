@@ -19,3 +19,4 @@ research/btc/reports/**/*.jsonl
 research/data-*/
 research/btc/reports/**/*.jsonl.gz
 research/btc/verify/**/out/
+research/btc/verify/**/data/

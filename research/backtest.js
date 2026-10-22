@@ -8,7 +8,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { benjaminiHochberg, clusterBootstrapSums, mean, normalCdf, normalQuantile, wilson } from './lib/stats.js';
-import { BASE_HYPOTHESES, TRADE_FIELDS, buildHypotheses } from './hypotheses.js';
+import * as DEFAULT_HYPOTHESES from './hypotheses.js';
 import { readProvenance } from './build-dataset.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -39,6 +39,17 @@ export const DEFAULTS = Object.freeze({
   alpha: 0.05,
   minSportMarkets: 300,
   only: null,
+  // Hypothesis module (default ./hypotheses.js). A module may export BACKTEST settings: foldBy,
+  // embargoFrom, cutoffScope, metaFields, altCosts, title, groupLabel, anchorLabel, offsetLabel.
+  hypotheses: null,
+  // 'start': folds ordered by each event's earliest startTs (default). 'decision': by its earliest decisionTs.
+  foldBy: 'start',
+  // 'start': train rows need startTs + embargo <= cutoff and, when known, settleTs <= cutoff (default).
+  // 'settle': train rows need a settleTs with settleTs + embargo <= cutoff (rows without one never train).
+  embargoFrom: 'start',
+  // 'fold': cutoff = the test fold's first decision (default). 'offsets': its first decision at the
+  // hypothesis's own offsets (every test bet is at one of them, so labels are still known in time).
+  cutoffScope: 'fold',
 });
 
 export const LABEL_FIELDS = Object.freeze(['won', 'closePrice', 'clv', 'settleTs']);
@@ -71,26 +82,36 @@ function rowProblem(x) {
 // -> { f, won, closePrice, clv, settleTs, fold }. f is a frozen copy WITHOUT the labels
 // (LABEL_FIELDS) and without lifetime gamma volume (it includes trading after the decision); f is
 // the only object hypotheses ever receive.
-export function prepareRow(x) {
+// metaFields (from the hypothesis module) are also moved out of f into meta: data that is not a
+// point-in-time feature (e.g. fee schedules as of collection) but is needed for cost sensitivities.
+export function prepareRow(x, metaFields = null) {
   // Rest-destructuring rather than `delete`: deleted keys push V8 objects into slow dictionary
   // mode, and select() reads these properties millions of times.
   const { won, closePrice, clv, settleTs, volume, ...f } = x;
   f.eventKey = String(f.eventKey == null || f.eventKey === '' ? f.conditionId || f.id : f.eventKey);
+  let meta = null;
+  if (metaFields && metaFields.length) {
+    meta = {};
+    for (const k of metaFields) { meta[k] = f[k] === undefined ? null : f[k]; delete f[k]; }
+  }
   return {
-    f: Object.freeze(f),
+    f: Object.freeze(meta ? { ...f } : f),
     won: won === true || won === 1 ? 1 : 0,
     closePrice: fin(closePrice) ? closePrice : null,
     clv: fin(clv) ? clv : null,
     settleTs: fin(settleTs) ? settleTs : null,
+    meta,
     fold: -1,
   };
 }
 
 // A training row's label must have been known at the test fold's first decision: its game started
 // at least embargoH earlier and, when the settlement time is known, it had settled.
-export const knownBy = (r, cutoff, embargoSec) => r.f.startTs + embargoSec <= cutoff && !(r.settleTs > cutoff);
+export const knownBy = (r, cutoff, embargoSec, embargoFrom = 'start') => (embargoFrom === 'settle'
+  ? r.settleTs != null && r.settleTs + embargoSec <= cutoff
+  : r.f.startTs + embargoSec <= cutoff && !(r.settleTs > cutoff));
 
-export async function loadDataset(file) {
+export async function loadDataset(file, { metaFields = null } = {}) {
   if (!fs.existsSync(file)) throw new Error(`dataset not found: ${file} — run research/build-dataset.js first or pass --data`);
   const rows = [], drops = {}, seen = new Set();
   let read = 0;
@@ -104,7 +125,7 @@ export async function loadDataset(file) {
     if (why) { bump(drops, why); continue; }
     if (seen.has(x.id)) { bump(drops, 'duplicate_id'); continue; }
     seen.add(x.id);
-    rows.push(prepareRow(x));
+    rows.push(prepareRow(x, metaFields));
   }
   return { rows, read, drops };
 }
@@ -124,18 +145,21 @@ export function loadProvenance(dataFile) {
 // ---------- folds & walk-forward ----------
 
 // Time-ordered folds of ~equal row counts. A whole event goes to one fold (its markets are
-// correlated), placed by the event's earliest start.
-export function assignFolds(rows, k) {
+// correlated), placed by the event's earliest start (foldBy 'start', default) or earliest decision
+// (foldBy 'decision', for long-horizon markets whose decisions span months before their anchor).
+export function assignFolds(rows, k, { foldBy = 'start' } = {}) {
   if (!Number.isInteger(k) || k < 2) throw new Error('--folds must be an integer >= 2');
+  if (foldBy !== 'start' && foldBy !== 'decision') throw new Error(`foldBy must be 'start' or 'decision', got "${foldBy}"`);
+  const key = foldBy === 'decision' ? 'decisionTs' : 'startTs';
   const events = new Map();
   for (const r of rows) {
     let e = events.get(r.f.eventKey);
-    if (!e) events.set(r.f.eventKey, (e = { key: r.f.eventKey, t: r.f.startTs, rows: [] }));
+    if (!e) events.set(r.f.eventKey, (e = { key: r.f.eventKey, t: r.f[key], rows: [] }));
     e.rows.push(r);
-    if (r.f.startTs < e.t) e.t = r.f.startTs;
+    if (r.f[key] < e.t) e.t = r.f[key];
   }
   const list = [...events.values()].sort((a, b) => a.t - b.t || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-  const folds = Array.from({ length: k }, (_, fold) => ({ fold, rows: [], nEvents: 0, startMin: Infinity, startMax: -Infinity, decisionMin: Infinity }));
+  const folds = Array.from({ length: k }, (_, fold) => ({ fold, rows: [], nEvents: 0, startMin: Infinity, startMax: -Infinity, decisionMin: Infinity, decisionMinByOffset: new Map() }));
   let before = 0;
   for (const e of list) {
     const f = folds[Math.min(k - 1, Math.floor((before * k) / rows.length))];
@@ -147,6 +171,8 @@ export function assignFolds(rows, k) {
       f.startMin = Math.min(f.startMin, r.f.startTs);
       f.startMax = Math.max(f.startMax, r.f.startTs);
       f.decisionMin = Math.min(f.decisionMin, r.f.decisionTs);
+      const dm = f.decisionMinByOffset.get(r.f.offsetH);
+      if (dm === undefined || r.f.decisionTs < dm) f.decisionMinByOffset.set(r.f.offsetH, r.f.decisionTs);
     }
   }
   if (folds.some((f) => !f.rows.length)) throw new Error(`cannot form ${k} non-empty time folds from ${list.length} events — lower --folds or add data`);
@@ -178,6 +204,18 @@ export function chooseParams(hyp, cands, train, o) {
   return best;
 }
 
+// The test fold's cutoff: its first decision, or (cutoffScope 'offsets') its first decision at the
+// hypothesis's offsets. Every test bet is placed at or after the cutoff.
+export function foldCutoff(fold, offsets, cutoffScope = 'fold') {
+  if (cutoffScope !== 'offsets' || !fold.decisionMinByOffset) return fold.decisionMin;
+  let c = Infinity;
+  for (const off of offsets) {
+    const v = fold.decisionMinByOffset.get(off);
+    if (v !== undefined && v < c) c = v;
+  }
+  return c === Infinity ? fold.decisionMin : c;
+}
+
 // Expanding window: for fold k >= 1, train on folds < k (minus the embargo), test on fold k.
 // hooks.onPhase(phase, k) lets tests audit exactly which rows each phase touches.
 export function walkForward(hyp, folds, o, hooks = {}) {
@@ -186,10 +224,10 @@ export function walkForward(hyp, folds, o, hooks = {}) {
   const embargoSec = o.embargoH * HOUR;
   const perFold = [], picks = [];
   for (let k = 1; k < folds.length; k++) {
-    const cutoff = folds[k].decisionMin;
+    const cutoff = foldCutoff(folds[k], hyp.offsets, o.cutoffScope);
     const train = [];
     for (let j = 0; j < k; j++) {
-      for (const r of folds[j].rows) if (offsets.has(r.f.offsetH) && knownBy(r, cutoff, embargoSec)) train.push(r);
+      for (const r of folds[j].rows) if (offsets.has(r.f.offsetH) && knownBy(r, cutoff, embargoSec, o.embargoFrom)) train.push(r);
     }
     hooks.onPhase?.('train', k);
     const chosen = chooseParams(hyp, cands, train, o);
@@ -197,7 +235,7 @@ export function walkForward(hyp, folds, o, hooks = {}) {
     const foldPicks = [];
     if (chosen) for (const r of folds[k].rows) if (r.f.offsetH === chosen.offsetH && hyp.select(r.f, chosen.params)) foldPicks.push(r);
     picks.push(...foldPicks);
-    perFold.push({ fold: k, nTrainRows: train.length, chosen, picks: foldPicks });
+    perFold.push({ fold: k, cutoff, nTrainRows: train.length, chosen, picks: foldPicks });
   }
   hooks.onPhase?.(null, -1);
   return { perFold, picks };
@@ -292,9 +330,26 @@ function evaluateHypothesis(h0, ctx, o) {
   const spreads = [...new Set([...o.sensitivitySpreads, o.spread, o.stressSpread])].sort((a, b) => a - b);
   const sensitivity = spreads.map((s) => { const b = betsAt(wf.picks, s, o); return { spread: s, n: b.length, roi: meanPnl(b) }; });
   const stressBets = betsAt(wf.picks, o.stressSpread, o);
-  const folds = wf.perFold.map(({ fold, nTrainRows, chosen, picks }) => {
+  const folds = wf.perFold.map(({ fold, cutoff, nTrainRows, chosen, picks }) => {
     const fb = betsAt(picks, o.spread, o);
-    return { fold, nTrainRows, chosen, nBets: fb.length, roi: meanPnl(fb) };
+    return { fold, cutoff: iso(cutoff), nTrainRows, chosen, nBets: fb.length, roi: meanPnl(fb) };
+  });
+  // Same out-of-sample picks re-costed by the module's alternative cost functions (sensitivity only).
+  const altCosts = (o.altCosts || []).map((ac) => {
+    const spreadsAc = [...new Set([o.spread, o.stressSpread])].sort((a, b) => a - b);
+    return {
+      id: ac.id, label: ac.label,
+      bySpread: spreadsAc.map((s) => {
+        let n = 0, pnl = 0;
+        for (const r of wf.picks) {
+          const cost = ac.cost(r.meta, r.f.price, s);
+          if (!(cost < o.maxCost)) continue;
+          n++;
+          pnl += betPnl(r.won, cost);
+        }
+        return { spread: s, n, roi: n ? pnl / n : null };
+      }),
+    };
   });
   const chosenKeys = new Set(folds.filter((f) => f.chosen).map((f) => JSON.stringify([f.chosen.offsetH, f.chosen.params])));
   return {
@@ -306,6 +361,7 @@ function evaluateHypothesis(h0, ctx, o) {
     oos: summarizeBets(bets, o, h0.id),
     sensitivity,
     stress: { spread: o.stressSpread, n: stressBets.length, roi: meanPnl(stressBets) },
+    altCosts,
     folds,
   };
 }
@@ -359,8 +415,13 @@ export function calibration(rows, nBuckets = 10) {
 function summarizeData(file, rows, read, drops, folds, o) {
   const markets = new Set(), events = new Set(), offsets = {}, sports = {}, marketTypes = {}, wonByMarketOffset = new Map(), lateSettling = new Set();
   let withTrades = 0, startMin = Infinity, startMax = -Infinity;
+  const feeMarkets = new Set(), metaMarkets = new Set();
   for (const r of rows) {
     const f = r.f;
+    if (r.meta) {
+      metaMarkets.add(f.conditionId || f.id);
+      if (r.meta.feeRate > 0) feeMarkets.add(f.conditionId || f.id);
+    }
     markets.add(f.conditionId || f.id);
     events.add(f.eventKey);
     bump(offsets, f.offsetH);
@@ -371,7 +432,7 @@ function summarizeData(file, rows, read, drops, folds, o) {
     startMax = Math.max(startMax, f.startTs);
     const k = `${f.conditionId}|${f.offsetH}`;
     wonByMarketOffset.set(k, (wonByMarketOffset.get(k) || 0) + r.won);
-    if (r.settleTs != null && r.settleTs - f.startTs > o.embargoH * HOUR) lateSettling.add(f.conditionId || f.id);
+    if (o.embargoFrom !== 'settle' && r.settleTs != null && r.settleTs - f.startTs > o.embargoH * HOUR) lateSettling.add(f.conditionId || f.id);
   }
   let labelAnomalies = 0;
   for (const v of wonByMarketOffset.values()) if (v > 1) labelAnomalies++;
@@ -383,6 +444,7 @@ function summarizeData(file, rows, read, drops, folds, o) {
     tradeCoverage: rows.length ? withTrades / rows.length : 0,
     labelAnomalies,
     lateSettlingMarkets: lateSettling.size,
+    feeMarkets: metaMarkets.size ? { withTakerFees: feeMarkets.size, withFeeInfo: metaMarkets.size } : null,
     folds: folds.map((f) => ({ fold: f.fold, role: f.fold === 0 ? 'train only' : 'test (OOS)', nRows: f.rows.length, nEvents: f.nEvents, startFrom: iso(f.startMin), startTo: iso(f.startMax), firstDecision: iso(f.decisionMin) })),
   };
 }
@@ -411,21 +473,43 @@ function filterOnly(hyps, only) {
 
 const SOURCE_LABEL_HELP = '--source-label is required: say where the data came from, e.g. --source-label "SYNTHETIC mock data" or --source-label "real: Polymarket gamma/clob, collected 2026-10-20". Every report repeats it.';
 
+// The hypothesis module: ./hypotheses.js unless --hypotheses names another file. Its optional
+// BACKTEST export supplies defaults for foldBy / embargoFrom / cutoffScope / metaFields / altCosts
+// and report wording; explicit options still win.
+export async function loadHypothesisModule(file) {
+  const mod = file ? await import(pathToFileURL(path.resolve(file)).href) : DEFAULT_HYPOTHESES;
+  if (typeof mod.buildHypotheses !== 'function' || !Array.isArray(mod.BASE_HYPOTHESES)) {
+    throw new Error(`hypothesis module ${file} must export buildHypotheses() and BASE_HYPOTHESES`);
+  }
+  return { mod, file: file ? path.resolve(file) : path.join(HERE, 'hypotheses.js'), settings: mod.BACKTEST && typeof mod.BACKTEST === 'object' ? mod.BACKTEST : {} };
+}
+
+const MODULE_KEYS = ['foldBy', 'embargoFrom', 'cutoffScope'];
+
 export async function runBacktest(opts = {}) {
-  const o = { ...DEFAULTS, ...opts };
+  const hm = await loadHypothesisModule(opts.hypotheses || null);
+  const o = { ...DEFAULTS };
+  for (const k of MODULE_KEYS) if (hm.settings[k] != null) o[k] = hm.settings[k];
+  Object.assign(o, Object.fromEntries(Object.entries(opts).filter(([, v]) => v !== undefined)));
+  o.metaFields = hm.settings.metaFields || [];
+  o.altCosts = (hm.settings.altCosts || []).filter((ac) => ac && typeof ac.cost === 'function');
+  if (!['fold', 'offsets'].includes(o.cutoffScope)) throw new Error(`cutoffScope must be 'fold' or 'offsets', got "${o.cutoffScope}"`);
+  if (!['start', 'settle'].includes(o.embargoFrom)) throw new Error(`embargoFrom must be 'start' or 'settle', got "${o.embargoFrom}"`);
+  const words = { title: hm.settings.title || 'Sports edge backtest', group: hm.settings.groupLabel || 'sport', anchor: hm.settings.anchorLabel || 'game start', offsetLabel: typeof hm.settings.offsetLabel === 'function' ? hm.settings.offsetLabel : (h) => `${h}h` };
   if (!o.sourceLabel || !String(o.sourceLabel).trim()) throw new Error(SOURCE_LABEL_HELP);
   o.sourceLabel = String(o.sourceLabel).trim();
   const dataFile = path.resolve(o.data);
-  const { rows, read, drops } = await loadDataset(dataFile);
+  const { rows, read, drops } = await loadDataset(dataFile, { metaFields: o.metaFields });
   if (!rows.length) throw new Error(`no usable rows in ${dataFile} (read ${read}, drops ${JSON.stringify(drops)})`);
-  const folds = assignFolds(rows, o.folds);
+  const folds = assignFolds(rows, o.folds, { foldBy: o.foldBy });
+  const tradeFields = hm.mod.TRADE_FIELDS || [];
   const ctx = {
     rows, folds,
     offsets: [...new Set(rows.map((r) => r.f.offsetH))].sort((a, b) => a - b),
-    hasTrades: rows.some((r) => TRADE_FIELDS.some((k) => fin(r.f[k]))),
+    hasTrades: rows.some((r) => tradeFields.some((k) => fin(r.f[k]))),
   };
   const sports = eligibleSports(rows, o.minSportMarkets);
-  let hyps = buildHypotheses({ sports });
+  let hyps = hm.mod.buildHypotheses({ sports });
   if (o.only && o.only.length) hyps = filterOnly(hyps, o.only);
 
   const results = hyps.map((h) => evaluateHypothesis(h, ctx, o));
@@ -457,6 +541,8 @@ export async function runBacktest(opts = {}) {
     },
     verdict: null,
     config: {
+      hypotheses: hm.file, foldBy: o.foldBy, embargoFrom: o.embargoFrom, cutoffScope: o.cutoffScope, metaFields: o.metaFields,
+      altCosts: o.altCosts.map((ac) => ({ id: ac.id, label: ac.label })), words: { title: words.title, group: words.group, anchor: words.anchor },
       data: dataFile, fee: o.fee, spread: o.spread, stressSpread: o.stressSpread, sensitivitySpreads: o.sensitivitySpreads,
       maxCost: o.maxCost, folds: o.folds, embargoH: o.embargoH, minN: o.minN, minEvents: o.minEvents, fdr: o.fdr, boot: o.boot, seed: o.seed,
       alpha: o.alpha, minSportMarkets: o.minSportMarkets, only: o.only || null, sportVariantsFor: sports,
@@ -480,7 +566,7 @@ export async function runBacktest(opts = {}) {
   const jsonPath = path.join(outDir, `${name}.json`);
   const mdPath = path.join(outDir, `${name}.md`);
   fs.writeFileSync(jsonPath, JSON.stringify(report, (k, v) => (typeof v === 'number' && !fin(v) ? null : v), 2) + '\n');
-  fs.writeFileSync(mdPath, toMarkdown(report));
+  fs.writeFileSync(mdPath, toMarkdown(report, words));
   return { report, jsonPath, mdPath };
 }
 
@@ -577,13 +663,14 @@ function num(x, d = 3) {
 const pctAbs = (x) => pct(x).replace('+', '');
 const ci = (s) => (s && s.lo != null ? `${pct(s.lo)} to ${pct(s.hi)}` : 'n/a');
 const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
-const paramStr = (c) => (c ? `${c.offsetH}h ${JSON.stringify(c.params)}` : 'none (no setting reached min n)');
+const paramStr = (c, offsetLabel = (h) => `${h}h`) => (c ? `${offsetLabel(c.offsetH)} ${JSON.stringify(c.params)}` : 'none (no setting reached min n)');
 
-function toMarkdown(rep) {
+function toMarkdown(rep, words = { title: 'Sports edge backtest', group: 'sport', anchor: 'game start', offsetLabel: (h) => `${h}h` }) {
   const c = rep.config, d = rep.data, L = [];
   const label = esc(rep.source.label);
   const contradicted = rep.source.looksSynthetic && !rep.source.labelLooksSynthetic;
-  L.push(`# Sports edge backtest | data source: ${label}${contradicted ? ' [SYNTHETIC per provenance]' : ''}`, '');
+  const G = words.group;
+  L.push(`# ${words.title} | data source: ${label}${contradicted ? ' [SYNTHETIC per provenance]' : ''}`, '');
   L.push(`**Data source: ${label}** (from \`--source-label\`; checked against the data's provenance below)`, '');
   const pv = rep.source.provenance;
   L.push(rep.source.looksSynthetic
@@ -597,14 +684,17 @@ function toMarkdown(rep) {
 
   L.push('', '## Setup', '');
   const sports = Object.entries(d.sports).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(', ');
-  L.push(`- Dataset: \`${d.file}\`. ${d.rowsUsed} rows (${d.rowsRead - d.rowsUsed} dropped), ${d.markets} markets, ${d.events} events, game starts ${d.startFrom} to ${d.startTo}.`);
-  L.push(`- Rows by sport: ${sports}. Trade features on ${pct(d.tradeCoverage, 0).replace('+', '')} of rows.`);
+  L.push(`- Dataset: \`${d.file}\`. ${d.rowsUsed} rows (${d.rowsRead - d.rowsUsed} dropped), ${d.markets} markets, ${d.events} events, ${words.anchor === 'game start' ? 'game starts' : `anchors (${words.anchor})`} ${d.startFrom} to ${d.startTo}.`);
+  L.push(`- Rows by ${G}: ${sports}. Trade features on ${pct(d.tradeCoverage, 0).replace('+', '')} of rows.`);
+  if (c.hypotheses && !/research[\/\\]hypotheses\.js$/.test(c.hypotheses)) L.push(`- Hypothesis module: \`${c.hypotheses}\`. Decisions per offset: ${Object.entries(d.offsets).sort((a, b) => Number(a[0]) - Number(b[0])).map(([k, v]) => `${words.offsetLabel(Number(k))} ${v}`).join(', ')}.`);
+  if (d.feeMarkets) L.push(`- Fees: ${d.feeMarkets.withTakerFees} of ${d.feeMarkets.withFeeInfo} markets carry a taker fee schedule (feeSchedule.rate > 0 with feesEnabled); the headline uses the flat fee below, the actual-fee re-costing is a sensitivity.`);
   L.push(`- Costs: entry cost = min(0.999, (price + ${c.spread}) x (1 + ${c.fee})); rows with cost >= ${c.maxCost} skipped; flat $1 stake.`);
   L.push(`- Walk-forward: ${c.folds} time-ordered folds, whole events per fold; fold 0 is train-only. For each later fold, parameters (grid x decision offset) are chosen on earlier folds only (best train ROI with n >= ${c.minN}), with a ${c.embargoH}h embargo before the fold's first decision. Only out-of-sample bets are reported.`);
-  L.push(`- Walk-forward training also skips rows whose market had not settled (closedTime) by the fold's first decision.`);
+  if (c.embargoFrom === 'settle') L.push(`- Fold order: events by their earliest ${c.foldBy === 'decision' ? 'decision' : 'start'}. Training rows must have SETTLED (closedTime) at least ${c.embargoH}h before the test fold's first decision${c.cutoffScope === 'offsets' ? " at the hypothesis's own offsets" : ''}; rows without a settle time never train.`);
+  else L.push(`- Walk-forward training also skips rows whose market had not settled (closedTime) by the fold's first decision.`);
   L.push(`- Statistics: 95% CIs by cluster bootstrap over eventKey (B = ${c.boot}, seed ${c.seed}); one-sided p for ROI > 0, floored at max(1/(B+1) = ${fmtP(rep.bh.minAttainableP)}, 2^-events) because no resampling test over few independent events can be more confident than that; Benjamini-Hochberg FDR q = ${c.fdr} across the ${rep.bh.m} hypotheses tested in this run.`);
   L.push(`- SURVIVES requires: ${c.survivalRule}.`);
-  L.push(`- Per-sport variants: ${c.sportVariantsFor.length ? c.sportVariantsFor.join(', ') : 'none'} (sports with >= ${c.minSportMarkets} markets).`);
+  L.push(`- Per-${G} variants: ${c.sportVariantsFor.length ? c.sportVariantsFor.join(', ') : 'none'} (${G === 'sport' ? 'sports' : `${G} values`} with >= ${c.minSportMarkets} markets).`);
 
   L.push('', '## Results (out-of-sample only)', '');
   L.push(`ROI is profit per $1 staked. CLV = close price minus entry price (positive means the market moved your way). Hurdle = ROI these bets would earn if prices were perfectly calibrated. MDE80 = true ROI at which this sample would clear the first Benjamini-Hochberg threshold (one-sided p <= q/m, m = ${rep.bh.m}) with 80% power. It is a best case: a "no edge" row says nothing about edges below it (they would likely be missed), and the CI and stress checks make detection harder still. n/a means the sample cannot meet min-n / min-events at all. The spread columns re-cost the same out-of-sample picks at each haircut.`, '');
@@ -619,6 +709,19 @@ function toMarkdown(rep) {
     L.push(`| ${esc(r.id)}${tag} | ${r.oos.n} (${r.oos.nEvents}) | ${pct(r.oos.roi.estimate)} | ${ci(r.oos.roi)} | ${pctAbs(r.oos.mde80)} | ${fmtP(r.oos.roi.p)} | ${fmtP(r.bh.pAdj)} | ${num(r.oos.clv.estimate, 4)} | ${pct(r.oos.hurdleRoi)} | ${r.sensitivity.map((s) => pct(s.roi)).join(' / ')} | ${verdict} |`);
   }
 
+  const withAlt = tested.filter((r) => r.altCosts && r.altCosts.length);
+  if (withAlt.length) {
+    for (const ac of c.altCosts || []) {
+      L.push('', `## Sensitivity: ${esc(ac.label)}`, '', 'Same out-of-sample picks, re-costed. Sensitivity only: survival is judged at the headline costs above.', '');
+      const sp = withAlt[0].altCosts.find((a) => a.id === ac.id)?.bySpread.map((b) => b.spread) || [];
+      L.push(`| Hypothesis | ${sp.map((s) => `Bets / ROI at spread ${s}`).join(' | ')} | Headline ROI |`, `|---|${sp.map(() => '---|').join('')}---|`);
+      for (const r of withAlt) {
+        const a = r.altCosts.find((x) => x.id === ac.id);
+        if (a) L.push(`| ${esc(r.id)} | ${a.bySpread.map((b) => `${b.n} / ${pct(b.roi)}`).join(' | ')} | ${pct(r.oos.roi.estimate)} |`);
+      }
+    }
+  }
+
   const survivors = tested.filter((r) => r.verdict.survives);
   if (survivors.length) {
     L.push('', '## Survivors', '');
@@ -626,7 +729,7 @@ function toMarkdown(rep) {
       L.push(`### ${esc(r.id)}: ${esc(r.name)}`, '', esc(r.rationale), '');
       L.push(`- OOS: ${r.oos.n} bets on ${r.oos.nEvents} events, win rate ${num(r.oos.winRate)} vs avg cost ${num(r.oos.avgCost)}; edge captured ${num(r.oos.edgeCaptured.estimate)} (CI ${num(r.oos.edgeCaptured.lo)} to ${num(r.oos.edgeCaptured.hi)}); mean CLV ${num(r.oos.clv.estimate, 4)} (CI ${num(r.oos.clv.lo, 4)} to ${num(r.oos.clv.hi, 4)}, n ${r.oos.clv.n}).`);
       L.push(`- BH-aware minimum detectable ROI at this sample size (80% power, best case): ${pct(r.oos.mde80)}. Distinct parameter choices across folds: ${r.distinctChoices}.`);
-      for (const f of r.folds) L.push(`- Fold ${f.fold}: ${paramStr(f.chosen)}${f.chosen ? ` (train n ${f.chosen.trainN}, ROI ${pct(f.chosen.trainRoi)})` : ''}; test ${f.nBets} bets, ROI ${pct(f.roi)}.`);
+      for (const f of r.folds) L.push(`- Fold ${f.fold}: ${paramStr(f.chosen, words.offsetLabel)}${f.chosen ? ` (train n ${f.chosen.trainN}, ROI ${pct(f.chosen.trainRoi)})` : ''}; test ${f.nBets} bets, ROI ${pct(f.roi)}.`);
       L.push('');
     }
   }
@@ -638,8 +741,9 @@ function toMarkdown(rep) {
   }
 
   L.push('', '## Calibration (in-sample, descriptive)', '');
-  const firstOffset = Object.keys(d.offsets).map(Number).sort((a, b) => a - b)[0];
-  L.push(`Rows at the ${firstOffset}h offset (closest to start); other offsets are in the JSON report. Gap = win rate minus average price. The Wilson CIs are per bucket, ignore within-event correlation and are not corrected for looking at many buckets, so an isolated gap is not an edge; only the walk-forward results above test that.`);
+  const offs = Object.keys(d.offsets).map(Number).sort((a, b) => a - b);
+  const firstOffset = offs.find((x) => x > 0) ?? offs[0];
+  L.push(`Rows at the ${words.offsetLabel(firstOffset)} offset (closest to ${words.anchor}); other offsets are in the JSON report. Gap = win rate minus average price. The Wilson CIs are per bucket, ignore within-event correlation and are not corrected for looking at many buckets, so an isolated gap is not an edge; only the walk-forward results above test that.`);
   const types = Object.keys(rep.calibration).sort((a, b) => (d.marketTypes[b] || 0) - (d.marketTypes[a] || 0));
   for (const mt of types) {
     const buckets = rep.calibration[mt][firstOffset];
@@ -654,7 +758,7 @@ function toMarkdown(rep) {
   }
   L.push('', '## Caveats', '');
   for (const cv of rep.caveats) L.push(`- ${cv}`);
-  L.push('', `_Generated ${rep.generatedAt} by research/backtest.js. Full numbers, per-fold choices and all calibration tables are in the JSON report._`, '');
+  L.push('', `_Generated ${rep.generatedAt} by research/backtest.js${c.hypotheses && !/research[\/\\]hypotheses\.js$/.test(c.hypotheses) ? ` with ${path.relative(path.dirname(HERE), c.hypotheses)}` : ''}. Full numbers, per-fold choices and all calibration tables are in the JSON report._`, '');
   return L.join('\n');
 }
 
@@ -678,9 +782,11 @@ const USAGE = `Usage: node research/backtest.js --source-label "<where the data 
   --only <ids>             comma-separated hypothesis ids (a base id also selects its @sport variants)
   --out <dir>              report directory (default research/reports)
   --name <base>            report file base name (default backtest-<UTC timestamp>)
+  --hypotheses <file>      hypothesis module (default research/hypotheses.js), e.g. research/general/hypotheses.js;
+                           its BACKTEST export sets fold order, embargo basis, cost sensitivities and wording
   --list                   print the base hypothesis ids and exit`;
 
-const VALUE_OPTS = new Set(['data', 'source-label', 'fee', 'spread', 'stress-spread', 'folds', 'embargo-h', 'min-n', 'min-events', 'fdr', 'boot', 'seed', 'min-sport-markets', 'only', 'out', 'name']);
+const VALUE_OPTS = new Set(['data', 'source-label', 'fee', 'spread', 'stress-spread', 'folds', 'embargo-h', 'min-n', 'min-events', 'fdr', 'boot', 'seed', 'min-sport-markets', 'only', 'out', 'name', 'hypotheses']);
 
 function parseArgs(argv) {
   const a = {};
@@ -708,8 +814,9 @@ function numArg(name, v, { min = 0, max = Infinity, int = false, exclusiveMin = 
 
 export function optsFromArgs(argv) {
   const a = parseArgs(argv);
-  if (a.help || a.list) return { help: !!a.help, list: !!a.list };
+  if (a.help || a.list) return { help: !!a.help, list: !!a.list, hypotheses: a.hypotheses || null };
   const o = {};
+  if (a.hypotheses) o.hypotheses = a.hypotheses;
   if (a.data) o.data = a.data;
   if (a.out) o.out = a.out;
   if (a.name) {
@@ -739,8 +846,10 @@ async function main() {
   const o = optsFromArgs(process.argv.slice(2));
   if (o.help) { console.log(USAGE); return; }
   if (o.list) {
-    for (const h of BASE_HYPOTHESES) console.log(`${h.id.padEnd(22)} ${h.role.padEnd(9)} ${h.name}`);
-    console.log('(per-sport variants <id>@<sport> are added for sports with enough markets)');
+    const hm = await loadHypothesisModule(o.hypotheses);
+    for (const h of hm.mod.BASE_HYPOTHESES) console.log(`${h.id.padEnd(24)} ${h.role.padEnd(9)} ${h.name}`);
+    const g = hm.settings.groupLabel || 'sport';
+    console.log(`(per-${g} variants <id>@<${g}> are added for ${g} values with enough markets)`);
     return;
   }
   if (!o.sourceLabel) throw new Error(SOURCE_LABEL_HELP);

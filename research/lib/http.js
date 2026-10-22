@@ -173,8 +173,10 @@ function isNetworkError(err) {
 
 /**
  * Shared client: one concurrency limiter + one rps limiter for all requests, optional cache.
- * getJson(url, { cache, allow404, cacheIf }) — cached entries are stored as { url, status, savedAt, body }
+ * getJson(url, { cache, allow404, cacheIf, shape }) — cached entries are stored as { url, status, savedAt, body }
  * under cacheDir/<sha1(url)>.json; 404s are cached too (as body null) when allow404 is set.
+ * shape(body) -> body is applied to fresh and cached bodies alike (before cacheIf and caching), so a
+ * caller can keep only the fields it reads and the cache stays small; it must be idempotent.
  * cacheIf(body) -> false keeps a response out of the cache and also rejects an entry already on
  * disk, so data that may still change (an unresolved market, a 404) is re-read on the next run.
  */
@@ -199,14 +201,16 @@ export function createHttpClient(options = {}) {
     }
   }
 
-  async function getJson(url, { cache = false, allow404 = false, cacheIf = null } = {}) {
+  async function getJson(url, { cache = false, allow404 = false, cacheIf = null, shape = null } = {}) {
     const file = cache && cacheDir ? cachePathFor(cacheDir, url) : null;
     const cacheable = (body) => !cacheIf || cacheIf(body);
+    const shaped = (body) => (shape && body != null ? shape(body) : body);
     if (file) {
       const hit = await readCache(file);
-      if (hit && cacheable(hit.body)) {
+      const hitBody = hit ? shaped(hit.body) : null;
+      if (hit && cacheable(hitBody)) {
         stats.cacheHits++;
-        return hit.body;
+        return hitBody;
       }
     }
     let body;
@@ -235,6 +239,7 @@ export function createHttpClient(options = {}) {
       stats.failures++;
       throw err;
     }
+    body = shaped(body);
     if (file && cacheable(body)) {
       await writeFileAtomic(file, JSON.stringify({ url, status: lastStatus, savedAt: Date.now(), body }));
     }

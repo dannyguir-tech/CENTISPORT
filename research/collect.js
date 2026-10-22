@@ -307,6 +307,37 @@ export function isFinalMarket(m) {
   return res.winnerIndex != null || res.skip === 'voided_50_50';
 }
 
+// Listing pages carry every market's full gamma object (~50 KB per event in 2026). Only these
+// fields are read, so pages are trimmed to them before caching (and returned trimmed either way).
+const EVENT_FIELDS = ['id', 'slug', 'ticker', 'title', 'startDate', 'endDate', 'startTime', 'closedTime', 'closed', 'negRisk', 'gameId', 'tags', 'series', 'sport', 'markets'];
+const MARKET_FIELDS = ['id', 'conditionId', 'question', 'slug', 'outcomes', 'outcomePrices', 'clobTokenIds', 'closed', 'startDate', 'endDate', 'closedTime',
+  'gameStartTime', 'eventStartTime', 'volume', 'volumeNum', 'negRisk', 'sportsMarketType', 'tags', 'events', 'feeType', 'feesEnabled', 'feeSchedule'];
+const pick = (o, keys) => {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return o;
+  const out = {};
+  for (const k of keys) if (o[k] !== undefined) out[k] = o[k];
+  return out;
+};
+const slimTag = (t) => (t && typeof t === 'object' ? pick(t, ['id', 'slug', 'label']) : t);
+const slimSeries = (x) => (x && typeof x === 'object' ? pick(x, ['id', 'slug', 'ticker', 'title']) : x);
+function slimMarket(m) {
+  const out = pick(m, MARKET_FIELDS);
+  if (out && Array.isArray(out.tags)) out.tags = out.tags.map(slimTag);
+  if (out && Array.isArray(out.events)) out.events = out.events.map((ev) => slimEvent(ev, false));
+  return out;
+}
+function slimEvent(ev, withMarkets = true) {
+  const out = pick(ev, withMarkets ? EVENT_FIELDS : EVENT_FIELDS.filter((k) => k !== 'markets'));
+  if (!out || typeof out !== 'object') return out;
+  if (Array.isArray(out.tags)) out.tags = out.tags.map(slimTag);
+  if (Array.isArray(out.series)) out.series = out.series.map(slimSeries);
+  if (out.sport && typeof out.sport === 'object') out.sport = pick(out.sport, ['sport', 'id']);
+  if (Array.isArray(out.markets)) out.markets = out.markets.map(slimMarket);
+  return out;
+}
+export const slimListing = (body) => (Array.isArray(body) ? body.map((x) => slimEvent(x)) : body && Array.isArray(body.data) ? { ...body, data: body.data.map((x) => slimEvent(x)) } : body);
+export const slimMarketsListing = (body) => (Array.isArray(body) ? body.map(slimMarket) : body && Array.isArray(body.data) ? { ...body, data: body.data.map(slimMarket) } : body);
+
 const eventIsFinal = (ev) => ev != null && typeof ev === 'object' && (!Array.isArray(ev.markets) || ev.markets.every(isFinalMarket));
 // Empty listing pages are never cached either: more items may appear at that offset later.
 const listingIsFinal = (itemIsFinal) => (body) => {
@@ -503,7 +534,7 @@ const OFFSET_CAP_RE = /offset/i;
 // When the listing is sorted by endDate newest first, paging then continues with a date cursor:
 // end_date_max moves to the oldest endDate seen (inclusive) and offset restarts at 0; items at that
 // boundary that were already yielded are dropped.
-async function* pagedList(ctx, base, endpoint, params, label, cacheIf) {
+async function* pagedList(ctx, base, endpoint, params, label, cacheIf, shape = null) {
   const { pageSize, maxPages } = ctx.opts;
   const byEndDesc = params.order === 'endDate' && params.ascending === 'false';
   let cur = params;
@@ -517,7 +548,7 @@ async function* pagedList(ctx, base, endpoint, params, label, cacheIf) {
     const url = `${base}${endpoint}?${qs}`;
     let body;
     try {
-      body = await ctx.http.getJson(url, { cache: ctx.cache, cacheIf });
+      body = await ctx.http.getJson(url, { cache: ctx.cache, cacheIf, shape });
     } catch (err) {
       if (!(offset > 0 && err instanceof HttpError && (err.status === 422 || err.status === 400) && OFFSET_CAP_RE.test(err.body))) throw err;
       ctx.stats.discovery.offsetCapHits = (ctx.stats.discovery.offsetCapHits || 0) + 1;
@@ -615,7 +646,7 @@ async function* discoverEvents(ctx, filters) {
     for (const f of filters) {
       if (ctx.windowFull || (buffer && buffer.length >= 4 * cap)) break;
       const params = { ...listingParams(ctx), ...f.params, ...(w ? { end_date_min: w.min, end_date_max: w.max } : {}) };
-      for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', params, w ? `${f.label} ${w.label}` : f.label, finalEventsPage)) {
+      for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', params, w ? `${f.label} ${w.label}` : f.label, finalEventsPage, slimListing)) {
         perFilter.set(f.label, perFilter.get(f.label) + items.length);
         total += items.length;
         ctx.stats.discovery.events += items.length;
@@ -646,7 +677,7 @@ async function* discoverMarkets(ctx) {
   let total = 0;
   for (const f of tagFilters(ctx.opts.tag)) {
     let first = true;
-    for await (const { items, url } of pagedList(ctx, ctx.bases.gamma, '/markets', { ...listingParams(ctx), ...f.params }, f.label, finalMarketsPage)) {
+    for await (const { items, url } of pagedList(ctx, ctx.bases.gamma, '/markets', { ...listingParams(ctx), ...f.params }, f.label, finalMarketsPage, slimMarketsListing)) {
       if (first && items.length) {
         const sporty = items.some((m) => m && (m.gameStartTime || m.sportsMarketType || inferSport(m.events?.[0], m, tagList(m.events?.[0]?.tags, m.tags))));
         if (!sporty) {
