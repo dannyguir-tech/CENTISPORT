@@ -1,177 +1,166 @@
 
 === 5m: 12958 markets, 46 days (2026-09-07..2026-10-22), OOS from 2026-09-26 (27 days, 6 folds); Up rate 0.5019
-  5m pre  n=12839 sd(p-.5)=0.0154 logit slope 1.5773 [1.1021,2.0394] intercept 0.0003 [-0.026,0.034]  mean(upWon-p)=0.0007 (p2=0.867)
-  5m s0   n=12921 sd(p-.5)=0.0203 logit slope 1.2857 [0.9031,1.6015] intercept 0.0036 [-0.0241,0.0379]  mean(upWon-p)=0.0011 (p2=0.799)
-  5m f25  n=12861 sd(p-.5)=0.1649 logit slope 1.077 [1.0253,1.1316] intercept 0.012 [-0.0184,0.0441]  mean(upWon-p)=0.0026 (p2=0.519)
-  5m f50  n=12826 sd(p-.5)=0.2943 logit slope 1.0301 [0.9967,1.0688] intercept 0.0049 [-0.0319,0.0372]  mean(upWon-p)=0.0008 (p2=0.826)
-  5m f75  n=12843 sd(p-.5)=0.3676 logit slope 1.0417 [1.014,1.0689] intercept 0.0407 [-0.007,0.0768]  mean(upWon-p)=0.0045 (p2=0.127)
-  5m f90  n=12823 sd(p-.5)=0.4468 logit slope 1.0977 [1.0651,1.1312] intercept 0.0342 [-0.0352,0.0862]  mean(upWon-p)=0.0017 (p2=0.348)
-  5m reaction s0->f50: n=12810 coef(late logit)=1.3878 coef(change)=-0.3584 CI [-0.7971,0.1521]
-  5m reaction f50->f75: n=12757 coef(late logit)=1.0404 coef(change)=0.004 CI [-0.0391,0.0453]
-  5m reaction f75->f90: n=12752 coef(late logit)=1.1047 coef(change)=-0.0127 CI [-0.0512,0.0276]
+  5m pre  n=12839 (slope fit n=12839; all-price slope 1.5773) sd(p-.5)=0.0154 logit slope 1.5773 [1.0804,2.0974] intercept 0.0003 [-0.0323,0.032]  mean(upWon-p)=0.0007 (p2=0.867)
+  5m s0   n=12921 (slope fit n=12921; all-price slope 1.2857) sd(p-.5)=0.0203 logit slope 1.2857 [0.8984,1.62] intercept 0.0036 [-0.0273,0.0356]  mean(upWon-p)=0.0011 (p2=0.799)
+  5m f25  n=12861 (slope fit n=12861; all-price slope 1.077) sd(p-.5)=0.1649 logit slope 1.077 [1.0221,1.125] intercept 0.012 [-0.021,0.043]  mean(upWon-p)=0.0026 (p2=0.519)
+  5m f50  n=12826 (slope fit n=12564; all-price slope 1.0296) sd(p-.5)=0.2943 logit slope 1.0299 [0.9917,1.0658] intercept 0.0033 [-0.0333,0.0376]  mean(upWon-p)=0.0008 (p2=0.826)
+  5m f75  n=12843 (slope fit n=10764; all-price slope 1.0338) sd(p-.5)=0.3676 logit slope 1.0264 [0.9896,1.0565] intercept 0.0412 [-0.0006,0.0892]  mean(upWon-p)=0.0045 (p2=0.127)
+  5m f90  n=12823 (slope fit n=5443; all-price slope 1.048) sd(p-.5)=0.4468 logit slope 0.9978 [0.9546,1.0417] intercept 0.035 [-0.0316,0.104]  mean(upWon-p)=0.0017 (p2=0.348)
+  5m reaction s0->f50: n=12810 coef(late logit)=1.3878 coef(change)=-0.3584 CI [-0.803,0.08]
+  5m reaction f50->f75: n=12757 coef(late logit)=1.0404 coef(change)=0.004 CI [-0.0416,0.0442]
+  5m reaction f75->f90: n=12752 coef(late logit)=1.1047 coef(change)=-0.0127 CI [-0.0639,0.0382]
   5m streak: P(Up|prevUp)=0.4996 (n=6503) P(Up|prevDown)=0.5043 (n=6453) P(same)=0.4977 p2=0.629
 
 === 15m: 11516 markets, 121 days (2026-06-24..2026-10-22), OOS from 2026-08-12 (72 days, 6 folds); Up rate 0.4976
-  15m pre  n=11477 sd(p-.5)=0.0178 logit slope 1.1772 [0.6798,1.7612] intercept -0.0117 [-0.0386,0.0268]  mean(upWon-p)=-0.0029 (p2=0.511)
-  15m s0   n=11493 sd(p-.5)=0.0254 logit slope 0.8026 [0.3684,1.23] intercept -0.009 [-0.0363,0.0298]  mean(upWon-p)=-0.0022 (p2=0.626)
-  15m f25  n=11473 sd(p-.5)=0.1934 logit slope 1.0638 [1.0202,1.1158] intercept -0.0111 [-0.043,0.0243]  mean(upWon-p)=-0.0024 (p2=0.527)
-  15m f50  n=11467 sd(p-.5)=0.2834 logit slope 1.0677 [1.0257,1.1127] intercept -0.0251 [-0.0604,0.0146]  mean(upWon-p)=-0.0042 (p2=0.244)
-  15m f75  n=11474 sd(p-.5)=0.3656 logit slope 1.0412 [1.0035,1.0741] intercept -0.0218 [-0.0662,0.0389]  mean(upWon-p)=-0.0025 (p2=0.414)
-  15m f90  n=11484 sd(p-.5)=0.4219 logit slope 1.0531 [1.0194,1.0835] intercept -0.0229 [-0.0797,0.0571]  mean(upWon-p)=-0.0018 (p2=0.443)
-  15m reaction s0->f50: n=11454 coef(late logit)=0.9101 coef(change)=0.1582 CI [-0.272,0.6121]
-  15m reaction f50->f75: n=11444 coef(late logit)=1.0421 coef(change)=-0.0015 CI [-0.0575,0.0561]
-  15m reaction f75->f90: n=11461 coef(late logit)=1.0374 coef(change)=0.0342 CI [-0.0168,0.0925]
+  15m pre  n=11477 (slope fit n=11477; all-price slope 1.1772) sd(p-.5)=0.0178 logit slope 1.1772 [0.6305,1.7564] intercept -0.0117 [-0.0418,0.023]  mean(upWon-p)=-0.0029 (p2=0.511)
+  15m s0   n=11493 (slope fit n=11493; all-price slope 0.8026) sd(p-.5)=0.0254 logit slope 0.8026 [0.3754,1.2298] intercept -0.009 [-0.0402,0.026]  mean(upWon-p)=-0.0022 (p2=0.626)
+  15m f25  n=11473 (slope fit n=11472; all-price slope 1.0638) sd(p-.5)=0.1934 logit slope 1.0638 [1.0148,1.1152] intercept -0.0111 [-0.0444,0.0238]  mean(upWon-p)=-0.0024 (p2=0.527)
+  15m f50  n=11467 (slope fit n=11334; all-price slope 1.0675) sd(p-.5)=0.2834 logit slope 1.0688 [1.0279,1.1187] intercept -0.0242 [-0.0619,0.022]  mean(upWon-p)=-0.0042 (p2=0.244)
+  15m f75  n=11474 (slope fit n=9614; all-price slope 1.0341) sd(p-.5)=0.3656 logit slope 1.0276 [0.9875,1.0692] intercept -0.023 [-0.0774,0.0341]  mean(upWon-p)=-0.0025 (p2=0.414)
+  15m f90  n=11484 (slope fit n=6453; all-price slope 1.0138) sd(p-.5)=0.4219 logit slope 1.0091 [0.9611,1.0522] intercept -0.0239 [-0.0884,0.0518]  mean(upWon-p)=-0.0018 (p2=0.443)
+  15m reaction s0->f50: n=11454 coef(late logit)=0.9101 coef(change)=0.1582 CI [-0.3395,0.6361]
+  15m reaction f50->f75: n=11444 coef(late logit)=1.0421 coef(change)=-0.0015 CI [-0.0612,0.0521]
+  15m reaction f75->f90: n=11461 coef(late logit)=1.0374 coef(change)=0.0342 CI [-0.0244,0.1029]
   15m streak: P(Up|prevUp)=0.488 (n=5727) P(Up|prevDown)=0.5069 (n=5786) P(same)=0.4906 p2=0.032
 
 === 1h: 8750 markets, 366 days (2025-10-22..2026-10-22), OOS from 2026-03-18 (219 days, 6 folds); Up rate 0.5005
-  1h pre  n=8729 sd(p-.5)=0.0169 logit slope 1.4938 [0.9473,1.9982] intercept 0.0014 [-0.0392,0.0455]  mean(upWon-p)=0.0004 (p2=0.941)
-  1h s0   n=8735 sd(p-.5)=0.0308 logit slope 1.0244 [0.6749,1.3867] intercept 0.0029 [-0.0387,0.0483]  mean(upWon-p)=0.0007 (p2=0.890)
-  1h f25  n=8727 sd(p-.5)=0.1904 logit slope 1.0495 [0.9959,1.1269] intercept -0.0115 [-0.0528,0.0361]  mean(upWon-p)=-0.0023 (p2=0.628)
-  1h f50  n=8729 sd(p-.5)=0.2738 logit slope 1.0525 [1.005,1.1001] intercept -0.0039 [-0.0589,0.0386]  mean(upWon-p)=-0.0006 (p2=0.888)
-  1h f75  n=8733 sd(p-.5)=0.361 logit slope 1.0972 [1.0441,1.1333] intercept 0.01 [-0.0424,0.0692]  mean(upWon-p)=0.0011 (p2=0.765)
-  1h f90  n=8737 sd(p-.5)=0.4202 logit slope 1.1101 [1.0683,1.1629] intercept 0.0034 [-0.0774,0.0762]  mean(upWon-p)=0.0001 (p2=0.965)
-  1h reaction s0->f50: n=8721 coef(late logit)=0.9363 coef(change)=0.1185 CI [-0.0825,0.5041]
-  1h reaction f50->f75: n=8723 coef(late logit)=1.0938 coef(change)=0.0053 CI [-0.0532,0.0619]
-  1h reaction f75->f90: n=8727 coef(late logit)=1.099 coef(change)=0.0252 CI [-0.0292,0.1173]
+  1h pre  n=8729 (slope fit n=8729; all-price slope 1.4938) sd(p-.5)=0.0169 logit slope 1.4938 [0.9809,2.0775] intercept 0.0014 [-0.0388,0.0424]  mean(upWon-p)=0.0004 (p2=0.941)
+  1h s0   n=8735 (slope fit n=8735; all-price slope 1.0244) sd(p-.5)=0.0308 logit slope 1.0244 [0.7027,1.3372] intercept 0.0029 [-0.0393,0.0446]  mean(upWon-p)=0.0007 (p2=0.890)
+  1h f25  n=8727 (slope fit n=8725; all-price slope 1.0495) sd(p-.5)=0.1904 logit slope 1.0494 [0.9957,1.1127] intercept -0.0115 [-0.0531,0.0335]  mean(upWon-p)=-0.0023 (p2=0.628)
+  1h f50  n=8729 (slope fit n=8670; all-price slope 1.0525) sd(p-.5)=0.2738 logit slope 1.0508 [1.005,1.0957] intercept -0.0039 [-0.0552,0.0424]  mean(upWon-p)=-0.0006 (p2=0.888)
+  1h f75  n=8733 (slope fit n=7623; all-price slope 1.0942) sd(p-.5)=0.361 logit slope 1.0845 [1.0388,1.1302] intercept 0.0099 [-0.0473,0.0699]  mean(upWon-p)=0.0011 (p2=0.765)
+  1h f90  n=8737 (slope fit n=5025; all-price slope 1.0773) sd(p-.5)=0.4202 logit slope 1.0782 [1.0268,1.1346] intercept -0.0032 [-0.0848,0.0853]  mean(upWon-p)=0.0001 (p2=0.965)
+  1h reaction s0->f50: n=8721 coef(late logit)=0.9363 coef(change)=0.1185 CI [-0.2072,0.4728]
+  1h reaction f50->f75: n=8723 coef(late logit)=1.0938 coef(change)=0.0053 CI [-0.0633,0.0787]
+  1h reaction f75->f90: n=8727 coef(late logit)=1.099 coef(change)=0.0252 CI [-0.0351,0.0954]
   1h streak: P(Up|prevUp)=0.477 (n=4363) P(Up|prevDown)=0.5228 (n=4359) P(same)=0.4771 p2=0.000
 
 === 4h: 2196 markets, 368 days (2025-10-15..2026-10-22), OOS from 2026-03-17 (220 days, 6 folds); Up rate 0.5009
-  4h pre  n=2190 sd(p-.5)=0.0094 logit slope -0.4198 [-1.9438,1.7355] intercept 0.0069 [-0.0786,0.0811]  mean(upWon-p)=0.0005 (p2=0.957)
-  4h s0   n=2190 sd(p-.5)=0.0228 logit slope 1.4592 [0.5068,2.3018] intercept 0.0057 [-0.0862,0.0842]  mean(upWon-p)=0.0016 (p2=0.880)
-  4h f25  n=2192 sd(p-.5)=0.1789 logit slope 1.0626 [0.9576,1.2081] intercept -0.046 [-0.1274,0.0453]  mean(upWon-p)=-0.0094 (p2=0.323)
-  4h f50  n=2194 sd(p-.5)=0.2579 logit slope 1.0677 [0.9991,1.1982] intercept -0.0338 [-0.1212,0.0586]  mean(upWon-p)=-0.0058 (p2=0.498)
-  4h f75  n=2193 sd(p-.5)=0.3429 logit slope 1.1122 [1.0348,1.2102] intercept -0.0102 [-0.1269,0.1272]  mean(upWon-p)=-0.0014 (p2=0.853)
-  4h f90  n=2192 sd(p-.5)=0.4087 logit slope 1.1949 [1.0786,1.3328] intercept -0.0023 [-0.1556,0.1287]  mean(upWon-p)=-0.0007 (p2=0.901)
-  4h reaction s0->f50: n=2188 coef(late logit)=2.1404 coef(change)=-1.0771 CI [-2.0507,-0.0693]
-  4h reaction f50->f75: n=2192 coef(late logit)=1.1007 coef(change)=0.0197 CI [-0.0897,0.17]
-  4h reaction f75->f90: n=2191 coef(late logit)=1.1484 coef(change)=0.104 CI [-0.0525,0.2541]
+  4h pre  n=2190 (slope fit n=2190; all-price slope -0.4198) sd(p-.5)=0.0094 logit slope -0.4198 [-2.5142,1.9807] intercept 0.0069 [-0.0657,0.077]  mean(upWon-p)=0.0005 (p2=0.957)
+  4h s0   n=2190 (slope fit n=2190; all-price slope 1.4592) sd(p-.5)=0.0228 logit slope 1.4592 [0.6188,2.2908] intercept 0.0057 [-0.0696,0.0782]  mean(upWon-p)=0.0016 (p2=0.880)
+  4h f25  n=2192 (slope fit n=2192; all-price slope 1.0626) sd(p-.5)=0.1789 logit slope 1.0626 [0.9576,1.1987] intercept -0.046 [-0.1186,0.0341]  mean(upWon-p)=-0.0094 (p2=0.323)
+  4h f50  n=2194 (slope fit n=2190; all-price slope 1.0677) sd(p-.5)=0.2579 logit slope 1.0672 [0.9878,1.156] intercept -0.0338 [-0.1219,0.0472]  mean(upWon-p)=-0.0058 (p2=0.498)
+  4h f75  n=2193 (slope fit n=2028; all-price slope 1.1085) sd(p-.5)=0.3429 logit slope 1.1198 [1.044,1.2143] intercept -0.0027 [-0.1203,0.1119]  mean(upWon-p)=-0.0014 (p2=0.853)
+  4h f90  n=2192 (slope fit n=1448; all-price slope 1.1757) sd(p-.5)=0.4087 logit slope 1.2359 [1.1297,1.353] intercept 0.0253 [-0.1257,0.1946]  mean(upWon-p)=-0.0007 (p2=0.901)
+  4h reaction s0->f50: n=2188 coef(late logit)=2.1404 coef(change)=-1.0771 CI [-2.0199,-0.0571]
+  4h reaction f50->f75: n=2192 coef(late logit)=1.1007 coef(change)=0.0197 CI [-0.1212,0.1647]
+  4h reaction f75->f90: n=2191 coef(late logit)=1.1484 coef(change)=0.104 CI [-0.0193,0.2591]
   4h streak: P(Up|prevUp)=0.466 (n=1088) P(Up|prevDown)=0.5368 (n=1088) P(same)=0.4646 p2=0.000
 
 === 1d: 529 markets, 529 days (2025-05-09..2026-10-20), OOS from 2025-12-07 (317 days, 6 folds); Up rate 0.5198
-  1d pre  n=521 sd(p-.5)=0.0097 logit slope -0.4866 [-4.7716,4.3169] intercept 0.0803 [-0.1687,0.3027]  mean(upWon-p)=0.0145 (p2=0.509)
-  1d s0   n=524 sd(p-.5)=0.0274 logit slope 0.521 [-1.167,2.2943] intercept 0.0608 [-0.0895,0.2036]  mean(upWon-p)=0.0133 (p2=0.541)
-  1d f25  n=525 sd(p-.5)=0.1782 logit slope 0.9181 [0.7087,1.2148] intercept 0.0161 [-0.1334,0.1687]  mean(upWon-p)=0.0025 (p2=0.902)
-  1d f50  n=527 sd(p-.5)=0.2569 logit slope 1.0168 [0.8632,1.2951] intercept 0.0167 [-0.1602,0.2281]  mean(upWon-p)=0.0033 (p2=0.862)
-  1d f75  n=527 sd(p-.5)=0.3257 logit slope 1.0391 [0.8714,1.2547] intercept 0.0029 [-0.1918,0.2137]  mean(upWon-p)=0.0009 (p2=0.954)
-  1d f90  n=528 sd(p-.5)=0.374 logit slope 1.023 [0.8844,1.2147] intercept 0.0771 [-0.1604,0.3084]  mean(upWon-p)=0.0086 (p2=0.552)
-  1d reaction s0->f50: n=524 coef(late logit)=0.9537 coef(change)=0.0588 CI [-2.3329,1.5733]
-  1d reaction f50->f75: n=526 coef(late logit)=0.9718 coef(change)=0.1411 CI [-0.1858,0.4534]
-  1d reaction f75->f90: n=527 coef(late logit)=1.026 coef(change)=-0.0144 CI [-0.3177,0.2512]
+  1d pre  n=521 (slope fit n=521; all-price slope -0.4866) sd(p-.5)=0.0097 logit slope -0.4866 [-4.6772,4.4278] intercept 0.0803 [-0.1263,0.2726]  mean(upWon-p)=0.0145 (p2=0.509)
+  1d s0   n=524 (slope fit n=524; all-price slope 0.521) sd(p-.5)=0.0274 logit slope 0.521 [-1.0352,2.0579] intercept 0.0608 [-0.0954,0.2388]  mean(upWon-p)=0.0133 (p2=0.541)
+  1d f25  n=525 (slope fit n=525; all-price slope 0.9181) sd(p-.5)=0.1782 logit slope 0.9181 [0.701,1.2148] intercept 0.0161 [-0.1607,0.1754]  mean(upWon-p)=0.0025 (p2=0.902)
+  1d f50  n=527 (slope fit n=524; all-price slope 1.0167) sd(p-.5)=0.2569 logit slope 1.0152 [0.8475,1.2375] intercept 0.0167 [-0.1815,0.2625]  mean(upWon-p)=0.0033 (p2=0.862)
+  1d f75  n=527 (slope fit n=500; all-price slope 1.0386) sd(p-.5)=0.3257 logit slope 1.0679 [0.9072,1.2479] intercept -0.0135 [-0.2316,0.1698]  mean(upWon-p)=0.0009 (p2=0.954)
+  1d f90  n=528 (slope fit n=429; all-price slope 1.0167) sd(p-.5)=0.374 logit slope 0.9817 [0.8442,1.1992] intercept 0.0805 [-0.1769,0.3496]  mean(upWon-p)=0.0086 (p2=0.552)
+  1d reaction s0->f50: n=524 coef(late logit)=0.9537 coef(change)=0.0588 CI [-1.7526,2.2313]
+  1d reaction f50->f75: n=526 coef(late logit)=0.9718 coef(change)=0.1411 CI [-0.1936,0.4808]
+  1d reaction f75->f90: n=527 coef(late logit)=1.026 coef(change)=-0.0144 CI [-0.3197,0.2859]
   1d streak: P(Up|prevUp)=0.5257 (n=272) P(Up|prevDown)=0.504 (n=252) P(same)=0.5115 p2=0.600
-  chainlink 15m m33: n=4293 corr(mkt,fair)=0.9287 coef mkt=0.9906 coef fair=0.0856 CI [-0.0114,0.2053]
-  chainlink 15m m67: n=4287 corr(mkt,fair)=0.9549 coef mkt=1.0279 coef fair=-0.0048 CI [-0.1304,0.0967]
-  chainlink 1h f25: n=1070 corr(mkt,fair)=0.9416 coef mkt=1.2864 coef fair=-0.203 CI [-0.4502,0.1835]
-  chainlink 1h f50: n=1063 corr(mkt,fair)=0.9576 coef mkt=0.8087 coef fair=0.2262 CI [-0.0233,0.4101]
-  chainlink 1h f75: n=1066 corr(mkt,fair)=0.9772 coef mkt=0.9609 coef fair=0.1408 CI [-0.2091,0.3295]
-  chainlink 1h f92: n=1074 corr(mkt,fair)=0.9777 coef mkt=0.9796 coef fair=0.1368 CI [-0.0425,0.3692]
-  chainlink 4h f25: n=266 corr(mkt,fair)=0.9614 coef mkt=1.2491 coef fair=0.0339 CI [-0.7446,0.7041]
-  chainlink 4h f50: n=266 corr(mkt,fair)=0.9721 coef mkt=1.0031 coef fair=-0.0144 CI [-0.5624,0.8862]
-  chainlink 4h f75: n=267 corr(mkt,fair)=0.9874 coef mkt=0.5927 coef fair=0.4409 CI [-0.4359,1.1005]
-  chainlink 4h f90: n=267 corr(mkt,fair)=0.9927 coef mkt=0.7329 coef fair=0.7072 CI [-0.2584,2.3022]
-  chainlink 1d f25: n=43 corr(mkt,fair)=0.9017 coef mkt=3.0396 coef fair=-0.7224 CI [-2.5719,1.6225]
-  chainlink 1d f50: n=44 corr(mkt,fair)=0.9496 coef mkt=0.9578 coef fair=0.3495 CI [-1.0703,3.8669]
-  chainlink 1d f75: n=44 corr(mkt,fair)=0.9838 coef mkt=-0.1243 coef fair=0.8429 CI [-0.1964,2.2192]
-  chainlink 1d f90: n=44 corr(mkt,fair)=0.9783 coef mkt=0.9933 coef fair=-0.0767 CI [-2.0402,1.3243]
+  chainlink 15m m33: n=4293 corr(mkt,fair)=0.9287 coef mkt=0.9906 coef fair=0.0856 CI [-0.015,0.2022]
+  chainlink 15m m67: n=4287 corr(mkt,fair)=0.9549 coef mkt=1.0279 coef fair=-0.0048 CI [-0.1157,0.1072]
+  chainlink 1h f25: n=1070 corr(mkt,fair)=0.9416 coef mkt=1.2864 coef fair=-0.203 CI [-0.592,0.1354]
+  chainlink 1h f50: n=1063 corr(mkt,fair)=0.9576 coef mkt=0.8087 coef fair=0.2262 CI [0.0047,0.4201]
+  chainlink 1h f75: n=1066 corr(mkt,fair)=0.9772 coef mkt=0.9609 coef fair=0.1408 CI [-0.1584,0.3928]
+  chainlink 1h f92: n=1074 corr(mkt,fair)=0.9777 coef mkt=0.9796 coef fair=0.1368 CI [-0.0988,0.3815]
+  chainlink 4h f25: n=266 corr(mkt,fair)=0.9614 coef mkt=1.2491 coef fair=0.0339 CI [-0.7864,0.9571]
+  chainlink 4h f50: n=266 corr(mkt,fair)=0.9721 coef mkt=1.0031 coef fair=-0.0144 CI [-0.5666,0.8879]
+  chainlink 4h f75: n=267 corr(mkt,fair)=0.9874 coef mkt=0.5927 coef fair=0.4409 CI [-0.329,1.1693]
+  chainlink 4h f90: n=267 corr(mkt,fair)=0.9927 coef mkt=0.7329 coef fair=0.7072 CI [-0.5231,1.8459]
+  chainlink 1d f25: n=43 corr(mkt,fair)=0.9017 coef mkt=3.0396 coef fair=-0.7224 CI [-2.5152,2.9452]
+  chainlink 1d f50: n=44 corr(mkt,fair)=0.9496 coef mkt=0.9578 coef fair=0.3495 CI [-0.8027,3.5941]
+  chainlink 1d f75: n=44 corr(mkt,fair)=0.9838 coef mkt=-0.1243 coef fair=0.8429 CI [-0.9564,2.4144]
+  chainlink 1d f90: n=44 corr(mkt,fair)=0.9783 coef mkt=0.9933 coef fair=-0.0767 CI [-2.1015,1.8635]
 
-Evaluating 1906 variants ...
-variants defined 1906, tested (OOS n>=20, days>=5) 1269; BH q=0.10 significant: 3 (all) / 1 (walk-forward only, m=65)
+Evaluating 2046 variants ...
+variants defined 2046, tested (OOS n>=20, days>=5) 1324; BH q=0.10 significant: 0 (all) / 0 (walk-forward only, m=57)
 
-Descriptive calibration-bin tests (folded favourite half, n>=30): m=216, BH-significant 4
-  1h f50 [0.98,1) n=62 resid=0.0144 p=0.00e+0 q=0.000
-  5m f90 [0.98,1) n=7385 resid=0.0033 p=1.17e-6 q=0.000
-  4h f90 [0.95,0.98) n=372 resid=0.0229 p=1.39e-5 q=0.001
-  1h f75 [0.98,1) n=1129 resid=0.0068 p=6.18e-4 q=0.033
+Descriptive calibration-bin tests (folded favourite half, n>=30): m=216, BH-significant 1
+  5m f90 [0.98,1) n=7385 resid=0.0033 p=3.00e-5 q=0.006
 
 Top 25 tested variants by OOS cluster-t (headline costs: docs_always fee, interp exec, 1c haircut):
-  F1_band_taker|15m|f25|up|{"lo":0.9,"hi":0.95}  IS roi=0.0512 | OOS n=47 win=1 cost=0.933 edge=0.067 roi=0.0721 CI[0.068,0.0759] t=33.26 p=0.00e+0 q=0.000 tape={"nLegsWithTape":5,"askAtSnapTime(t_k-12s)":{"n":5,"roiTape":0.0701,"tTape":14.57,"avgCostTape":0.9346,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1},"askAtTk":{"n":5,"roiTape":0.0637,"tTape":15.1,"avgCostTape":0.9402,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1}}
-  F3_wf_band_taker|15m|f25|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=51 win=1 cost=0.9357 edge=0.0643 roi=0.069 CI[0.0638,0.0736] t=25.86 p=0.00e+0 q=0.000 tape={"nLegsWithTape":5,"askAtSnapTime(t_k-12s)":{"n":5,"roiTape":0.0701,"tTape":14.57,"avgCostTape":0.9346,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1},"askAtTk":{"n":5,"roiTape":0.0637,"tTape":15.1,"avgCostTape":0.9402,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1}}
-  F1_band_taker|1d|f75|down|{"lo":0.95,"hi":0.98}  IS roi=0.025 | OOS n=30 win=1 cost=0.9762 edge=0.0238 roi=0.0245 CI[0.0214,0.0272] t=17.04 p=1.11e-16 q=0.000 
-  F6_reaction_taker|4h|f90|mom|{"from":"f75","to":"f90","thr":0.3}  IS roi=-0.0052 | OOS n=150 win=0.92 cost=0.8432 edge=0.0768 roi=0.1118 CI[0.0408,0.1758] t=3.34 p=5.69e-4 q=0.181 
-  F1_band_taker|1h|f75|up|{"lo":0.95,"hi":0.98}  IS roi=-0.0015 | OOS n=411 win=0.9903 cost=0.9782 edge=0.0121 roi=0.0122 CI[0.0003,0.0201] t=2.48 p=7.10e-3 q=1.000 
-  F3_wf_band_taker|4h|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=148 win=0.9797 cost=0.9588 edge=0.0209 roi=0.0227 CI[-0.0007,0.0426] t=1.81 p=3.65e-2 q=1.000 
-  F1_band_taker|4h|f90|down|{"lo":0.9,"hi":0.95}  IS roi=0.0183 | OOS n=80 win=0.975 cost=0.9433 edge=0.0317 roi=0.0336 CI[-0.0076,0.0612] t=1.79 p=3.92e-2 q=1.000 
-  F1_band_taker|1d|f75|up|{"lo":0.7,"hi":0.8}  IS roi=-0.0156 | OOS n=24 win=0.875 cost=0.768 edge=0.107 roi=0.1471 CI[-0.0742,0.3019] t=1.62 p=5.94e-2 q=1.000 
-  F1_band_taker|1d|f50|down|{"lo":0.8,"hi":0.9}  IS roi=-0.0924 | OOS n=33 win=0.9394 cost=0.8747 edge=0.0647 roi=0.0761 CI[-0.06,0.1524] t=1.56 p=6.41e-2 q=1.000 
-  F6_reaction_taker|4h|f90|mom|{"from":"f75","to":"f90","thr":0.2}  IS roi=-0.027 | OOS n=277 win=0.8556 cost=0.8173 edge=0.0383 roi=0.0448 CI[-0.0101,0.0934] t=1.54 p=6.28e-2 q=1.000 
-  F3_wf_band_taker|5m|pre|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=58 win=0.6897 cost=0.5902 edge=0.0994 roi=0.1722 CI[0.0137,0.4042] t=1.49 p=8.02e-2 q=1.000 tape={"nLegsWithTape":1,"askAtSnapTime(t_k-12s)":{"n":1,"roiTape":0.6213,"tTape":null,"avgCostTape":0.6168,"roiHeadlineSameLegs":0.6084,"avgCostHeadlineSameLegs":0.6217,"winRate":1},"askAtTk":{"n":1,"roiTape":0.5973,"tTape":null,"avgCostTape":0.6261,"roiHeadlineSameLegs":0.6084,"avgCostHeadlineSameLegs":0.6217,"winRate":1}}
-  F1_band_taker|4h|f90|up|{"lo":0.95,"hi":0.98}  IS roi=0.0106 | OOS n=112 win=0.9911 cost=0.9777 edge=0.0133 roi=0.0133 CI[-0.0065,0.0234] t=1.44 p=7.62e-2 q=1.000 
-  F1_band_taker|1d|f50|up|{"lo":0.3,"hi":0.4}  IS roi=-0.1193 | OOS n=39 win=0.4872 cost=0.3804 edge=0.1068 roi=0.2783 CI[-0.165,0.7202] t=1.3 p=1.01e-1 q=1.000 
-  F1_band_taker|1d|f50|up|{"lo":0.5,"hi":0.6}  IS roi=0.3218 | OOS n=39 win=0.6667 cost=0.5704 edge=0.0963 roi=0.171 CI[-0.0566,0.3875] t=1.27 p=1.06e-1 q=1.000 
-  F1_band_taker|4h|f90|down|{"lo":0.5,"hi":0.6}  IS roi=0.0243 | OOS n=42 win=0.6667 cost=0.5778 edge=0.0888 roi=0.1641 CI[-0.1602,0.3922] t=1.24 p=1.12e-1 q=1.000 
-  F1_band_taker|1d|f50|tok|{"lo":0.5,"hi":0.6}  IS roi=0.1324 | OOS n=76 win=0.6447 cost=0.577 edge=0.0678 roi=0.1134 CI[-0.0911,0.2945] t=1.2 p=1.16e-1 q=1.000 
-  F3_wf_band_taker|1d|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=51 win=0.6275 cost=0.5468 edge=0.0806 roi=0.1499 CI[-0.0915,0.3654] t=1.19 p=1.20e-1 q=1.000 
-  F1_band_taker|15m|f25|down|{"lo":0.8,"hi":0.9}  IS roi=-0.02 | OOS n=339 win=0.8791 cost=0.8591 edge=0.02 roi=0.0222 CI[-0.0168,0.0563] t=1.14 p=1.28e-1 q=1.000 
-  F8_chainlink_fair_taker|1h|f50|fair|{"margin":0.06}  IS roi=-0.0351 | OOS n=150 win=0.6133 cost=0.5711 edge=0.0422 roi=0.1162 CI[-0.0884,0.3103] t=1.14 p=1.33e-1 q=1.000 
-  F2_band_maker|1d|f25|tok|{"lo":0.6,"hi":0.7,"delta":0.01}  IS roi=-0.0687 | OOS n=99 win=0.6869 cost=0.6349 edge=0.052 roi=0.0812 CI[-0.0607,0.24] t=1.1 p=1.38e-1 q=1.000 
-  F3_wf_band_taker|1d|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=46 win=0.9565 cost=0.9228 edge=0.0337 roi=0.0365 CI[-0.0378,0.088] t=1.08 p=1.43e-1 q=1.000 
-  F1_band_taker|1d|f25|tok|{"lo":0.4,"hi":0.5}  IS roi=0.0118 | OOS n=134 win=0.5224 cost=0.4775 edge=0.0449 roi=0.0978 CI[-0.0692,0.2575] t=1.07 p=1.43e-1 q=1.000 
-  F1_band_taker|1h|f90|down|{"lo":0.8,"hi":0.9}  IS roi=0.0015 | OOS n=297 win=0.8923 cost=0.8728 edge=0.0194 roi=0.0209 CI[-0.0155,0.0579] t=1.06 p=1.45e-1 q=1.000 
-  F1_band_taker|15m|f75|down|{"lo":0.5,"hi":0.6}  IS roi=-0.0645 | OOS n=418 win=0.6029 cost=0.5718 edge=0.0311 roi=0.0456 CI[-0.0215,0.1551] t=1.04 p=1.50e-1 q=1.000 
-  F1_band_taker|1d|f25|up|{"lo":0.4,"hi":0.5}  IS roi=0.0473 | OOS n=57 win=0.5439 cost=0.4783 edge=0.0656 roi=0.1447 CI[-0.1225,0.3719] t=1.03 p=1.54e-1 q=1.000 
+  F1_band_taker|15m|f25|up|{"lo":0.9,"hi":0.95}  IS roi=0.0512 | OOS n=47 win=1 cost=0.933 edge=0.067 roi=0.0721 CI[-0.0092,0.0765] t=33.26 p=3.82e-2 q=1.000 tape={"nLegsWithTape":5,"askAtSnapTime(t_k-12s)":{"n":5,"roiTape":0.0701,"tTape":14.57,"avgCostTape":0.9346,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1},"askAtTk":{"n":5,"roiTape":0.0637,"tTape":15.1,"avgCostTape":0.9402,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1}}
+  F3_wf_band_taker|15m|f25|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=36 win=1 cost=0.9365 edge=0.0635 roi=0.0682 CI[-0.0352,0.0746] t=19.55 p=9.36e-2 q=1.000 tape={"nLegsWithTape":5,"askAtSnapTime(t_k-12s)":{"n":5,"roiTape":0.0701,"tTape":14.57,"avgCostTape":0.9346,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1},"askAtTk":{"n":5,"roiTape":0.0637,"tTape":15.1,"avgCostTape":0.9402,"roiHeadlineSameLegs":0.0643,"avgCostHeadlineSameLegs":0.9398,"winRate":1}}
+  F1_band_taker|1d|f75|down|{"lo":0.95,"hi":0.98}  IS roi=0.025 | OOS n=30 win=1 cost=0.9762 edge=0.0238 roi=0.0245 CI[-0.0919,0.0271] t=17.04 p=4.85e-1 q=1.000 
+  F1_band_taker|1h|f50|tok|{"lo":0.98,"hi":0.999}  IS roi=0.0053 | OOS n=49 win=1 cost=0.9957 edge=0.0043 roi=0.0043 CI[-0.0687,0.0049] t=12.76 p=8.11e-1 q=1.000 
+  F1_band_taker|4h|f75|up|{"lo":0.98,"hi":0.999}  IS roi=-0.0786 | OOS n=68 win=1 cost=0.9966 edge=0.0034 roi=0.0034 CI[-0.0502,0.004] t=11.06 p=7.93e-1 q=1.000 
+  F1_band_taker|1h|f50|down|{"lo":0.98,"hi":0.999}  IS roi=0.0046 | OOS n=25 win=1 cost=0.9956 edge=0.0044 roi=0.0044 CI[-0.1293,0.0054] t=9 p=8.95e-1 q=1.000 
+  F1_band_taker|1h|f50|up|{"lo":0.98,"hi":0.999}  IS roi=0.0063 | OOS n=24 win=1 cost=0.9959 edge=0.0041 roi=0.0041 CI[-0.1344,0.005] t=8.86 p=9.06e-1 q=1.000 
+  F1_band_taker|1d|f90|tok|{"lo":0.98,"hi":0.999}  IS roi=-0.0408 | OOS n=55 win=1 cost=0.9969 edge=0.0031 roi=0.0031 CI[-0.0624,0.0039] t=8.29 p=8.43e-1 q=1.000 
+  F1_band_taker|5m|f50|up|{"lo":0.98,"hi":0.999}  IS roi=0.0033 | OOS n=112 win=1 cost=0.9969 edge=0.0031 roi=0.0031 CI[-0.0302,0.0043] t=5.94 p=7.07e-1 q=1.000 tape={"nLegsWithTape":6,"askAtSnapTime(t_k-12s)":{"n":4,"roiTape":0.0094,"tTape":null,"avgCostTape":0.9907,"roiHeadlineSameLegs":0.0025,"avgCostHeadlineSameLegs":0.9975,"winRate":1},"askAtTk":{"n":3,"roiTape":0.0094,"tTape":null,"avgCostTape":0.9907,"roiHeadlineSameLegs":0.0025,"avgCostHeadlineSameLegs":0.9975,"winRate":1}}
+  F1_band_taker|1d|f90|down|{"lo":0.98,"hi":0.999}  IS roi=-0.0808 | OOS n=31 win=1 cost=0.9971 edge=0.0029 roi=0.003 CI[-0.1076,0.004] t=5.92 p=9.13e-1 q=1.000 
+  F1_band_taker|1d|f90|up|{"lo":0.98,"hi":0.999}  IS roi=0.0028 | OOS n=24 win=1 cost=0.9967 edge=0.0033 roi=0.0033 CI[-0.1351,0.0045] t=5.73 p=9.24e-1 q=1.000 
+  F1_band_taker|15m|f50|down|{"lo":0.98,"hi":0.999}  IS roi=0.0038 | OOS n=22 win=1 cost=0.9965 edge=0.0035 roi=0.0036 CI[-0.1456,0.0052] t=4.7 p=9.25e-1 q=1.000 tape={"nLegsWithTape":2,"askAtSnapTime(t_k-12s)":{"n":2,"roiTape":0.0094,"tTape":null,"avgCostTape":0.9907,"roiHeadlineSameLegs":0.0061,"avgCostHeadlineSameLegs":0.994,"winRate":1},"askAtTk":{"n":1,"roiTape":0.0037,"tTape":null,"avgCostTape":0.9963,"roiHeadlineSameLegs":0.0018,"avgCostHeadlineSameLegs":0.9982,"winRate":1}}
+  F6_reaction_taker|4h|f90|mom|{"from":"f75","to":"f90","thr":0.3}  IS roi=-0.0052 | OOS n=150 win=0.92 cost=0.8432 edge=0.0768 roi=0.1118 CI[0.0264,0.1763] t=3.34 p=2.28e-3 q=1.000 
+  F1_band_taker|1h|f75|up|{"lo":0.95,"hi":0.98}  IS roi=-0.0015 | OOS n=411 win=0.9903 cost=0.9782 edge=0.0121 roi=0.0122 CI[-0.003,0.0202] t=2.48 p=5.39e-2 q=1.000 
+  F1_band_taker|4h|f90|down|{"lo":0.9,"hi":0.95}  IS roi=0.0183 | OOS n=80 win=0.975 cost=0.9433 edge=0.0317 roi=0.0336 CI[-0.0317,0.0617] t=1.79 p=1.61e-1 q=1.000 
+  F1_band_taker|1d|f75|up|{"lo":0.7,"hi":0.8}  IS roi=-0.0156 | OOS n=24 win=0.875 cost=0.768 edge=0.107 roi=0.1471 CI[-0.1016,0.3104] t=1.62 p=1.58e-1 q=1.000 
+  F1_band_taker|1d|f50|down|{"lo":0.8,"hi":0.9}  IS roi=-0.0924 | OOS n=33 win=0.9394 cost=0.8747 edge=0.0647 roi=0.0761 CI[-0.0809,0.1512] t=1.56 p=1.99e-1 q=1.000 
+  F6_reaction_taker|4h|f90|mom|{"from":"f75","to":"f90","thr":0.2}  IS roi=-0.027 | OOS n=277 win=0.8556 cost=0.8173 edge=0.0383 roi=0.0448 CI[-0.0119,0.0976] t=1.54 p=6.28e-2 q=1.000 
+  F1_band_taker|4h|f90|up|{"lo":0.95,"hi":0.98}  IS roi=0.0106 | OOS n=112 win=0.9911 cost=0.9777 edge=0.0133 roi=0.0133 CI[-0.0272,0.0235] t=1.44 p=2.84e-1 q=1.000 
+  F1_band_taker|1d|f50|up|{"lo":0.3,"hi":0.4}  IS roi=-0.1193 | OOS n=39 win=0.4872 cost=0.3804 edge=0.1068 roi=0.2783 CI[-0.1519,0.7081] t=1.3 p=1.14e-1 q=1.000 
+  F1_band_taker|1d|f50|up|{"lo":0.5,"hi":0.6}  IS roi=0.3218 | OOS n=39 win=0.6667 cost=0.5704 edge=0.0963 roi=0.171 CI[-0.1076,0.4167] t=1.27 p=1.46e-1 q=1.000 
+  F1_band_taker|4h|f90|down|{"lo":0.5,"hi":0.6}  IS roi=0.0243 | OOS n=42 win=0.6667 cost=0.5778 edge=0.0888 roi=0.1641 CI[-0.1078,0.4131] t=1.24 p=1.56e-1 q=1.000 
+  F1_band_taker|1d|f50|tok|{"lo":0.5,"hi":0.6}  IS roi=0.1324 | OOS n=76 win=0.6447 cost=0.577 edge=0.0678 roi=0.1134 CI[-0.0769,0.2947] t=1.2 p=1.39e-1 q=1.000 
+  F3_wf_band_taker|1d|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  IS roi=- | OOS n=51 win=0.6275 cost=0.5468 edge=0.0806 roi=0.1499 CI[-0.1034,0.3821] t=1.19 p=1.54e-1 q=1.000 
+  F1_band_taker|15m|f25|down|{"lo":0.8,"hi":0.9}  IS roi=-0.02 | OOS n=339 win=0.8791 cost=0.8591 edge=0.02 roi=0.0222 CI[-0.0222,0.059] t=1.14 p=1.63e-1 q=1.000 tape={"nLegsWithTape":15,"askAtSnapTime(t_k-12s)":{"n":13,"roiTape":0,"tTape":0,"avgCostTape":0.8456,"roiHeadlineSameLegs":0.0053,"avgCostHeadlineSameLegs":0.8398,"winRate":0.8462},"askAtTk":{"n":14,"roiTape":0.0053,"tTape":0.04,"avgCostTape":0.8514,"roiHeadlineSameLegs":0.0136,"avgCostHeadlineSameLegs":0.8436,"winRate":0.8571}}
 
 Walk-forward procedures (OOS):
-  F3_wf_band_taker|15m|f25|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=51 win=1 cost=0.9357 edge=0.0643 roi=0.069 CI[0.0638,0.0736] t=25.86 q=0.000
-  F3_wf_band_taker|4h|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=148 win=0.9797 cost=0.9588 edge=0.0209 roi=0.0227 CI[-0.0007,0.0426] t=1.81 q=1.000
-  F3_wf_band_taker|5m|pre|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=58 win=0.6897 cost=0.5902 edge=0.0994 roi=0.1722 CI[0.0137,0.4042] t=1.49 q=1.000
-  F3_wf_band_taker|1d|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=51 win=0.6275 cost=0.5468 edge=0.0806 roi=0.1499 CI[-0.0915,0.3654] t=1.19 q=1.000
-  F3_wf_band_taker|1d|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=46 win=0.9565 cost=0.9228 edge=0.0337 roi=0.0365 CI[-0.0378,0.088] t=1.08 q=1.000
-  F3_wf_band_taker|1d|f75|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=62 win=0.9677 cost=0.9424 edge=0.0253 roi=0.0251 CI[-0.0192,0.0618] t=1.01 q=1.000
-  F8_wf_chainlink_model|4h|f90|model|{"margin":0.01}  n=67 win=0.9104 cost=0.8696 edge=0.0409 roi=0.0482 CI[-0.0338,0.1309] t=0.99 q=1.000
-  F4_wf_logit_model|5m|pre|model|{"margin":0.01}  n=37 win=0.7027 cost=0.6263 edge=0.0764 roi=0.1192 CI[-0.1215,0.3686] t=0.96 q=1.000
-  F8_wf_chainlink_model|1h|f25|model|{"margin":0.01}  n=32 win=0.7188 cost=0.6724 edge=0.0464 roi=0.0641 CI[-0.1657,0.2861] t=0.59 q=1.000
-  F4_wf_logit_model|1h|f75|model|{"margin":0.01}  n=177 win=0.8814 cost=0.871 edge=0.0104 roi=0.0129 CI[-0.0403,0.0546] t=0.49 q=1.000
-  F3_wf_band_taker|4h|f90|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=328 win=0.9695 cost=0.9647 edge=0.0048 roi=0.0047 CI[-0.0136,0.0208] t=0.49 q=1.000
-  F4_wf_logit_model|1h|pre|model|{"margin":0.01}  n=209 win=0.5837 cost=0.5745 edge=0.0092 roi=0.0171 CI[-0.0807,0.1189] t=0.33 q=1.000
-  F5_wf_band_maker|1d|f50|tok|{"delta":0.01}  n=20 win=0.4 cost=0.367 edge=0.033 roi=0.0947 CI[-0.4583,0.639] t=0.31 q=1.000
-  F3_wf_band_taker|1d|f50|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=60 win=0.3667 cost=0.3553 edge=0.0114 roi=0.0373 CI[-0.2858,0.3962] t=0.21 q=1.000
-  F3_wf_band_taker|1h|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=45 win=0.9778 cost=0.9751 edge=0.0027 roi=0.0025 CI[-0.0436,0.0269] t=0.11 q=1.000
-  F4_wf_logit_model|4h|pre|model|{"margin":0.01}  n=109 win=0.5046 cost=0.5023 edge=0.0023 roi=0.0047 CI[-0.1605,0.1802] t=0.05 q=1.000
-  F3_wf_band_taker|15m|f75|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=183 win=0.9454 cost=0.9444 edge=0.001 roi=0.0002 CI[-0.0337,0.036] t=0.01 q=1.000
-  F3_wf_band_taker|1d|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=43 win=0.3953 cost=0.3869 edge=0.0085 roi=-0.0018 CI[-0.3546,0.4049] t=-0.01 q=1.000
-  F6_wf_reaction_taker|1d|f75|mom|{"from":"f50","to":"f75"}  n=25 win=0.8 cost=0.8047 edge=-0.0047 roi=-0.0072 CI[-0.2396,0.1731] t=-0.07 q=1.000
-  F3_wf_band_taker|4h|f75|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=345 win=0.9014 cost=0.9031 edge=-0.0017 roi=-0.0014 CI[-0.0362,0.0296] t=-0.08 q=1.000
-  F3_wf_band_taker|4h|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=99 win=0.8889 cost=0.8937 edge=-0.0048 roi=-0.0054 CI[-0.0647,0.062] t=-0.16 q=1.000
-  F3_wf_band_taker|1d|f90|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=53 win=0.9434 cost=0.9502 edge=-0.0068 roi=-0.007 CI[-0.0854,0.0525] t=-0.21 q=1.000
-  F3_wf_band_taker|1h|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=65 win=0.9692 cost=0.9752 edge=-0.006 roi=-0.006 CI[-0.0524,0.0267] t=-0.27 q=1.000
-  F8_wf_chainlink_model|15m|m33|model|{"margin":0.01}  n=93 win=0.7742 cost=0.7817 edge=-0.0075 roi=-0.0121 CI[-0.0897,0.0564] t=-0.3 q=1.000
-  F3_wf_band_taker|4h|f50|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=127 win=0.8819 cost=0.8926 edge=-0.0107 roi=-0.0126 CI[-0.0761,0.053] t=-0.39 q=1.000
-  F3_wf_band_taker|4h|f75|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=90 win=0.9111 cost=0.9253 edge=-0.0142 roi=-0.0173 CI[-0.0716,0.0449] t=-0.52 q=1.000
-  F3_wf_band_taker|15m|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=212 win=0.8821 cost=0.8929 edge=-0.0108 roi=-0.0131 CI[-0.058,0.0308] t=-0.54 q=1.000
-  F5_wf_band_maker|4h|f50|tok|{"delta":0.01}  n=51 win=0.8431 cost=0.8675 edge=-0.0243 roi=-0.0286 CI[-0.1256,0.0635] t=-0.54 q=1.000
-  F4_wf_logit_model|4h|f50|model|{"margin":0.01}  n=206 win=0.7961 cost=0.8107 edge=-0.0146 roi=-0.0188 CI[-0.0763,0.0528] t=-0.54 q=1.000
-  F8_wf_chainlink_model|4h|f75|model|{"margin":0.01}  n=76 win=0.6842 cost=0.7131 edge=-0.0289 roi=-0.0519 CI[-0.221,0.1443] t=-0.56 q=1.000
-  F4_wf_logit_model|4h|f75|model|{"margin":0.01}  n=262 win=0.813 cost=0.8256 edge=-0.0126 roi=-0.0194 CI[-0.0862,0.0473] t=-0.63 q=1.000
-  F3_wf_band_taker|15m|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=386 win=0.8808 cost=0.8924 edge=-0.0116 roi=-0.0142 CI[-0.0501,0.0218] t=-0.75 q=1.000
-  F4_wf_logit_model|4h|f90|model|{"margin":0.01}  n=435 win=0.8506 cost=0.8612 edge=-0.0107 roi=-0.0169 CI[-0.0575,0.0155] t=-0.84 q=1.000
-  F3_wf_band_taker|1h|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=57 win=0.6491 cost=0.696 edge=-0.0469 roi=-0.0704 CI[-0.2305,0.0659] t=-0.85 q=1.000
-  F3_wf_band_taker|4h|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=94 win=0.9362 cost=0.9573 edge=-0.0211 roi=-0.0228 CI[-0.0722,0.0229] t=-0.89 q=1.000
-  F3_wf_band_taker|1h|f75|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=27 win=0.3333 cost=0.4022 edge=-0.0689 roi=-0.1797 CI[-0.5228,0.1404] t=-0.91 q=1.000
-  F3_wf_band_taker|1h|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=78 win=0.859 cost=0.892 edge=-0.033 roi=-0.0395 CI[-0.1349,0.0429] t=-0.91 q=1.000
-  F4_wf_logit_model|1d|f25|model|{"margin":0.01}  n=66 win=0.1818 cost=0.255 edge=-0.0732 roi=-0.2131 CI[-0.6531,0.2069] t=-0.91 q=1.000
-  F3_wf_band_taker|4h|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=22 win=0.8182 cost=0.8949 edge=-0.0767 roi=-0.0849 CI[-0.2518,0.0635] t=-0.98 q=1.000
-  F5_wf_band_maker|4h|f25|tok|{"delta":0.01}  n=38 win=0.7368 cost=0.8183 edge=-0.0814 roi=-0.1017 CI[-0.2699,0.0728] t=-1.03 q=1.000
-  F3_wf_band_taker|1h|f25|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=75 win=0.7467 cost=0.7967 edge=-0.0501 roi=-0.0619 CI[-0.1822,0.0347] t=-1.05 q=1.000
-  F3_wf_band_taker|5m|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=69 win=0.8261 cost=0.8462 edge=-0.0201 roi=-0.0331 CI[-0.0866,0.024] t=-1.08 q=1.000
-  F3_wf_band_taker|5m|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=32 win=0.5938 cost=0.6942 edge=-0.1004 roi=-0.1556 CI[-0.3865,0.1257] t=-1.11 q=1.000
-  F4_wf_logit_model|1d|f75|model|{"margin":0.01}  n=38 win=0.7105 cost=0.7846 edge=-0.074 roi=-0.1098 CI[-0.2957,0.0691] t=-1.15 q=1.000
-  F3_wf_band_taker|4h|f25|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=57 win=0.7895 cost=0.8563 edge=-0.0668 roi=-0.0804 CI[-0.1893,0.0309] t=-1.19 q=1.000
-  F4_wf_logit_model|1h|f90|model|{"margin":0.01}  n=104 win=0.8269 cost=0.8624 edge=-0.0355 roi=-0.0457 CI[-0.1205,0.0307] t=-1.2 q=1.000
-  F4_wf_logit_model|1d|s0|model|{"margin":0.01}  n=33 win=0.4545 cost=0.5504 edge=-0.0958 roi=-0.1953 CI[-0.5224,0.1639] t=-1.25 q=1.000
-  F8_wf_chainlink_model|1h|f75|model|{"margin":0.01}  n=65 win=0.7231 cost=0.7523 edge=-0.0292 roi=-0.0931 CI[-0.2154,0.0419] t=-1.36 q=1.000
-  F3_wf_band_taker|15m|s0|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=47 win=0.3617 cost=0.472 edge=-0.1103 roi=-0.2431 CI[-0.5523,0.0412] t=-1.38 q=1.000
-  F3_wf_band_taker|1h|f50|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=80 win=0.475 cost=0.5495 edge=-0.0745 roi=-0.1351 CI[-0.2995,0.0641] t=-1.4 q=1.000
-  F3_wf_band_taker|4h|f25|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=29 win=0.4828 cost=0.6502 edge=-0.1675 roi=-0.2694 CI[-0.6081,0.0319] t=-1.56 q=1.000
-  F3_wf_band_taker|1h|f25|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=71 win=0.5493 cost=0.6497 edge=-0.1004 roi=-0.1565 CI[-0.3279,0.0332] t=-1.58 q=1.000
-  F4_wf_logit_model|5m|f90|model|{"margin":0.01}  n=126 win=0.8175 cost=0.8547 edge=-0.0372 roi=-0.0462 CI[-0.0987,0.0095] t=-1.6 q=1.000
-  F3_wf_band_taker|1h|f75|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=532 win=0.8496 cost=0.8764 edge=-0.0268 roi=-0.0317 CI[-0.0672,0.0035] t=-1.64 q=1.000
-  F3_wf_band_taker|1h|f90|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=71 win=0.6197 cost=0.7027 edge=-0.0829 roi=-0.1189 CI[-0.2318,0.0379] t=-1.65 q=1.000
-  F3_wf_band_taker|1h|f75|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=225 win=0.8089 cost=0.8501 edge=-0.0412 roi=-0.0507 CI[-0.1108,0.005] t=-1.68 q=1.000
-  F3_wf_band_taker|1d|f75|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=54 win=0.7963 cost=0.8871 edge=-0.0908 roi=-0.1079 CI[-0.2253,0.0309] t=-1.7 q=1.000
-  F8_wf_chainlink_model|1h|f92|model|{"margin":0.01}  n=52 win=0.5962 cost=0.6271 edge=-0.031 roi=-0.1761 CI[-0.3429,0.0241] t=-1.79 q=1.000
-  F3_wf_band_taker|15m|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=120 win=0.8917 cost=0.9384 edge=-0.0467 roi=-0.0609 CI[-0.127,-0.0124] t=-1.99 q=1.000
-  F4_wf_logit_model|15m|f90|model|{"margin":0.01}  n=115 win=0.8 cost=0.84 edge=-0.04 roi=-0.0736 CI[-0.1481,0.0008] t=-2.01 q=1.000
-  F8_wf_chainlink_model|1h|f50|model|{"margin":0.01}  n=59 win=0.5932 cost=0.6413 edge=-0.0481 roi=-0.1998 CI[-0.3867,0.0066] t=-2.08 q=1.000
-  F3_wf_band_taker|15m|f90|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=137 win=0.9051 cost=0.9369 edge=-0.0318 roi=-0.0418 CI[-0.0714,0.007] t=-2.15 q=1.000
-  F5_wf_band_maker|4h|f90|tok|{"delta":0.01}  n=48 win=0.75 cost=0.8573 edge=-0.1073 roi=-0.1627 CI[-0.2916,-0.0396] t=-2.19 q=1.000
-  F4_wf_logit_model|1d|pre|model|{"margin":0.01}  n=37 win=0.2973 cost=0.5183 edge=-0.221 roi=-0.4244 CI[-0.7414,-0.1097] t=-2.88 q=1.000
-  F8_wf_chainlink_model|4h|f25|model|{"margin":0.01}  n=75 win=0.6 cost=0.7202 edge=-0.1202 roi=-0.2108 CI[-0.3604,-0.0805] t=-2.98 q=1.000
+  F3_wf_band_taker|15m|f25|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=36 win=1 cost=0.9365 edge=0.0635 roi=0.0682 CI[-0.0352,0.0746] t=19.55 q=1.000
+  F3_wf_band_taker|1d|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=51 win=0.6275 cost=0.5468 edge=0.0806 roi=0.1499 CI[-0.1034,0.3821] t=1.19 q=1.000
+  F3_wf_band_taker|5m|pre|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=42 win=0.6905 cost=0.5908 edge=0.0996 roi=0.1697 CI[-0.0865,0.5969] t=1.13 q=1.000
+  F8_wf_chainlink_model|4h|f90|model|{"margin":0.01}  n=67 win=0.9104 cost=0.8696 edge=0.0409 roi=0.0482 CI[-0.0592,0.1308] t=0.99 q=1.000
+  F4_wf_logit_model|5m|pre|model|{"margin":0.01}  n=37 win=0.7027 cost=0.6263 edge=0.0764 roi=0.1192 CI[-0.1344,0.365] t=0.96 q=1.000
+  F8_wf_chainlink_model|1h|f25|model|{"margin":0.01}  n=32 win=0.7188 cost=0.6724 edge=0.0464 roi=0.0641 CI[-0.1875,0.2713] t=0.59 q=1.000
+  F4_wf_logit_model|1h|f75|model|{"margin":0.01}  n=177 win=0.8814 cost=0.871 edge=0.0104 roi=0.0129 CI[-0.0523,0.0631] t=0.49 q=1.000
+  F4_wf_logit_model|1h|pre|model|{"margin":0.01}  n=209 win=0.5837 cost=0.5745 edge=0.0092 roi=0.0171 CI[-0.1019,0.1287] t=0.33 q=1.000
+  F5_wf_band_maker|1d|f50|tok|{"delta":0.01}  n=20 win=0.4 cost=0.367 edge=0.033 roi=0.0947 CI[-0.4512,0.6714] t=0.31 q=1.000
+  F3_wf_band_taker|1d|f50|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=60 win=0.3667 cost=0.3553 edge=0.0114 roi=0.0373 CI[-0.3229,0.4279] t=0.21 q=1.000
+  F3_wf_band_taker|1d|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=60 win=0.9333 cost=0.9264 edge=0.0069 roi=0.0069 CI[-0.0925,0.0639] t=0.19 q=1.000
+  F3_wf_band_taker|4h|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=78 win=0.8974 cost=0.8929 edge=0.0046 roi=0.0053 CI[-0.0923,0.0754] t=0.15 q=1.000
+  F4_wf_logit_model|4h|pre|model|{"margin":0.01}  n=109 win=0.5046 cost=0.5023 edge=0.0023 roi=0.0047 CI[-0.1794,0.1879] t=0.05 q=1.000
+  F3_wf_band_taker|1d|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=43 win=0.3953 cost=0.3869 edge=0.0085 roi=-0.0018 CI[-0.3633,0.4067] t=-0.01 q=1.000
+  F3_wf_band_taker|4h|f75|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=255 win=0.8902 cost=0.8921 edge=-0.0019 roi=-0.0016 CI[-0.0518,0.0421] t=-0.07 q=1.000
+  F8_wf_chainlink_model|15m|m33|model|{"margin":0.01}  n=93 win=0.7742 cost=0.7817 edge=-0.0075 roi=-0.0121 CI[-0.131,0.0839] t=-0.3 q=1.000
+  F3_wf_band_taker|1h|f90|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=34 win=0.6765 cost=0.7008 edge=-0.0243 roi=-0.037 CI[-0.2745,0.1737] t=-0.34 q=1.000
+  F3_wf_band_taker|1h|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=31 win=0.871 cost=0.8918 edge=-0.0209 roi=-0.0264 CI[-0.2022,0.0853] t=-0.39 q=1.000
+  F3_wf_band_taker|4h|f90|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=467 win=0.9143 cost=0.9178 edge=-0.0034 roi=-0.006 CI[-0.0368,0.0237] t=-0.39 q=1.000
+  F3_wf_band_taker|15m|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=212 win=0.8821 cost=0.8929 edge=-0.0108 roi=-0.0131 CI[-0.0685,0.0328] t=-0.54 q=1.000
+  F4_wf_logit_model|4h|f50|model|{"margin":0.01}  n=206 win=0.7961 cost=0.8107 edge=-0.0146 roi=-0.0188 CI[-0.0922,0.0485] t=-0.54 q=1.000
+  F3_wf_band_taker|1d|f75|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=42 win=0.881 cost=0.9004 edge=-0.0194 roi=-0.0307 CI[-0.167,0.0707] t=-0.54 q=1.000
+  F8_wf_chainlink_model|4h|f75|model|{"margin":0.01}  n=76 win=0.6842 cost=0.7131 edge=-0.0289 roi=-0.0519 CI[-0.2228,0.1448] t=-0.56 q=1.000
+  F3_wf_band_taker|4h|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=187 win=0.9144 cost=0.9249 edge=-0.0104 roi=-0.0138 CI[-0.0644,0.0309] t=-0.59 q=1.000
+  F3_wf_band_taker|1h|f75|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=692 win=0.8512 cost=0.8602 edge=-0.0091 roi=-0.0101 CI[-0.0436,0.0196] t=-0.6 q=1.000
+  F3_wf_band_taker|4h|f75|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=481 win=0.8794 cost=0.8875 edge=-0.008 roi=-0.0104 CI[-0.0453,0.0204] t=-0.61 q=1.000
+  F3_wf_band_taker|1h|f75|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=39 win=0.7436 cost=0.7799 edge=-0.0363 roi=-0.0487 CI[-0.2445,0.0955] t=-0.63 q=1.000
+  F4_wf_logit_model|4h|f75|model|{"margin":0.01}  n=262 win=0.813 cost=0.8256 edge=-0.0126 roi=-0.0194 CI[-0.0821,0.0374] t=-0.63 q=1.000
+  F3_wf_band_taker|15m|f50|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=386 win=0.8808 cost=0.8924 edge=-0.0116 roi=-0.0142 CI[-0.0534,0.0197] t=-0.75 q=1.000
+  F4_wf_logit_model|4h|f90|model|{"margin":0.01}  n=435 win=0.8506 cost=0.8612 edge=-0.0107 roi=-0.0169 CI[-0.0565,0.0229] t=-0.84 q=1.000
+  F3_wf_band_taker|1h|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=57 win=0.6491 cost=0.696 edge=-0.0469 roi=-0.0704 CI[-0.2537,0.0919] t=-0.85 q=1.000
+  F4_wf_logit_model|1d|f25|model|{"margin":0.01}  n=66 win=0.1818 cost=0.255 edge=-0.0732 roi=-0.2131 CI[-0.6211,0.2409] t=-0.91 q=1.000
+  F3_wf_band_taker|4h|f50|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=31 win=0.871 cost=0.9264 edge=-0.0554 roi=-0.0584 CI[-0.232,0.0476] t=-0.92 q=1.000
+  F5_wf_band_maker|4h|f50|tok|{"delta":0.01}  n=31 win=0.8065 cost=0.8653 edge=-0.0589 roi=-0.0684 CI[-0.2636,0.071] t=-0.94 q=1.000
+  F3_wf_band_taker|1h|f25|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=75 win=0.7467 cost=0.7967 edge=-0.0501 roi=-0.0619 CI[-0.1994,0.0489] t=-1.05 q=1.000
+  F3_wf_band_taker|5m|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=69 win=0.8261 cost=0.8462 edge=-0.0201 roi=-0.0331 CI[-0.1489,0.0608] t=-1.08 q=1.000
+  F3_wf_band_taker|5m|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=32 win=0.5938 cost=0.6942 edge=-0.1004 roi=-0.1556 CI[-0.4163,0.1241] t=-1.11 q=1.000
+  F3_wf_band_taker|4h|f90|down|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=214 win=0.8925 cost=0.9119 edge=-0.0193 roi=-0.0301 CI[-0.0811,0.0193] t=-1.15 q=1.000
+  F4_wf_logit_model|1d|f75|model|{"margin":0.01}  n=38 win=0.7105 cost=0.7846 edge=-0.074 roi=-0.1098 CI[-0.2959,0.0705] t=-1.15 q=1.000
+  F4_wf_logit_model|1h|f90|model|{"margin":0.01}  n=104 win=0.8269 cost=0.8624 edge=-0.0355 roi=-0.0457 CI[-0.1386,0.0309] t=-1.2 q=1.000
+  F3_wf_band_taker|15m|f75|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=104 win=0.9231 cost=0.9444 edge=-0.0213 roi=-0.024 CI[-0.0941,0.0171] t=-1.21 q=1.000
+  F4_wf_logit_model|1d|s0|model|{"margin":0.01}  n=33 win=0.4545 cost=0.5504 edge=-0.0958 roi=-0.1953 CI[-0.4833,0.1301] t=-1.25 q=1.000
+  F8_wf_chainlink_model|1h|f75|model|{"margin":0.01}  n=65 win=0.7231 cost=0.7523 edge=-0.0292 roi=-0.0931 CI[-0.2155,0.0861] t=-1.36 q=1.000
+  F3_wf_band_taker|15m|s0|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=47 win=0.3617 cost=0.472 edge=-0.1103 roi=-0.2431 CI[-0.5831,0.0812] t=-1.38 q=1.000
+  F3_wf_band_taker|1h|f25|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=71 win=0.5493 cost=0.6497 edge=-0.1004 roi=-0.1565 CI[-0.3457,0.0315] t=-1.58 q=1.000
+  F4_wf_logit_model|5m|f90|model|{"margin":0.01}  n=126 win=0.8175 cost=0.8547 edge=-0.0372 roi=-0.0462 CI[-0.133,0.024] t=-1.6 q=1.000
+  F8_wf_chainlink_model|1h|f92|model|{"margin":0.01}  n=52 win=0.5962 cost=0.6271 edge=-0.031 roi=-0.1761 CI[-0.3612,0.1456] t=-1.79 q=1.000
+  F5_wf_band_maker|4h|f90|tok|{"delta":0.01}  n=35 win=0.7143 cost=0.8245 edge=-0.1102 roi=-0.1832 CI[-0.3777,0.0149] t=-1.91 q=1.000
+  F3_wf_band_taker|15m|f90|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=120 win=0.8917 cost=0.9384 edge=-0.0467 roi=-0.0609 CI[-0.1254,-0.003] t=-1.99 q=1.000
+  F4_wf_logit_model|15m|f90|model|{"margin":0.01}  n=115 win=0.8 cost=0.84 edge=-0.04 roi=-0.0736 CI[-0.1487,0.0272] t=-2.01 q=1.000
+  F3_wf_band_taker|4h|f25|tok|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=56 win=0.4107 cost=0.501 edge=-0.0903 roi=-0.2808 CI[-0.5465,0.0803] t=-2.04 q=1.000
+  F8_wf_chainlink_model|1h|f50|model|{"margin":0.01}  n=59 win=0.5932 cost=0.6413 edge=-0.0481 roi=-0.1998 CI[-0.3858,0.1057] t=-2.08 q=1.000
+  F3_wf_band_taker|4h|f50|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=29 win=0.5517 cost=0.7301 edge=-0.1783 roi=-0.2921 CI[-0.5335,-0.0194] t=-2.26 q=1.000
+  F3_wf_band_taker|1h|f75|up|{"select":"max train cluster-t over contiguous bands, trade if t>=1.5"}  n=143 win=0.7622 cost=0.8351 edge=-0.0728 roi=-0.0893 CI[-0.1783,-0.0126] t=-2.28 q=1.000
+  F5_wf_band_maker|4h|f25|tok|{"delta":0.01}  n=69 win=0.4203 cost=0.5408 edge=-0.1205 roi=-0.2972 CI[-0.522,-0.0053] t=-2.42 q=1.000
+  F4_wf_logit_model|1d|pre|model|{"margin":0.01}  n=37 win=0.2973 cost=0.5183 edge=-0.221 roi=-0.4244 CI[-0.6906,-0.1167] t=-2.88 q=1.000
+  F8_wf_chainlink_model|4h|f25|model|{"margin":0.01}  n=75 win=0.6 cost=0.7202 edge=-0.1202 roi=-0.2108 CI[-0.3519,-0.0234] t=-2.98 q=1.000

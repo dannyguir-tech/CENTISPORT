@@ -173,8 +173,10 @@ function isNetworkError(err) {
 
 /**
  * Shared client: one concurrency limiter + one rps limiter for all requests, optional cache.
- * getJson(url, { cache, allow404 }) — cached entries are stored as { url, status, savedAt, body }
+ * getJson(url, { cache, allow404, cacheIf }) — cached entries are stored as { url, status, savedAt, body }
  * under cacheDir/<sha1(url)>.json; 404s are cached too (as body null) when allow404 is set.
+ * cacheIf(body) -> false keeps a response out of the cache and also rejects an entry already on
+ * disk, so data that may still change (an unresolved market, a 404) is re-read on the next run.
  */
 export function createHttpClient(options = {}) {
   const {
@@ -197,11 +199,12 @@ export function createHttpClient(options = {}) {
     }
   }
 
-  async function getJson(url, { cache = false, allow404 = false } = {}) {
+  async function getJson(url, { cache = false, allow404 = false, cacheIf = null } = {}) {
     const file = cache && cacheDir ? cachePathFor(cacheDir, url) : null;
+    const cacheable = (body) => !cacheIf || cacheIf(body);
     if (file) {
       const hit = await readCache(file);
-      if (hit) {
+      if (hit && cacheable(hit.body)) {
         stats.cacheHits++;
         return hit.body;
       }
@@ -232,7 +235,7 @@ export function createHttpClient(options = {}) {
       stats.failures++;
       throw err;
     }
-    if (file) {
+    if (file && cacheable(body)) {
       await writeFileAtomic(file, JSON.stringify({ url, status: lastStatus, savedAt: Date.now(), body }));
     }
     return body;

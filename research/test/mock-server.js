@@ -115,8 +115,11 @@ function buildTrades(entry, wallets) {
   const rng = mulberry32(seedOf(`trades-${meta.cid}`));
   const out = [];
   const span = meta.closeTs - meta.listingTs;
-  for (let k = 0; k < meta.nTrades; k++) {
-    const t = Math.round(meta.closeTs - span * rng() ** 2); // denser near the game
+  const inGame = meta.inGameTrades || 0;
+  for (let k = 0; k < meta.nTrades + inGame; k++) {
+    // The first nTrades are spread over the market's life, denser near the game; any extra ones
+    // are live betting between kickoff and close (the tape the collector must page through).
+    const t = k < meta.nTrades ? Math.round(meta.closeTs - span * rng() ** 2) : meta.gs + 1 + Math.floor(rng() * (meta.closeTs - meta.gs - 1));
     const idx = rng() < 0.5 ? 0 : 1;
     const whale = rng() < 0.03 ? 20 : 1;
     out.push({
@@ -304,6 +307,12 @@ export function buildFixture({ nEvents = 18, seed = 7, favoriteBias = 0, t0 = Da
   set('manyTrades', 9, 'moneyline', ({ meta }) => {
     meta.nTrades = 1200;
   });
+  // Heavy live betting: 3200 in-game trades sit in front of the pre-game tape (newest first), more
+  // than --max-trades-per-market, so in-game trades must not count toward it.
+  set('busyInGame', 10, 'moneyline', ({ meta }) => {
+    meta.nTrades = 400;
+    meta.inGameTrades = 3200;
+  });
   const dupEvent = events.find((e) => e.markets.some((m) => byCid.get(m.conditionId).meta.eventIndex === 11)) || null;
   if (dupEvent) tricky.duplicatedEventSlug = dupEvent.slug;
 
@@ -339,6 +348,12 @@ function filterEvents(fixture, q) {
   // Offset pagination over a shifting set can repeat an item; reproduce that across a page boundary.
   if (fixture.dupEvent && list.includes(fixture.dupEvent) && list.length > 10) list.splice(10, 0, fixture.dupEvent);
   return list;
+}
+
+// The events a /gamma/events request returns, for tests that need to know what a cached page held.
+export function eventsPage(fixture, url, limitCap = 500) {
+  const q = new URL(url, 'http://mock').searchParams;
+  return paginate(filterEvents(fixture, q), q, limitCap);
 }
 
 const paginate = (list, q, cap, def = 20) => {

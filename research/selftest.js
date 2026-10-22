@@ -2,11 +2,15 @@
 // SYNTHETIC self-test of the research tooling. It validates build-dataset.js + backtest.js on data
 // with known ground truth (lib/synthetic.js) and says NOTHING about real Polymarket markets.
 //
-// For each seed it generates two paired worlds:
+// For each seed it generates three worlds:
 //   null    - prices are calibrated martingales; after costs no rule has positive expected ROI,
 //             so every SURVIVES is a false discovery.
 //   planted - known edges (see PLANTED_EDGES); those hypotheses must SURVIVE and their mirror
 //             images must not.
+//   stress  - null prices plus data defects: one-sided price gaps, trade flow that reveals moves
+//             after a stale quote, and busy in-game tapes cut short by the collector's page cap.
+//             Every SURVIVES is false, trade features must be exact or null, and no rule may have
+//             positive true ROI at its fill price.
 // The builder and backtester run as child processes exactly as a user would run them. Every tested
 // hypothesis is then re-traded in-process with the parameters the backtest chose per fold and priced
 // with the generator's true probabilities, which tells a real discovery from a lucky one.
@@ -16,19 +20,21 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { PLANTED_EDGES, PLANTED_MIRRORS, generateWorld } from './lib/synthetic.js';
+import { PLANTED_EDGES, PLANTED_MIRRORS, WORLDS, generateWorld } from './lib/synthetic.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(HERE, 'build-dataset.js');
 const BACKTEST = path.join(HERE, 'backtest.js');
 const HYPOTHESES = path.join(HERE, 'hypotheses.js');
+const NULL_LIKE = new Set(['null', 'stress']); // worlds where every survivor is a false discovery
+const FLOW = ['nTrades24h', 'netBuyNotional24h', 'largeNetNotional24h', 'distinctWallets24h', 'topWalletShare24h'];
 const HOUR = 3600;
 const TAG = '[SYNTHETIC]';
 const REQUIRED_TYPES = ['moneyline', 'spread', 'total', 'prop', 'map'];
 // Markets the builder must drop: their only start information is missing, a bare date, or after settlement.
 const MUST_DROP = ['no_game_start', 'event_start_date_only', 'closed_before_start'];
 
-const DEFAULTS = Object.freeze({ events: 2500, seeds: [1, 2, 3], jobs: 2, boot: 2000, fdr: 0.1, keep: false, workDir: null, json: null });
+const DEFAULTS = Object.freeze({ events: 2500, seeds: [1, 2, 3], worlds: WORLDS, jobs: 2, boot: 2000, fdr: 0.1, keep: false, workDir: null, json: null });
 
 const log = (s = '') => { for (const line of String(s).split('\n')) console.log(`${TAG} ${line}`); };
 const fin = Number.isFinite;
@@ -42,7 +48,8 @@ const USAGE = `Usage: node research/selftest.js [options]
 SYNTHETIC self-test: checks that the tooling finds planted edges and finds nothing in calibrated
 data. Output is about the tooling only, never about real markets.
   --events 2500     events per world (planted-edge power needs ~2500; fewer may miss them)
-  --seeds 1,2,3     one null + one planted world per seed
+  --seeds 1,2,3     one world of each kind per seed
+  --worlds null,planted,stress   which worlds to run (default all three)
   --jobs 2          worlds processed concurrently
   --boot 2000       bootstrap replicates passed to backtest.js
   --fdr 0.10        BH false discovery rate passed to backtest.js (also sets the allowed null rate)
@@ -73,6 +80,10 @@ export function optsFromArgs(argv) {
     else if (key === 'seeds') {
       o.seeds = [...new Set(val.split(',').map((s) => s.trim()).filter(Boolean).map((s) => num('seeds', s, { int: true, min: -Infinity })))];
       if (!o.seeds.length) throw new UsageError('--seeds is empty');
+    } else if (key === 'worlds') {
+      o.worlds = [...new Set(val.split(',').map((s) => s.trim()).filter(Boolean))];
+      const bad = o.worlds.filter((w) => !WORLDS.includes(w));
+      if (bad.length || !o.worlds.length) throw new UsageError(`--worlds takes a comma-separated subset of ${WORLDS.join(', ')}`);
     } else if (key === 'jobs') o.jobs = num(key, val, { int: true, min: 1 });
     else if (key === 'boot') o.boot = num(key, val, { int: true, min: 1 });
     else if (key === 'fdr') o.fdr = num(key, val, { min: 0, max: 1, exclusiveMin: true });
@@ -121,12 +132,19 @@ function trueProb(truth, f) {
   return f.outcomeIndex === 0 ? t.q0[k] : 1 - t.q0[k];
 }
 
-// Streams dataset.jsonl to check game-start handling and market-type classification against the generator.
-async function scanDataset(file, truth, gen) {
+// A busy market's full pre-game tape from truth.jsonl, in the builder's trade format.
+const truthTape = (t) => t.tape.map(([ts, tok, side, size, price, wallet]) => ({ t: ts, asset: t.tokenIds[tok], side, size, price, wallet })).sort((a, b) => a.t - b.t);
+
+// Streams dataset.jsonl to check game-start handling, market-type classification, quote
+// synchronisation and (for busy tapes) trade-feature completeness against the generator.
+async function scanDataset(file, truth, gen, api) {
   const dropSet = new Map();
   for (const d of MUST_DROP) for (const cid of gen.dirty[d] || []) dropSet.set(cid, d);
   const fallback = new Set(gen.fallbackStart);
-  const out = { rows: 0, types: {}, startMismatch: 0, leaked: {}, fallbackRows: 0, classMismatch: new Set(), unknownMarkets: 0 };
+  const vigMax = gen.params.vigMax;
+  const tapes = new Map();
+  const out = { rows: 0, types: {}, startMismatch: 0, leaked: {}, fallbackRows: 0, classMismatch: new Set(), unknownMarkets: 0,
+    paired: 0, unsynced: [], busy: { rows: 0, exact: 0, nulled: 0, wrong: [] }, flowCheck: typeof api.tradeFeatures === 'function' };
   const rl = readline.createInterface({ input: fs.createReadStream(file), crlfDelay: Infinity });
   for await (const line of rl) {
     if (!line.trim()) continue;
@@ -139,6 +157,20 @@ async function scanDataset(file, truth, gen) {
     if (dropSet.has(r.conditionId)) out.leaked[dropSet.get(r.conditionId)] = (out.leaked[dropSet.get(r.conditionId)] || 0) + 1;
     if (fallback.has(r.conditionId)) out.fallbackRows++;
     if (gen.classOf[r.conditionId] && gen.classOf[r.conditionId] !== r.marketType) out.classMismatch.add(r.conditionId);
+    // Both tokens are quoted from one fair price plus a shared vig in [0, vigMax]: a pair stamped
+    // at the same time sums to 1..1+vigMax (+- rounding). Anything else pairs a stale and a fresh quote.
+    if (r.overround != null) {
+      out.paired++;
+      if (r.overround < -0.0015 || r.overround > vigMax + 0.0015) out.unsynced.push(`${r.id} (${r.overround})`);
+    }
+    if (t.tape && out.flowCheck) {
+      if (!tapes.has(r.conditionId)) tapes.set(r.conditionId, truthTape(t));
+      out.busy.rows++;
+      if (FLOW.every((k) => r[k] === null)) { out.busy.nulled++; continue; }
+      const want = api.tradeFeatures(tapes.get(r.conditionId), t.tokenIds, r.outcomeIndex, r.decisionTs - r.priceAgeSec, 1000);
+      if (FLOW.every((k) => r[k] === want[k])) out.busy.exact++;
+      else out.busy.wrong.push(`${r.id}: nTrades24h ${r.nTrades24h} vs ${want.nTrades24h}`);
+    }
   }
   return out;
 }
@@ -147,7 +179,8 @@ async function loadAuditApi() {
   try {
     const bt = await import(pathToFileURL(BACKTEST).href);
     const hy = await import(pathToFileURL(HYPOTHESES).href);
-    const api = { loadDataset: bt.loadDataset, assignFolds: bt.assignFolds, walkForward: bt.walkForward, entryCost: bt.entryCost, buildHypotheses: hy.buildHypotheses };
+    const bd = await import(pathToFileURL(BUILD).href);
+    const api = { loadDataset: bt.loadDataset, assignFolds: bt.assignFolds, walkForward: bt.walkForward, entryCost: bt.entryCost, buildHypotheses: hy.buildHypotheses, tradeFeatures: bd.tradeFeatures };
     const missing = Object.entries(api).filter(([, f]) => typeof f !== 'function').map(([k]) => k);
     return missing.length ? { unavailable: `backtest.js/hypotheses.js do not export ${missing.join(', ')}` } : api;
   } catch (e) {
@@ -202,7 +235,7 @@ async function runWorld(seed, world, o, root, api) {
   } catch (e) {
     return fail(`generator failed: ${e.message}`);
   }
-  res.gen = { markets: gen.markets, priceFiles: gen.priceFiles, tradeFiles: gen.tradeFiles, informedMarkets: gen.informedMarkets, bySport: gen.bySport };
+  res.gen = { markets: gen.markets, priceFiles: gen.priceFiles, tradeFiles: gen.tradeFiles, informedMarkets: gen.informedMarkets, busyMarkets: gen.busyMarkets, bySport: gen.bySport };
 
   const b = await runNode(BUILD, ['--data-dir', dataDir], 15 * 60e3);
   if (b.code !== 0) return fail(`build-dataset.js exited with code ${b.code}: ${tail(b.stderr || b.stdout)}`);
@@ -219,7 +252,7 @@ async function runWorld(seed, world, o, root, api) {
   if (!Array.isArray(report.hypotheses) || !report.config || !report.data) return fail('backtest report lacks hypotheses/config/data; the report format changed');
 
   const truth = await loadTruth(truthFile);
-  const ds = await scanDataset(datasetFile, truth, gen);
+  const ds = await scanDataset(datasetFile, truth, gen, api);
   let audit;
   if (api.unavailable) audit = { unavailable: api.unavailable };
   else {
@@ -261,6 +294,19 @@ function evaluateWorld(res, report, ds, gen, audit, o) {
     startOk ? `startTs matches truth on every row; ${dropped} markets without a usable start dropped; eventStartDate fallback kept ${ds.fallbackRows} rows`
       : `start mismatches ${ds.startMismatch}, rows from markets that must be dropped ${leaked.map(([k, v]) => `${k}:${v}`).join(' ') || 0}, fallback rows ${ds.fallbackRows}, unknown markets ${ds.unknownMarkets}`);
 
+  check('dataset: overround only from synchronous quotes', ds.unsynced.length ? 'FAIL' : 'PASS',
+    ds.unsynced.length ? `${ds.unsynced.length} of ${ds.paired} paired rows mix a stale and a fresh quote (e.g. ${ds.unsynced.slice(0, 2).join(', ')})` : `all ${ds.paired} rows with a complement pair quotes stamped together`);
+  if (res.world === 'stress') {
+    const b = ds.busy;
+    if (!ds.flowCheck) check('dataset: busy tapes give exact or null trade features', 'WARN', 'build-dataset.js does not export tradeFeatures; skipped');
+    else {
+      const vacuous = !b.exact || !b.nulled;
+      check('dataset: busy tapes give exact or null trade features', b.wrong.length ? 'FAIL' : vacuous ? 'WARN' : 'PASS',
+        b.wrong.length ? `${b.wrong.length} of ${b.rows} rows from cut-short tapes report counts that are neither exact nor null (e.g. ${b.wrong.slice(0, 2).join('; ')})`
+          : `${gen.busyMarkets} busy markets: ${b.exact} rows exact, ${b.nulled} rows null because the tape stops before their window${vacuous ? ' (one kind missing: check not exercised)' : ''}`);
+    }
+  }
+
   const base = hyps.get('baseline-all');
   const baseOk = base && base.status === 'tested' && !base.verdict?.survives && base.oos.roi.estimate < 0;
   check('baseline-all loses after costs (sanity)', baseOk ? 'PASS' : 'FAIL', base ? `${summary(base)}; hurdle ${pct(base.oos?.hurdleRoi)}` : 'baseline-all missing from report');
@@ -272,10 +318,13 @@ function evaluateWorld(res, report, ds, gen, audit, o) {
     const mism = Object.entries(audit.byId).filter(([, a]) => !a.matches || a.error);
     check('truth audit reproduces backtest OOS bets', mism.length ? 'WARN' : 'PASS',
       mism.length ? `${mism.length} hypotheses differ (e.g. ${mism[0][0]}: audit n ${mism[0][1].n}, report n ${hyps.get(mism[0][0])?.oos?.n}); true ROI figures may be off` : `bet counts match for all ${tested.length} tested hypotheses`);
-    if (res.world === 'null') {
+    if (NULL_LIKE.has(res.world)) {
       let worst = null;
       for (const [id, a] of Object.entries(audit.byId)) if (a.trueRoi != null && (!worst || a.trueRoi > worst.v)) worst = { id, v: a.trueRoi };
-      check('truth: no tested rule has +EV (generator sanity)', worst && worst.v < 0 ? 'PASS' : 'FAIL', worst ? `highest true OOS ROI ${pct(worst.v)} (${worst.id})` : 'no priced bets');
+      // In the stress world this is also the leak detector: a rule that read information newer
+      // than its (stale) fill price shows positive true ROI there.
+      const name = res.world === 'null' ? 'truth: no tested rule has +EV (generator sanity)' : 'truth: no tested rule has +EV at its fill price';
+      check(name, worst && worst.v < 0 ? 'PASS' : 'FAIL', worst ? `highest true OOS ROI ${pct(worst.v)} (${worst.id})` : 'no priced bets');
     } else {
       const weak = Object.keys(PLANTED_EDGES).filter((id) => !(truthOf(id)?.trueRoi > 0));
       check('truth: planted rules have +EV (generator sanity)', weak.length ? 'FAIL' : 'PASS',
@@ -283,7 +332,7 @@ function evaluateWorld(res, report, ds, gen, audit, o) {
     }
   }
 
-  if (res.world === 'null') {
+  if (NULL_LIKE.has(res.world)) {
     const s = res.survivors;
     check('no hypothesis SURVIVES', s.length ? 'COUNT' : 'PASS',
       s.length ? `${s.length} false survivor(s): ${s.map((x) => x.id).join(', ')} (counted toward the false-survival rate)` : `0 of ${tested.length} tested`);
@@ -307,15 +356,15 @@ function evaluateWorld(res, report, ds, gen, audit, o) {
 
 function aggregate(results, o) {
   const agg = [];
-  const nulls = results.filter((r) => r.world === 'null' && !r.error);
+  const nulls = results.filter((r) => NULL_LIKE.has(r.world) && !r.error);
   const planted = results.filter((r) => r.world === 'planted' && !r.error);
   if (nulls.length) {
     const withSurv = nulls.filter((r) => r.survivors.length).length;
     const nFalse = nulls.reduce((s, r) => s + r.survivors.length, 0);
     const nTests = nulls.reduce((s, r) => s + r.tested, 0);
     const allowed = Math.floor(o.fdr * nulls.length);
-    agg.push({ name: 'null worlds: false-survival rate', status: withSurv <= allowed ? 'PASS' : 'FAIL',
-      detail: `${withSurv} of ${nulls.length} null worlds had a survivor (${nFalse} of ${nTests} hypothesis tests); allowed <= ${allowed} = floor(q ${o.fdr} x ${nulls.length} worlds)` });
+    agg.push({ name: 'null + stress worlds: false-survival rate', status: withSurv <= allowed ? 'PASS' : 'FAIL',
+      detail: `${withSurv} of ${nulls.length} null/stress worlds had a survivor (${nFalse} of ${nTests} hypothesis tests); allowed <= ${allowed} = floor(q ${o.fdr} x ${nulls.length} worlds)` });
   }
   if (planted.length) {
     const parts = Object.keys(PLANTED_EDGES).map((id) => {
@@ -348,13 +397,17 @@ const EXPLAIN = [
   '  world. The survival rule adds a bootstrap CI above 0 and profit at the stress spread, and true ROI is below 0',
   '  (the cost drag), not at 0, so the realistic rate is far below q. At most floor(q x worlds) null worlds may have a',
   '  survivor: 0 for fewer than 10 seeds. Any null survivor with few seeds points to leakage or a miscalibrated test.',
+  '- Stress worlds keep null prices but add one-sided price gaps, trade flow that reveals moves after a stale quote,',
+  '  and busy in-game tapes cut short by the collector\'s page cap. They count as null worlds above. A survivor, a',
+  '  rule with positive true ROI at its fill price, a stale/fresh quote pair or a trade count that is neither exact nor',
+  '  null means features saw information the fill price did not reflect, or a truncated tape was read as complete.',
   '- Planted worlds hide edges of known size. Their hypotheses must survive every seed, and their mirror images must not.',
   '  The generator\'s true probabilities price every OOS bet: a survivor whose true ROI is <= 0 is a false discovery,',
   '  and the share of those must stay within q. Missing planted edges at small --events usually means too few bets.',
 ];
 
 function printTable(results, agg, o) {
-  const W = { seed: 4, world: 7, name: 44, status: 6 };
+  const W = { seed: 4, world: 7, name: 54, status: 6 };
   const row = (seed, world, name, status, detail) =>
     log(`${String(seed).padStart(W.seed)}  ${String(world).padEnd(W.world)}  ${String(name).padEnd(W.name)}  ${String(status).padEnd(W.status)}  ${detail}`);
   log('');
@@ -395,13 +448,13 @@ async function main() {
   }
   const root = o.workDir ? path.resolve(o.workDir) : fs.mkdtempSync(path.join(os.tmpdir(), 'centisport-selftest-'));
   fs.mkdirSync(root, { recursive: true });
-  log(`events/world ${o.events}, seeds ${o.seeds.join(',')}, bootstrap B ${o.boot}, FDR q ${o.fdr}, jobs ${o.jobs}`);
+  log(`events/world ${o.events}, seeds ${o.seeds.join(',')}, worlds ${o.worlds.join(',')}, bootstrap B ${o.boot}, FDR q ${o.fdr}, jobs ${o.jobs}`);
   log(`work dir ${root}${o.keep ? ' (kept)' : ' (deleted at the end; pass --keep to inspect)'}`);
   if (o.events < 2000) log(`note: ${o.events} events per world is below the ~2500 the planted-edge checks are sized for; missed planted edges may be low power.`);
 
   const api = await loadAuditApi();
   if (api.unavailable) log(`warning: truth audit disabled: ${api.unavailable}`);
-  const tasks = o.seeds.flatMap((seed) => ['null', 'planted'].map((world) => ({ seed, world })));
+  const tasks = o.seeds.flatMap((seed) => o.worlds.map((world) => ({ seed, world })));
   const t0 = Date.now();
   const results = await pool(tasks, o.jobs, async ({ seed, world }) => {
     const r = await runWorld(seed, world, o, root, api);

@@ -9,21 +9,28 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startMockServer } from './mock-server.js';
+import { eventsPage, startMockServer } from './mock-server.js';
 import { cachePathFor, createHttpClient, createLimiter, createRateLimiter, fetchJson, HttpError, parseRetryAfter } from '../lib/http.js';
-import { inferSport, looksLikeGameTime, normalizeMarket, parseTs, readSlugList, resolveWinner } from '../collect.js';
+import { inferSport, isFinalMarket, looksLikeGameTime, normalizeMarket, parseTs, readSlugList, resolveWinner } from '../collect.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const COLLECT = path.join(HERE, '..', 'collect.js');
 const HOUR = 3600;
 const PRE = 78 * HOUR; // collect.js defaults
 const POST = 2 * HOUR;
+// Trades are kept only before kickoff: features never use later ones (lib/tape.js).
+const inTradeWindow = (t, gs) => t >= gs - PRE && t <= gs;
 const FAST = ['--rps', '300', '--concurrency', '8', '--retry-base-ms', '10', '--page-size', '5', '--since', '2025-01-01', '--until', '2025-12-31', '--quiet'];
 
 let server;
 let tmpRoot;
 
 const readJsonl = (file) => readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+// Whether a listing page held only final markets (and so may be served from raw/ on a later run).
+const pageIsFinal = (url) => {
+  const evs = eventsPage(server.fixture, url);
+  return evs.length > 0 && evs.every((ev) => ev.markets.every(isFinalMarket));
+};
 
 function runCollect(args, srv = server) {
   const start = srv.requests.length;
@@ -131,6 +138,21 @@ describe('lib/http.js', () => {
     assert.ok(existsSync(cachePathFor(cacheDir, `${base}/cached`)));
   });
 
+  test('client cache: cacheIf keeps changeable responses (and 404s) out, including entries already on disk', async () => {
+    const cacheDir = path.join(tmpRoot, 'httpcache-if');
+    const client = createHttpClient({ cacheDir, rps: 100 });
+    const stable = (body) => body != null && body.value >= 1000;
+    const first = await client.getJson(`${base}/cached`, { cache: true, cacheIf: stable });
+    assert.ok(!existsSync(cachePathFor(cacheDir, `${base}/cached`)), 'not written');
+    const second = await client.getJson(`${base}/cached`, { cache: true, cacheIf: stable });
+    assert.equal(second.value, first.value + 1, 'fetched again');
+    await client.getJson(`${base}/cached`, { cache: true }); // written without a predicate ...
+    await client.getJson(`${base}/cached`, { cache: true, cacheIf: stable }); // ... but rejected on read
+    assert.equal(client.stats.cacheHits, 0);
+    assert.equal(await client.getJson(`${base}/missing`, { cache: true, allow404: true, cacheIf: (b) => b != null }), null);
+    assert.ok(!existsSync(cachePathFor(cacheDir, `${base}/missing`)), '404 not cached');
+  });
+
   test('limiters bound concurrency and request rate', async () => {
     const limit = createLimiter(3);
     let active = 0;
@@ -175,10 +197,25 @@ describe('collect.js helpers', () => {
   test('resolveWinner requires exactly one final 1', () => {
     assert.deepEqual(resolveWinner('["0","1"]', 2), { winnerIndex: 1 });
     assert.deepEqual(resolveWinner([1, 0], 2), { winnerIndex: 0 });
+    assert.deepEqual(resolveWinner('["1.0","0.000"]', 2), { winnerIndex: 0 });
     assert.deepEqual(resolveWinner('["0.5","0.5"]', 2), { skip: 'voided_50_50' });
     assert.deepEqual(resolveWinner('["0.97","0.03"]', 2), { skip: 'ambiguous_resolution' });
     assert.deepEqual(resolveWinner('["1","1"]', 2), { skip: 'ambiguous_resolution' });
     assert.deepEqual(resolveWinner(null, 2), { skip: 'missing_outcome_prices' });
+    // Review DI-6: Number() would read "", " ", null and false as 0 and true as 1.
+    for (const bad of ['["1",""]', '["1"," "]', [1, null], [true, false], '["", "1"]', ['1', 'zero'], ['1', {}]]) {
+      assert.deepEqual(resolveWinner(bad, 2), { skip: 'ambiguous_resolution' }, JSON.stringify(bad));
+    }
+  });
+
+  test('isFinalMarket: only closed markets with a clean winner or a 50-50 void can be cached', () => {
+    const m = { closed: true, outcomes: '["A","B"]', outcomePrices: '["1","0"]' };
+    assert.equal(isFinalMarket(m), true);
+    assert.equal(isFinalMarket({ ...m, outcomePrices: '["0.5","0.5"]' }), true);
+    assert.equal(isFinalMarket({ ...m, closed: false }), false);
+    assert.equal(isFinalMarket({ ...m, outcomePrices: '["0.62","0.38"]' }), false);
+    assert.equal(isFinalMarket({ ...m, outcomePrices: null }), false);
+    assert.equal(isFinalMarket(null), false);
   });
 
   test('game start never falls back to settlement times', () => {
@@ -246,10 +283,14 @@ describe('collect.js against the mock API (events-tag)', () => {
     expected.duplicate = fx.dupEvent.markets.length;
     assert.deepEqual(s.skipped, Object.fromEntries(Object.entries(expected).sort()));
 
+    // Listing pages whose markets are all final come from raw/; pages holding a market that could
+    // still change (not closed, or not cleanly resolved) are re-read so it is not skipped forever.
     const run1Listing = new Set(run1.requests.filter((r) => r.path === '/gamma/events').map((r) => r.url));
-    const relisted = run2.requests.filter((r) => r.path === '/gamma/events' && run1Listing.has(r.url));
-    assert.deepEqual(relisted, [], 'listing pages from run 1 come from raw/ cache');
-    assert.ok(s.http.cacheHits >= run1Listing.size);
+    const relisted = new Set(run2.requests.filter((r) => r.path === '/gamma/events' && run1Listing.has(r.url)).map((r) => r.url));
+    const changeable = [...run1Listing].filter((u) => !pageIsFinal(u));
+    assert.deepEqual([...relisted].sort(), changeable.sort());
+    assert.ok(s.http.cacheHits >= run1Listing.size - changeable.length);
+    assert.ok(run2.requests.some((r) => r.path === '/gamma/events' && !pageIsFinal(r.url)), 'fixture: some pages hold a changeable market');
 
     const firstRows = readJsonl(marketsFile()).slice(0, 8);
     const oldTokens = new Set(firstRows.flatMap((r) => r.tokenIds));
@@ -313,7 +354,7 @@ describe('collect.js against the mock API (events-tag)', () => {
     const e = fx.byCid.get(fx.tricky.manyTrades);
     const { gs, tokenIds } = e.meta;
     const all = fx.tradesCache.get(e.meta.cid);
-    const want = all.filter((t) => t.timestamp >= gs - PRE && t.timestamp <= gs + POST);
+    const want = all.filter((t) => inTradeWindow(t.timestamp, gs));
     const got = readJsonl(path.join(dataDir, 'trades', `${e.meta.cid}.jsonl`));
     assert.ok(want.length > 500, 'fixture needs more than one page in window');
     assert.equal(got.length, want.length);
@@ -328,6 +369,22 @@ describe('collect.js against the mock API (events-tag)', () => {
     const row = readJsonl(marketsFile()).find((r) => r.conditionId === e.meta.cid);
     assert.equal(row.tradesInfo.n, got.length);
     assert.equal(row.tradesInfo.truncated, false);
+    assert.equal(row.tradesInfo.v, 2);
+    assert.equal(row.tradesInfo.coverageFromT, gs - PRE);
+    assert.deepEqual(JSON.parse(readFileSync(path.join(dataDir, 'trades', `${e.meta.cid}.meta.json`), 'utf8')), row.tradesInfo, 'sidecar matches the record');
+  });
+
+  test('heavy in-game trading does not use up the trade cap (review R1 / DI-1)', () => {
+    const e = fx.byCid.get(fx.tricky.busyInGame);
+    const { gs } = e.meta;
+    const all = fx.tradesCache.get(e.meta.cid);
+    assert.ok(all.filter((t) => t.timestamp > gs).length > 3000, 'fixture: more in-game trades than --max-trades-per-market');
+    const got = readJsonl(path.join(dataDir, 'trades', `${e.meta.cid}.jsonl`));
+    assert.equal(got.length, all.filter((t) => inTradeWindow(t.timestamp, gs)).length, 'every pre-game trade kept');
+    assert.ok(got.every((t) => t.t <= gs), 'no in-game trades stored');
+    const row = readJsonl(marketsFile()).find((r) => r.conditionId === e.meta.cid);
+    assert.equal(row.tradesInfo.truncated, false);
+    assert.equal(row.tradesInfo.stop, 'window_start', 'paged through the live trades to before gs - 78h');
   });
 
   test('injected faults were retried (429 honoring Retry-After, 500, 502)', () => {
@@ -342,13 +399,14 @@ describe('collect.js against the mock API (events-tag)', () => {
     }
   });
 
-  test('run 3 is a no-op with zero network requests', async () => {
+  test('run 3 collects nothing new and only re-reads listing pages that could still change', async () => {
     const run3 = await runCollect([...ARGS(), '--max-markets', '1000']);
     assert.equal(run3.code, 0, run3.stderr);
-    assert.equal(run3.requests.length, 0);
+    const listed = run2.requests.filter((r) => r.path === '/gamma/events').map((r) => r.url);
+    assert.deepEqual(run3.requests.map((r) => r.url).sort(), [...new Set(listed.filter((u) => !pageIsFinal(u)))].sort());
     assert.equal(run3.summary.kept, 0);
     assert.equal(run3.summary.alreadyCollected, okEntries.length);
-    assert.equal(run3.summary.http.requests, 0);
+    assert.equal(run3.summary.trades.backfilled, 0);
   });
 
   test('a torn last line is repaired and --max-markets already met short-circuits', async () => {
@@ -359,7 +417,13 @@ describe('collect.js against the mock API (events-tag)', () => {
     assert.match(r.stderr, /rewriting without them/);
     const rows = readJsonl(marketsFile());
     assert.equal(rows.length, okEntries.length);
-    assert.equal(readJsonl(path.join(dataDir, 'collect-runs.jsonl')).length, 4);
+    // Every run writes "started" before touching markets.jsonl and an end line after it.
+    const lines = readJsonl(path.join(dataDir, 'collect-runs.jsonl'));
+    const runs = new Map();
+    for (const l of lines) runs.set(l.runId, [...(runs.get(l.runId) || []), l.status]);
+    assert.equal(runs.size, 4);
+    for (const st of runs.values()) assert.deepEqual(st, ['started', 'completed']);
+    assert.ok(lines.every((l) => l.synthetic && l.bases.gamma === server.gammaBase));
   });
 });
 
@@ -420,7 +484,7 @@ describe('collect.js other strategies and failures', () => {
       assert.ok(rows.some((m) => m.conditionId === many.meta.cid));
       for (const m of rows) {
         const e = fx.byCid.get(m.conditionId);
-        const want = fx.tradesCache.get(m.conditionId).filter((t) => t.timestamp >= e.meta.gs - PRE && t.timestamp <= e.meta.gs + POST);
+        const want = fx.tradesCache.get(m.conditionId).filter((t) => inTradeWindow(t.timestamp, e.meta.gs));
         assert.equal(readJsonl(path.join(dataDir, 'trades', `${m.conditionId}.jsonl`)).length, want.length, `all windowed trades for ${m.conditionId}`);
         assert.equal(m.tradesInfo.truncated, false);
       }

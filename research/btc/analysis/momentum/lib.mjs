@@ -62,12 +62,36 @@ export function mkTrade({ day, t, side, pUp, win, fee, id, extra }) {
   return { day, t, side, pRef, win: win ? 1 : 0, fee, id, ...(extra || {}) };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Maker (resting limit) simulation. At decision time tDec post a bid for `side` at
+// limit = mid - MAKER_OFFSET. Count it filled only if a LATER snapshot (real time in (tDec, end-10])
+// shows that side's mid <= limit - MAKER_THROUGH, i.e. the market traded through our price.
+// Fill price = limit, no fee. This only fills when price moves against us (adverse selection is
+// built in); the 1/min snapshots cannot see queue position or brief dips -> fill-uncertainty caveat.
+// ---------------------------------------------------------------------------------------------
+export const MAKER_OFFSET = 0.005, MAKER_THROUGH = 0.005;
+export function makerTrade(base, ep, tDec, end) {
+  if (!base) return null;
+  const limit = Math.round((base.pRef - MAKER_OFFSET) * 1000) / 1000;
+  if (limit <= 0.01) return null;
+  const need = limit - MAKER_THROUGH;
+  for (let i = firstIdxAtOrAfter(ep, tDec + 1); i < ep.length; i++) {
+    const [t, pUp] = ep[i];
+    if (t > end - 10) break;
+    const ps = base.side === 'U' ? pUp : 1 - pUp;
+    if (ps <= need + 1e-9) return { ...base, pRef: limit, mk: true, fillDelay: t - tDec };
+  }
+  return null;
+}
+
 export function costOf(pRef, fee, model = HEADLINE, haircut = HAIRCUT) {
   const exec = Math.min(0.995, Math.max(0.005, pRef + haircut));
   return exec + fees.takerFeePerShare(exec, { fee }, model);
 }
 export function pnlOf(t, model = HEADLINE, haircut = HAIRCUT) {
-  const c = costOf(t.pRef, t.fee, model, haircut);
+  // maker fills (t.mk): resting bid filled at t.pRef, no fee, no haircut, rebate ignored (conservative)
+  // observed-fill entries (t.ex = a real taker fill price): cost = fill + 0.2c slippage + fee, no extra haircut
+  const c = t.mk ? t.pRef : t.ex != null ? costOf(t.ex, t.fee, model, 0.002) : costOf(t.pRef, t.fee, model, haircut);
   return { cost: c, pnl: t.win / c - 1, edge: t.win - c };
 }
 export function summarize(trades, model = HEADLINE, haircut = HAIRCUT) {

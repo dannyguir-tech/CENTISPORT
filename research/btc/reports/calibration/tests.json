@@ -13,16 +13,18 @@
    "tests": {
     "flb_skew_pre": {
      "n": 12839,
+     "nSlopeFit": 12839,
+     "slopeAllPricesEps001": 1.5773,
      "priceDispersion": 0.0154,
      "logitIntercept": 0.0003,
      "interceptCI": [
-      -0.026,
-      0.034
+      -0.0323,
+      0.032
      ],
      "logitSlope": 1.5773,
      "slopeCI": [
-      1.1021,
-      2.0394
+      1.0804,
+      2.0974
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0007,
@@ -31,16 +33,18 @@
     },
     "flb_skew_s0": {
      "n": 12921,
+     "nSlopeFit": 12921,
+     "slopeAllPricesEps001": 1.2857,
      "priceDispersion": 0.0203,
      "logitIntercept": 0.0036,
      "interceptCI": [
-      -0.0241,
-      0.0379
+      -0.0273,
+      0.0356
      ],
      "logitSlope": 1.2857,
      "slopeCI": [
-      0.9031,
-      1.6015
+      0.8984,
+      1.62
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0011,
@@ -49,16 +53,18 @@
     },
     "flb_skew_f25": {
      "n": 12861,
+     "nSlopeFit": 12861,
+     "slopeAllPricesEps001": 1.077,
      "priceDispersion": 0.1649,
      "logitIntercept": 0.012,
      "interceptCI": [
-      -0.0184,
-      0.0441
+      -0.021,
+      0.043
      ],
      "logitSlope": 1.077,
      "slopeCI": [
-      1.0253,
-      1.1316
+      1.0221,
+      1.125
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0026,
@@ -67,16 +73,18 @@
     },
     "flb_skew_f50": {
      "n": 12826,
+     "nSlopeFit": 12564,
+     "slopeAllPricesEps001": 1.0296,
      "priceDispersion": 0.2943,
-     "logitIntercept": 0.0049,
+     "logitIntercept": 0.0033,
      "interceptCI": [
-      -0.0319,
-      0.0372
+      -0.0333,
+      0.0376
      ],
-     "logitSlope": 1.0301,
+     "logitSlope": 1.0299,
      "slopeCI": [
-      0.9967,
-      1.0688
+      0.9917,
+      1.0658
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0008,
@@ -85,16 +93,18 @@
     },
     "flb_skew_f75": {
      "n": 12843,
+     "nSlopeFit": 10764,
+     "slopeAllPricesEps001": 1.0338,
      "priceDispersion": 0.3676,
-     "logitIntercept": 0.0407,
+     "logitIntercept": 0.0412,
      "interceptCI": [
-      -0.007,
-      0.0768
+      -0.0006,
+      0.0892
      ],
-     "logitSlope": 1.0417,
+     "logitSlope": 1.0264,
      "slopeCI": [
-      1.014,
-      1.0689
+      0.9896,
+      1.0565
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0045,
@@ -103,18 +113,20 @@
     },
     "flb_skew_f90": {
      "n": 12823,
+     "nSlopeFit": 5443,
+     "slopeAllPricesEps001": 1.048,
      "priceDispersion": 0.4468,
-     "logitIntercept": 0.0342,
+     "logitIntercept": 0.035,
      "interceptCI": [
-      -0.0352,
-      0.0862
+      -0.0316,
+      0.104
      ],
-     "logitSlope": 1.0977,
+     "logitSlope": 0.9978,
      "slopeCI": [
-      1.0651,
-      1.1312
+      0.9546,
+      1.0417
      ],
-     "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
+     "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
      "meanResidUpMinusPrice": 0.0017,
      "residSE": 0.0018,
      "residPtwo": 0.34830698611125444
@@ -124,8 +136,8 @@
      "slopeLate": 1.3878,
      "changeCoef": -0.3584,
      "changeCoefCI": [
-      -0.7971,
-      0.1521
+      -0.803,
+      0.08
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -134,8 +146,8 @@
      "slopeLate": 1.0404,
      "changeCoef": 0.004,
      "changeCoefCI": [
-      -0.0391,
-      0.0453
+      -0.0416,
+      0.0442
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -144,8 +156,8 @@
      "slopeLate": 1.1047,
      "changeCoef": -0.0127,
      "changeCoefCI": [
-      -0.0512,
-      0.0276
+      -0.0639,
+      0.0382
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -180,16 +192,18 @@
    "tests": {
     "flb_skew_pre": {
      "n": 11477,
+     "nSlopeFit": 11477,
+     "slopeAllPricesEps001": 1.1772,
      "priceDispersion": 0.0178,
      "logitIntercept": -0.0117,
      "interceptCI": [
-      -0.0386,
-      0.0268
+      -0.0418,
+      0.023
      ],
      "logitSlope": 1.1772,
      "slopeCI": [
-      0.6798,
-      1.7612
+      0.6305,
+      1.7564
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0029,
@@ -198,16 +212,18 @@
     },
     "flb_skew_s0": {
      "n": 11493,
+     "nSlopeFit": 11493,
+     "slopeAllPricesEps001": 0.8026,
      "priceDispersion": 0.0254,
      "logitIntercept": -0.009,
      "interceptCI": [
-      -0.0363,
-      0.0298
+      -0.0402,
+      0.026
      ],
      "logitSlope": 0.8026,
      "slopeCI": [
-      0.3684,
-      1.23
+      0.3754,
+      1.2298
      ],
      "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
      "meanResidUpMinusPrice": -0.0022,
@@ -216,16 +232,18 @@
     },
     "flb_skew_f25": {
      "n": 11473,
+     "nSlopeFit": 11472,
+     "slopeAllPricesEps001": 1.0638,
      "priceDispersion": 0.1934,
      "logitIntercept": -0.0111,
      "interceptCI": [
-      -0.043,
-      0.0243
+      -0.0444,
+      0.0238
      ],
      "logitSlope": 1.0638,
      "slopeCI": [
-      1.0202,
-      1.1158
+      1.0148,
+      1.1152
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0024,
@@ -234,16 +252,18 @@
     },
     "flb_skew_f50": {
      "n": 11467,
+     "nSlopeFit": 11334,
+     "slopeAllPricesEps001": 1.0675,
      "priceDispersion": 0.2834,
-     "logitIntercept": -0.0251,
+     "logitIntercept": -0.0242,
      "interceptCI": [
-      -0.0604,
-      0.0146
+      -0.0619,
+      0.022
      ],
-     "logitSlope": 1.0677,
+     "logitSlope": 1.0688,
      "slopeCI": [
-      1.0257,
-      1.1127
+      1.0279,
+      1.1187
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0042,
@@ -252,16 +272,18 @@
     },
     "flb_skew_f75": {
      "n": 11474,
+     "nSlopeFit": 9614,
+     "slopeAllPricesEps001": 1.0341,
      "priceDispersion": 0.3656,
-     "logitIntercept": -0.0218,
+     "logitIntercept": -0.023,
      "interceptCI": [
-      -0.0662,
-      0.0389
+      -0.0774,
+      0.0341
      ],
-     "logitSlope": 1.0412,
+     "logitSlope": 1.0276,
      "slopeCI": [
-      1.0035,
-      1.0741
+      0.9875,
+      1.0692
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0025,
@@ -270,16 +292,18 @@
     },
     "flb_skew_f90": {
      "n": 11484,
+     "nSlopeFit": 6453,
+     "slopeAllPricesEps001": 1.0138,
      "priceDispersion": 0.4219,
-     "logitIntercept": -0.0229,
+     "logitIntercept": -0.0239,
      "interceptCI": [
-      -0.0797,
-      0.0571
+      -0.0884,
+      0.0518
      ],
-     "logitSlope": 1.0531,
+     "logitSlope": 1.0091,
      "slopeCI": [
-      1.0194,
-      1.0835
+      0.9611,
+      1.0522
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0018,
@@ -291,8 +315,8 @@
      "slopeLate": 0.9101,
      "changeCoef": 0.1582,
      "changeCoefCI": [
-      -0.272,
-      0.6121
+      -0.3395,
+      0.6361
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -301,8 +325,8 @@
      "slopeLate": 1.0421,
      "changeCoef": -0.0015,
      "changeCoefCI": [
-      -0.0575,
-      0.0561
+      -0.0612,
+      0.0521
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -311,8 +335,8 @@
      "slopeLate": 1.0374,
      "changeCoef": 0.0342,
      "changeCoefCI": [
-      -0.0168,
-      0.0925
+      -0.0244,
+      0.1029
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -347,16 +371,18 @@
    "tests": {
     "flb_skew_pre": {
      "n": 8729,
+     "nSlopeFit": 8729,
+     "slopeAllPricesEps001": 1.4938,
      "priceDispersion": 0.0169,
      "logitIntercept": 0.0014,
      "interceptCI": [
-      -0.0392,
-      0.0455
+      -0.0388,
+      0.0424
      ],
      "logitSlope": 1.4938,
      "slopeCI": [
-      0.9473,
-      1.9982
+      0.9809,
+      2.0775
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0004,
@@ -365,16 +391,18 @@
     },
     "flb_skew_s0": {
      "n": 8735,
+     "nSlopeFit": 8735,
+     "slopeAllPricesEps001": 1.0244,
      "priceDispersion": 0.0308,
      "logitIntercept": 0.0029,
      "interceptCI": [
-      -0.0387,
-      0.0483
+      -0.0393,
+      0.0446
      ],
      "logitSlope": 1.0244,
      "slopeCI": [
-      0.6749,
-      1.3867
+      0.7027,
+      1.3372
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0007,
@@ -383,16 +411,18 @@
     },
     "flb_skew_f25": {
      "n": 8727,
+     "nSlopeFit": 8725,
+     "slopeAllPricesEps001": 1.0495,
      "priceDispersion": 0.1904,
      "logitIntercept": -0.0115,
      "interceptCI": [
-      -0.0528,
-      0.0361
+      -0.0531,
+      0.0335
      ],
-     "logitSlope": 1.0495,
+     "logitSlope": 1.0494,
      "slopeCI": [
-      0.9959,
-      1.1269
+      0.9957,
+      1.1127
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0023,
@@ -401,16 +431,18 @@
     },
     "flb_skew_f50": {
      "n": 8729,
+     "nSlopeFit": 8670,
+     "slopeAllPricesEps001": 1.0525,
      "priceDispersion": 0.2738,
      "logitIntercept": -0.0039,
      "interceptCI": [
-      -0.0589,
-      0.0386
+      -0.0552,
+      0.0424
      ],
-     "logitSlope": 1.0525,
+     "logitSlope": 1.0508,
      "slopeCI": [
       1.005,
-      1.1001
+      1.0957
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0006,
@@ -419,16 +451,18 @@
     },
     "flb_skew_f75": {
      "n": 8733,
+     "nSlopeFit": 7623,
+     "slopeAllPricesEps001": 1.0942,
      "priceDispersion": 0.361,
-     "logitIntercept": 0.01,
+     "logitIntercept": 0.0099,
      "interceptCI": [
-      -0.0424,
-      0.0692
+      -0.0473,
+      0.0699
      ],
-     "logitSlope": 1.0972,
+     "logitSlope": 1.0845,
      "slopeCI": [
-      1.0441,
-      1.1333
+      1.0388,
+      1.1302
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0011,
@@ -437,16 +471,18 @@
     },
     "flb_skew_f90": {
      "n": 8737,
+     "nSlopeFit": 5025,
+     "slopeAllPricesEps001": 1.0773,
      "priceDispersion": 0.4202,
-     "logitIntercept": 0.0034,
+     "logitIntercept": -0.0032,
      "interceptCI": [
-      -0.0774,
-      0.0762
+      -0.0848,
+      0.0853
      ],
-     "logitSlope": 1.1101,
+     "logitSlope": 1.0782,
      "slopeCI": [
-      1.0683,
-      1.1629
+      1.0268,
+      1.1346
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0001,
@@ -458,8 +494,8 @@
      "slopeLate": 0.9363,
      "changeCoef": 0.1185,
      "changeCoefCI": [
-      -0.0825,
-      0.5041
+      -0.2072,
+      0.4728
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -468,8 +504,8 @@
      "slopeLate": 1.0938,
      "changeCoef": 0.0053,
      "changeCoefCI": [
-      -0.0532,
-      0.0619
+      -0.0633,
+      0.0787
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -478,8 +514,8 @@
      "slopeLate": 1.099,
      "changeCoef": 0.0252,
      "changeCoefCI": [
-      -0.0292,
-      0.1173
+      -0.0351,
+      0.0954
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -514,16 +550,18 @@
    "tests": {
     "flb_skew_pre": {
      "n": 2190,
+     "nSlopeFit": 2190,
+     "slopeAllPricesEps001": -0.4198,
      "priceDispersion": 0.0094,
      "logitIntercept": 0.0069,
      "interceptCI": [
-      -0.0786,
-      0.0811
+      -0.0657,
+      0.077
      ],
      "logitSlope": -0.4198,
      "slopeCI": [
-      -1.9438,
-      1.7355
+      -2.5142,
+      1.9807
      ],
      "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
      "meanResidUpMinusPrice": 0.0005,
@@ -532,16 +570,18 @@
     },
     "flb_skew_s0": {
      "n": 2190,
+     "nSlopeFit": 2190,
+     "slopeAllPricesEps001": 1.4592,
      "priceDispersion": 0.0228,
      "logitIntercept": 0.0057,
      "interceptCI": [
-      -0.0862,
-      0.0842
+      -0.0696,
+      0.0782
      ],
      "logitSlope": 1.4592,
      "slopeCI": [
-      0.5068,
-      2.3018
+      0.6188,
+      2.2908
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0016,
@@ -550,16 +590,18 @@
     },
     "flb_skew_f25": {
      "n": 2192,
+     "nSlopeFit": 2192,
+     "slopeAllPricesEps001": 1.0626,
      "priceDispersion": 0.1789,
      "logitIntercept": -0.046,
      "interceptCI": [
-      -0.1274,
-      0.0453
+      -0.1186,
+      0.0341
      ],
      "logitSlope": 1.0626,
      "slopeCI": [
       0.9576,
-      1.2081
+      1.1987
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0094,
@@ -568,16 +610,18 @@
     },
     "flb_skew_f50": {
      "n": 2194,
+     "nSlopeFit": 2190,
+     "slopeAllPricesEps001": 1.0677,
      "priceDispersion": 0.2579,
      "logitIntercept": -0.0338,
      "interceptCI": [
-      -0.1212,
-      0.0586
+      -0.1219,
+      0.0472
      ],
-     "logitSlope": 1.0677,
+     "logitSlope": 1.0672,
      "slopeCI": [
-      0.9991,
-      1.1982
+      0.9878,
+      1.156
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0058,
@@ -586,16 +630,18 @@
     },
     "flb_skew_f75": {
      "n": 2193,
+     "nSlopeFit": 2028,
+     "slopeAllPricesEps001": 1.1085,
      "priceDispersion": 0.3429,
-     "logitIntercept": -0.0102,
+     "logitIntercept": -0.0027,
      "interceptCI": [
-      -0.1269,
-      0.1272
+      -0.1203,
+      0.1119
      ],
-     "logitSlope": 1.1122,
+     "logitSlope": 1.1198,
      "slopeCI": [
-      1.0348,
-      1.2102
+      1.044,
+      1.2143
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0014,
@@ -604,16 +650,18 @@
     },
     "flb_skew_f90": {
      "n": 2192,
+     "nSlopeFit": 1448,
+     "slopeAllPricesEps001": 1.1757,
      "priceDispersion": 0.4087,
-     "logitIntercept": -0.0023,
+     "logitIntercept": 0.0253,
      "interceptCI": [
-      -0.1556,
-      0.1287
+      -0.1257,
+      0.1946
      ],
-     "logitSlope": 1.1949,
+     "logitSlope": 1.2359,
      "slopeCI": [
-      1.0786,
-      1.3328
+      1.1297,
+      1.353
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": -0.0007,
@@ -625,8 +673,8 @@
      "slopeLate": 2.1404,
      "changeCoef": -1.0771,
      "changeCoefCI": [
-      -2.0507,
-      -0.0693
+      -2.0199,
+      -0.0571
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -635,8 +683,8 @@
      "slopeLate": 1.1007,
      "changeCoef": 0.0197,
      "changeCoefCI": [
-      -0.0897,
-      0.17
+      -0.1212,
+      0.1647
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -645,8 +693,8 @@
      "slopeLate": 1.1484,
      "changeCoef": 0.104,
      "changeCoefCI": [
-      -0.0525,
-      0.2541
+      -0.0193,
+      0.2591
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -681,16 +729,18 @@
    "tests": {
     "flb_skew_pre": {
      "n": 521,
+     "nSlopeFit": 521,
+     "slopeAllPricesEps001": -0.4866,
      "priceDispersion": 0.0097,
      "logitIntercept": 0.0803,
      "interceptCI": [
-      -0.1687,
-      0.3027
+      -0.1263,
+      0.2726
      ],
      "logitSlope": -0.4866,
      "slopeCI": [
-      -4.7716,
-      4.3169
+      -4.6772,
+      4.4278
      ],
      "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
      "meanResidUpMinusPrice": 0.0145,
@@ -699,16 +749,18 @@
     },
     "flb_skew_s0": {
      "n": 524,
+     "nSlopeFit": 524,
+     "slopeAllPricesEps001": 0.521,
      "priceDispersion": 0.0274,
      "logitIntercept": 0.0608,
      "interceptCI": [
-      -0.0895,
-      0.2036
+      -0.0954,
+      0.2388
      ],
      "logitSlope": 0.521,
      "slopeCI": [
-      -1.167,
-      2.2943
+      -1.0352,
+      2.0579
      ],
      "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
      "meanResidUpMinusPrice": 0.0133,
@@ -717,15 +769,17 @@
     },
     "flb_skew_f25": {
      "n": 525,
+     "nSlopeFit": 525,
+     "slopeAllPricesEps001": 0.9181,
      "priceDispersion": 0.1782,
      "logitIntercept": 0.0161,
      "interceptCI": [
-      -0.1334,
-      0.1687
+      -0.1607,
+      0.1754
      ],
      "logitSlope": 0.9181,
      "slopeCI": [
-      0.7087,
+      0.701,
       1.2148
      ],
      "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
@@ -735,16 +789,18 @@
     },
     "flb_skew_f50": {
      "n": 527,
+     "nSlopeFit": 524,
+     "slopeAllPricesEps001": 1.0167,
      "priceDispersion": 0.2569,
      "logitIntercept": 0.0167,
      "interceptCI": [
-      -0.1602,
-      0.2281
+      -0.1815,
+      0.2625
      ],
-     "logitSlope": 1.0168,
+     "logitSlope": 1.0152,
      "slopeCI": [
-      0.8632,
-      1.2951
+      0.8475,
+      1.2375
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0033,
@@ -753,16 +809,18 @@
     },
     "flb_skew_f75": {
      "n": 527,
+     "nSlopeFit": 500,
+     "slopeAllPricesEps001": 1.0386,
      "priceDispersion": 0.3257,
-     "logitIntercept": 0.0029,
+     "logitIntercept": -0.0135,
      "interceptCI": [
-      -0.1918,
-      0.2137
+      -0.2316,
+      0.1698
      ],
-     "logitSlope": 1.0391,
+     "logitSlope": 1.0679,
      "slopeCI": [
-      0.8714,
-      1.2547
+      0.9072,
+      1.2479
      ],
      "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
      "meanResidUpMinusPrice": 0.0009,
@@ -771,18 +829,20 @@
     },
     "flb_skew_f90": {
      "n": 528,
+     "nSlopeFit": 429,
+     "slopeAllPricesEps001": 1.0167,
      "priceDispersion": 0.374,
-     "logitIntercept": 0.0771,
+     "logitIntercept": 0.0805,
      "interceptCI": [
-      -0.1604,
-      0.3084
+      -0.1769,
+      0.3496
      ],
-     "logitSlope": 1.023,
+     "logitSlope": 0.9817,
      "slopeCI": [
-      0.8844,
-      1.2147
+      0.8442,
+      1.1992
      ],
-     "slopeInterp": "slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)",
+     "slopeInterp": "slope<1: prices more extreme than outcomes (favourites overpriced)",
      "meanResidUpMinusPrice": 0.0086,
      "residSE": 0.0144,
      "residPtwo": 0.5522940365473392
@@ -792,8 +852,8 @@
      "slopeLate": 0.9537,
      "changeCoef": 0.0588,
      "changeCoefCI": [
-      -2.3329,
-      1.5733
+      -1.7526,
+      2.2313
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -802,8 +862,8 @@
      "slopeLate": 0.9718,
      "changeCoef": 0.1411,
      "changeCoefCI": [
-      -0.1858,
-      0.4534
+      -0.1936,
+      0.4808
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -812,8 +872,8 @@
      "slopeLate": 1.026,
      "changeCoef": -0.0144,
      "changeCoefCI": [
-      -0.3177,
-      0.2512
+      -0.3197,
+      0.2859
      ],
      "interp": "changeCoef>0: under-reaction (moves continue beyond the price); <0: over-reaction (moves partly revert)"
     },
@@ -849,8 +909,8 @@
      "coefMarket": 0.9906,
      "coefFair": 0.0856,
      "coefFairCI": [
-      -0.0114,
-      0.2053
+      -0.015,
+      0.2022
      ],
      "corrMarketFair": 0.9287,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -860,8 +920,8 @@
      "coefMarket": 1.0279,
      "coefFair": -0.0048,
      "coefFairCI": [
-      -0.1304,
-      0.0967
+      -0.1157,
+      0.1072
      ],
      "corrMarketFair": 0.9549,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -880,8 +940,8 @@
      "coefMarket": 1.2864,
      "coefFair": -0.203,
      "coefFairCI": [
-      -0.4502,
-      0.1835
+      -0.592,
+      0.1354
      ],
      "corrMarketFair": 0.9416,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -891,8 +951,8 @@
      "coefMarket": 0.8087,
      "coefFair": 0.2262,
      "coefFairCI": [
-      -0.0233,
-      0.4101
+      0.0047,
+      0.4201
      ],
      "corrMarketFair": 0.9576,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -902,8 +962,8 @@
      "coefMarket": 0.9609,
      "coefFair": 0.1408,
      "coefFairCI": [
-      -0.2091,
-      0.3295
+      -0.1584,
+      0.3928
      ],
      "corrMarketFair": 0.9772,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -913,8 +973,8 @@
      "coefMarket": 0.9796,
      "coefFair": 0.1368,
      "coefFairCI": [
-      -0.0425,
-      0.3692
+      -0.0988,
+      0.3815
      ],
      "corrMarketFair": 0.9777,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -933,8 +993,8 @@
      "coefMarket": 1.2491,
      "coefFair": 0.0339,
      "coefFairCI": [
-      -0.7446,
-      0.7041
+      -0.7864,
+      0.9571
      ],
      "corrMarketFair": 0.9614,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -944,8 +1004,8 @@
      "coefMarket": 1.0031,
      "coefFair": -0.0144,
      "coefFairCI": [
-      -0.5624,
-      0.8862
+      -0.5666,
+      0.8879
      ],
      "corrMarketFair": 0.9721,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -955,8 +1015,8 @@
      "coefMarket": 0.5927,
      "coefFair": 0.4409,
      "coefFairCI": [
-      -0.4359,
-      1.1005
+      -0.329,
+      1.1693
      ],
      "corrMarketFair": 0.9874,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -966,8 +1026,8 @@
      "coefMarket": 0.7329,
      "coefFair": 0.7072,
      "coefFairCI": [
-      -0.2584,
-      2.3022
+      -0.5231,
+      1.8459
      ],
      "corrMarketFair": 0.9927,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -986,8 +1046,8 @@
      "coefMarket": 3.0396,
      "coefFair": -0.7224,
      "coefFairCI": [
-      -2.5719,
-      1.6225
+      -2.5152,
+      2.9452
      ],
      "corrMarketFair": 0.9017,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -997,8 +1057,8 @@
      "coefMarket": 0.9578,
      "coefFair": 0.3495,
      "coefFairCI": [
-      -1.0703,
-      3.8669
+      -0.8027,
+      3.5941
      ],
      "corrMarketFair": 0.9496,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -1008,8 +1068,8 @@
      "coefMarket": -0.1243,
      "coefFair": 0.8429,
      "coefFairCI": [
-      -0.1964,
-      2.2192
+      -0.9564,
+      2.4144
      ],
      "corrMarketFair": 0.9838,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -1019,8 +1079,8 @@
      "coefMarket": 0.9933,
      "coefFair": -0.0767,
      "coefFairCI": [
-      -2.0402,
-      1.3243
+      -2.1015,
+      1.8635
      ],
      "corrMarketFair": 0.9783,
      "interp": "coefFair>0 with CI excluding 0: market under-reacts to the Chainlink move known at the mark"
@@ -1030,19 +1090,8 @@
  },
  "calibrationBinTests": {
   "m": 216,
-  "nSig": 4,
+  "nSig": 1,
   "significant": [
-   {
-    "tf": "1h",
-    "dk": "f50",
-    "lo": 0.98,
-    "hi": 1,
-    "n": 62,
-    "resid": 0.0144,
-    "p": 0,
-    "q": 0,
-    "sig": true
-   },
    {
     "tf": "5m",
     "dk": "f90",
@@ -1050,30 +1099,8 @@
     "hi": 1,
     "n": 7385,
     "resid": 0.0033,
-    "p": 0.000001169304873371857,
-    "q": 0.00012628492632416055,
-    "sig": true
-   },
-   {
-    "tf": "4h",
-    "dk": "f90",
-    "lo": 0.95,
-    "hi": 0.98,
-    "n": 372,
-    "resid": 0.0229,
-    "p": 0.000013872914464752029,
-    "q": 0.000998849841462146,
-    "sig": true
-   },
-   {
-    "tf": "1h",
-    "dk": "f75",
-    "lo": 0.98,
-    "hi": 1,
-    "n": 1129,
-    "resid": 0.0068,
-    "p": 0.0006179277678337591,
-    "q": 0.03336809946302299,
+    "p": 0.000029978549429324885,
+    "q": 0.006475366676734175,
     "sig": true
    }
   ]

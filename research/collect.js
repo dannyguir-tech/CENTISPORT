@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // Collects RESOLVED Polymarket sports markets plus price history (and optionally trades) around
 // game start into a research data dir. Safe to re-run: markets already in markets.jsonl and
-// price/trade files already on disk are skipped, and listing pages are served from raw/ cache.
-import { createReadStream, createWriteStream, existsSync } from 'node:fs';
+// price/trade files already on disk are skipped, and discovery responses whose markets are all
+// final are served from the raw/ cache.
+import { randomUUID } from 'node:crypto';
+import { appendFileSync, createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { appendFile, mkdir, open, readFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHttpClient, createLimiter, HttpError, writeFileAtomic } from './lib/http.js';
+import { createTape, TAPE_VERSION } from './lib/tape.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HOUR = 3600;
@@ -26,9 +29,11 @@ const HELP = `Usage: node research/collect.js [options]
 Discovers resolved sports markets and writes, under --data-dir:
   markets.jsonl               one resolved market per line (deduped by conditionId)
   prices/<tokenId>.json       { tokenId, points:[{t,p}] } for [gameStart - pre-hours, gameStart + post-hours]
-  trades/<conditionId>.jsonl  trades in the same window (with --trades)
-  raw/<sha1(url)>.json        response cache for discovery requests (resume without re-downloading)
-  collect-runs.jsonl          one provenance line per run (args, API bases, summary)
+  trades/<conditionId>.jsonl  pre-game trades in [gameStart - pre-hours, gameStart] (with --trades)
+  trades/<conditionId>.meta.json  how far back that tape is complete (also in markets.jsonl tradesInfo)
+  raw/<sha1(url)>.json        response cache for discovery requests whose markets are all final
+  collect-runs.jsonl          provenance: a "started" line before any market is written, then a
+                              completed / failed / interrupted line (args, API bases, summary)
 
 Options:
   --data-dir DIR              default research/data
@@ -39,8 +44,10 @@ Options:
   --since YYYY-MM-DD          keep games starting on/after this date (UTC)
   --until YYYY-MM-DD          keep games starting on/before this date (UTC)
   --max-markets N             stop once markets.jsonl holds N markets (default 3000)
-  --trades                    also fetch trades from data-api
-  --max-trades-per-market N   default 3000 (newest kept when truncated; see tradesInfo)
+  --trades                    also fetch trades from data-api; markets already in markets.jsonl
+                              without a current trade tape are backfilled first
+  --max-trades-per-market N   default 3000 pre-game trades; paging stops there (tradesInfo.coverageFromT
+                              records how far back the tape is complete; in-game trades never count)
   --max-trade-pages N         default 30 pages of ${TRADES_PAGE}
   --concurrency N             parallel requests (default 4)
   --rps N                     requests per second cap (default 4)
@@ -237,16 +244,40 @@ export function tagList(...lists) {
   return out;
 }
 
+// Number() would turn "", " ", null and false into 0 and true into 1, which lets a malformed or
+// partly missing price array pass as a clean resolution.
+const NUMERIC_RE = /^\s*-?\d+(\.\d+)?([eE][-+]?\d+)?\s*$/;
+const strictNumber = (v) => (typeof v === 'number' ? v : typeof v === 'string' && NUMERIC_RE.test(v) ? Number(v) : NaN);
+
 export function resolveWinner(outcomePrices, n) {
   const arr = parseJsonArray(outcomePrices);
   if (!arr || arr.length !== n) return { skip: 'missing_outcome_prices' };
-  const p = arr.map(Number);
+  const p = arr.map(strictNumber);
   if (p.some((x) => !Number.isFinite(x))) return { skip: 'ambiguous_resolution' };
   const ones = p.flatMap((x, i) => (Math.abs(x - 1) < 1e-9 ? [i] : []));
   if (ones.length === 1 && p.every((x, i) => i === ones[0] || Math.abs(x) < 1e-6)) return { winnerIndex: ones[0] };
   if (p.every((x) => Math.abs(x - 1 / n) < 1e-6)) return { skip: 'voided_50_50' };
   return { skip: 'ambiguous_resolution' };
 }
+
+// A market that can no longer change: closed with a clean winner or a 50-50 void. Discovery
+// responses are cached only when every market in them is final; otherwise a market fetched while
+// open (or before its outcomePrices settled) would be replayed from raw/ and skipped forever.
+export function isFinalMarket(m) {
+  if (!m || typeof m !== 'object' || bool(m.closed) !== true) return false;
+  const outcomes = parseJsonArray(m.outcomes);
+  const res = resolveWinner(m.outcomePrices, outcomes ? outcomes.length : -1);
+  return res.winnerIndex != null || res.skip === 'voided_50_50';
+}
+
+const eventIsFinal = (ev) => ev != null && typeof ev === 'object' && (!Array.isArray(ev.markets) || ev.markets.every(isFinalMarket));
+// Empty listing pages are never cached either: more items may appear at that offset later.
+const listingIsFinal = (itemIsFinal) => (body) => {
+  const items = Array.isArray(body) ? body : body && Array.isArray(body.data) ? body.data : null;
+  return items != null && items.length > 0 && items.every(itemIsFinal);
+};
+const finalEventsPage = listingIsFinal(eventIsFinal);
+const finalMarketsPage = listingIsFinal(isFinalMarket);
 
 const GAME_START_FIELDS = [
   ['market.gameStartTime', (m) => m.gameStartTime],
@@ -409,14 +440,14 @@ const itemKey = (it) => (it && (it.id ?? it.conditionId ?? it.slug)) ?? JSON.str
 
 // Advances by the number of items actually returned and stops on an empty page, so a server-side
 // cap on `limit` below --page-size can't silently end discovery after the first page.
-async function* pagedList(ctx, base, endpoint, params, label) {
+async function* pagedList(ctx, base, endpoint, params, label, cacheIf) {
   const { pageSize, maxPages } = ctx.opts;
   let offset = 0;
   let prevFirst = null;
   for (let page = 0; page < maxPages; page++) {
     const qs = new URLSearchParams({ ...params, limit: String(pageSize), offset: String(offset) });
     const url = `${base}${endpoint}?${qs}`;
-    const items = asArray(await ctx.http.getJson(url, { cache: ctx.cache }), url);
+    const items = asArray(await ctx.http.getJson(url, { cache: ctx.cache, cacheIf }), url);
     ctx.stats.discovery.pages++;
     if (!items.length) return;
     const first = itemKey(items[0]);
@@ -441,7 +472,7 @@ async function* discoverEvents(ctx, filters) {
   let withMarkets = 0;
   for (const f of filters) {
     let n = 0;
-    for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', { ...listingParams(ctx), ...f.params }, f.label)) {
+    for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', { ...listingParams(ctx), ...f.params }, f.label, finalEventsPage)) {
       n += items.length;
       ctx.stats.discovery.events += items.length;
       const pairs = [];
@@ -463,7 +494,7 @@ async function* discoverMarkets(ctx) {
   let total = 0;
   for (const f of tagFilters(ctx.opts.tag)) {
     let first = true;
-    for await (const { items, url } of pagedList(ctx, ctx.bases.gamma, '/markets', { ...listingParams(ctx), ...f.params }, f.label)) {
+    for await (const { items, url } of pagedList(ctx, ctx.bases.gamma, '/markets', { ...listingParams(ctx), ...f.params }, f.label, finalMarketsPage)) {
       if (first && items.length) {
         const sporty = items.some((m) => m && (m.gameStartTime || m.sportsMarketType || inferSport(m.events?.[0], m, tagList(m.events?.[0]?.tags, m.tags))));
         if (!sporty) {
@@ -479,12 +510,13 @@ async function* discoverMarkets(ctx) {
   if (total === 0) throw new CollectError(noEventsHelp(ctx, `--strategy markets --tag ${ctx.opts.tag}`));
 }
 
+// 404s are not cached (cacheIf rejects a null body): a slug may simply not be live yet.
 async function fetchEventBySlug(ctx, slug) {
   const enc = encodeURIComponent(slug);
-  const direct = await ctx.http.getJson(`${ctx.bases.gamma}/events/slug/${enc}`, { cache: ctx.cache, allow404: true });
+  const direct = await ctx.http.getJson(`${ctx.bases.gamma}/events/slug/${enc}`, { cache: ctx.cache, allow404: true, cacheIf: eventIsFinal });
   if (direct && Array.isArray(direct.markets) && direct.markets.length) return direct;
   const url = `${ctx.bases.gamma}/events?slug=${enc}`;
-  const listed = await ctx.http.getJson(url, { cache: ctx.cache, allow404: true });
+  const listed = await ctx.http.getJson(url, { cache: ctx.cache, allow404: true, cacheIf: finalEventsPage });
   const ev = listed == null ? null : asArray(listed, url)[0];
   return ev && Array.isArray(ev.markets) && ev.markets.length ? ev : null;
 }
@@ -580,38 +612,31 @@ async function loadOrFetchPrices(ctx, tokenId, a, b) {
   return points;
 }
 
-async function tradesInfoFromFile(file) {
-  let n = 0;
-  let oldestT = null;
-  let newestT = null;
-  const rl = readline.createInterface({ input: createReadStream(file, 'utf8'), crlfDelay: Infinity });
-  for await (const line of rl) {
-    if (!line.trim()) continue;
-    const t = JSON.parse(line).t;
-    n++;
-    if (oldestT == null || t < oldestT) oldestT = t;
-    if (newestT == null || t > newestT) newestT = t;
-  }
-  return { n, truncated: null, oldestT, newestT };
-}
+const tapeFiles = (ctx, conditionId) => {
+  const base = path.join(ctx.dirs.trades, conditionId);
+  return { trades: `${base}.jsonl`, meta: `${base}.meta.json` };
+};
 
-async function loadOrFetchTrades(ctx, record, a, b) {
-  const file = path.join(ctx.dirs.trades, `${record.conditionId}.jsonl`);
-  if (existsSync(file)) {
-    ctx.stats.trades.fromDisk++;
-    return tradesInfoFromFile(file);
+// Trades in [a, startTs] with coverage info. A tape on disk is reused only with its v2 sidecar;
+// older tapes kept in-game trades and lost their coverage on resume, so they are fetched again.
+async function loadOrFetchTrades(ctx, record, a, startTs) {
+  const files = tapeFiles(ctx, record.conditionId);
+  if (existsSync(files.trades)) {
+    const meta = await readJsonIfExists(files.meta);
+    if (meta && meta.v === TAPE_VERSION && meta.fromT === a && meta.toT === startTs) {
+      ctx.stats.trades.fromDisk++;
+      return meta;
+    }
   }
   const { maxTradesPerMarket, maxTradePages } = ctx.opts;
-  const tokens = new Set(record.tokenIds);
-  const seen = new Set();
-  const kept = [];
-  let truncated = false;
+  const tape = createTape({ conditionId: record.conditionId, tokenIds: record.tokenIds, fromT: a, toT: startTs, maxTrades: maxTradesPerMarket, normalize: normalizeTrade });
+  let stop = null;
   let offset = 0;
   let probing = false;
   let shortLen = 0;
-  for (let page = 0; ; page++) {
+  for (let page = 0; !stop; page++) {
     if (page >= maxTradePages) {
-      truncated = true;
+      stop = 'max_pages';
       break;
     }
     const url = `${ctx.bases.data}/trades?market=${encodeURIComponent(record.conditionId)}&limit=${TRADES_PAGE}&offset=${offset}`;
@@ -619,65 +644,56 @@ async function loadOrFetchTrades(ctx, record, a, b) {
     try {
       body = await ctx.http.getJson(url, { allow404: true });
     } catch (err) {
-      // data-api caps deep offsets with a 400; keep what we have and flag it.
+      // data-api caps deep offsets with a 400; keep what we have and record the coverage.
       if (err instanceof HttpError && err.status === 400 && page > 0) {
-        truncated = true;
+        stop = 'deep_offset';
         break;
       }
       throw err;
     }
-    if (body == null) break;
+    if (body == null) {
+      stop = 'end_of_tape';
+      break;
+    }
     const rows = asArray(body, url);
     if (probing) {
       probing = false;
       if (!rows.length) {
         // The short page really was the last one, so the server's cap is at least that long.
         ctx.tradesCapAtLeast = Math.max(ctx.tradesCapAtLeast, shortLen);
+        stop = 'end_of_tape';
         break;
       }
       // A short page was followed by more rows: the server caps `limit` below what we asked for.
       ctx.tradesPageCap = Math.min(ctx.tradesPageCap ?? Infinity, shortLen);
       ctx.warn(`data-api /trades returns at most ${ctx.tradesPageCap} rows per page; paging by that`);
     }
-    let desc = true;
-    let prevT = Infinity;
-    let minT = Infinity;
-    for (const raw of rows) {
-      // Guard against a filter-ignoring API returning other markets' trades.
-      if (raw?.conditionId && raw.conditionId !== record.conditionId) continue;
-      const tr = normalizeTrade(raw);
-      if (!tr || !tokens.has(tr.asset)) continue;
-      if (tr.t > prevT) desc = false;
-      prevT = tr.t;
-      minT = Math.min(minT, tr.t);
-      const key = raw.transactionHash ? `${raw.transactionHash}|${tr.asset}|${tr.side}|${tr.size}|${tr.price}|${tr.wallet}` : null;
-      if (key && seen.has(key)) continue;
-      if (key) seen.add(key);
-      if (tr.t >= a && tr.t <= b) kept.push(tr);
-    }
-    if (kept.length >= maxTradesPerMarket) {
-      truncated = kept.length > maxTradesPerMarket || rows.length >= (ctx.tradesPageCap ?? TRADES_PAGE);
-      kept.length = Math.min(kept.length, maxTradesPerMarket);
+    const state = tape.addPage(rows);
+    if (state !== 'more') {
+      stop = state;
       break;
     }
     offset += rows.length;
-    if (desc && minT < a) break; // newest-first and already past the window start
-    if (!rows.length) break;
-    if (rows.length >= TRADES_PAGE) ctx.tradesPageCap ??= TRADES_PAGE;
+    if (!rows.length) stop = 'end_of_tape';
+    else if (rows.length >= TRADES_PAGE) ctx.tradesPageCap ??= TRADES_PAGE;
     else if (ctx.tradesPageCap == null) {
       // Short page with the cap unknown: the last page, or a server-side cap. Shorter than a page
       // already proven complete means last page; otherwise one probe of the next offset decides.
-      if (rows.length < ctx.tradesCapAtLeast) break;
-      shortLen = rows.length;
-      probing = true;
-    } else if (rows.length < ctx.tradesPageCap) break;
+      if (rows.length < ctx.tradesCapAtLeast) stop = 'end_of_tape';
+      else {
+        shortLen = rows.length;
+        probing = true;
+      }
+    } else if (rows.length < ctx.tradesPageCap) stop = 'end_of_tape';
   }
-  kept.sort((x, y) => x.t - y.t);
-  await writeFileAtomic(file, kept.map((t) => `${JSON.stringify(t)}\n`).join(''));
+  const { trades, info } = tape.finish(stop);
+  // Tape first, then its sidecar: a crash in between leaves a tape without meta, which is refetched.
+  await writeFileAtomic(files.trades, trades.map((t) => `${JSON.stringify(t)}\n`).join(''));
+  await writeFileAtomic(files.meta, JSON.stringify(info));
   ctx.stats.trades.fetched++;
-  ctx.stats.trades.rows += kept.length;
-  if (truncated) ctx.stats.trades.truncated++;
-  return { n: kept.length, truncated, oldestT: kept.length ? kept[0].t : null, newestT: kept.length ? kept[kept.length - 1].t : null };
+  ctx.stats.trades.rows += trades.length;
+  if (info.truncated) ctx.stats.trades.truncated++;
+  return info;
 }
 
 async function processMarket(ctx, { record, startTs }) {
@@ -693,7 +709,7 @@ async function processMarket(ctx, { record, startTs }) {
   if (series.every((s) => s.length === 0)) return { skip: 'no_price_history' };
   if (ctx.opts.trades) {
     try {
-      record.tradesInfo = await loadOrFetchTrades(ctx, record, a, b);
+      record.tradesInfo = await loadOrFetchTrades(ctx, record, a, startTs);
     } catch (err) {
       ctx.warn(`trades failed for ${record.conditionId}: ${err.message}`);
       return { skip: 'trades_fetch_failed' };
@@ -752,6 +768,72 @@ async function loadExistingMarkets(file, warn) {
   return ids;
 }
 
+async function* readRecords(file) {
+  const rl = readline.createInterface({ input: createReadStream(file, 'utf8'), crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    let o = null;
+    try {
+      o = JSON.parse(line);
+    } catch {}
+    if (o && typeof o.conditionId === 'string') yield o;
+  }
+}
+
+// Streams markets.jsonl through fn(record) into a temp file, then swaps it in.
+async function rewriteRecords(file, fn) {
+  const tmp = `${file}.${process.pid}.rewrite.tmp`;
+  const out = createWriteStream(tmp);
+  for await (const rec of readRecords(file)) {
+    if (!out.write(`${JSON.stringify(fn(rec))}\n`)) await new Promise((resolve) => out.once('drain', resolve));
+  }
+  await new Promise((resolve, reject) => out.end((err) => (err ? reject(err) : resolve())));
+  await rename(tmp, file);
+}
+
+// The start normalizeMarket stored: gameStartTime, or eventStartDate when that was the source.
+export function storedStartTs(times = {}) {
+  return times.gameStartSource === 'eventStartDate' ? parseTs(times.eventStartDate) : parseTs(times.gameStartTime);
+}
+
+const hasCurrentTape = (ctx, rec) => rec.tradesInfo?.v === TAPE_VERSION && existsSync(tapeFiles(ctx, rec.conditionId).trades);
+
+// Markets already in markets.jsonl but collected without --trades (the README's smoke test) or
+// by an older collector get their tape before discovery starts. Otherwise the newest markets,
+// i.e. the last out-of-sample fold, would silently have no trade features.
+async function backfillTrades(ctx, marketsFile, limit) {
+  if (!existsSync(marketsFile)) return;
+  const todo = [];
+  let total = 0;
+  for await (const rec of readRecords(marketsFile)) {
+    total++;
+    if (!hasCurrentTape(ctx, rec)) todo.push(rec);
+  }
+  if (!todo.length) return;
+  if (!ctx.opts.trades) {
+    if (todo.length < total) ctx.warn(`${todo.length} of ${total} markets in markets.jsonl have no current trade tape; re-run with --trades to backfill them (their trade features stay null until then)`);
+    return;
+  }
+  ctx.log(`backfilling trade tapes for ${todo.length} of ${total} markets already in markets.jsonl`);
+  const infos = new Map();
+  await Promise.all(
+    todo.map((rec) =>
+      limit(async () => {
+        const startTs = storedStartTs(rec.times);
+        try {
+          if (startTs == null) throw new Error('no stored game start time');
+          infos.set(rec.conditionId, await loadOrFetchTrades(ctx, rec, startTs - Math.round(ctx.opts.preHours * HOUR), startTs));
+          ctx.stats.trades.backfilled++;
+        } catch (err) {
+          ctx.stats.trades.backfillFailed++;
+          ctx.warn(`trade backfill failed for ${rec.conditionId}: ${err.message}`);
+        }
+      })
+    )
+  );
+  if (infos.size) await rewriteRecords(marketsFile, (rec) => (infos.has(rec.conditionId) ? { ...rec, tradesInfo: infos.get(rec.conditionId) } : rec));
+}
+
 // ---------- main ----------
 
 function resolveBases(env) {
@@ -780,6 +862,45 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
   const dataDir = path.resolve(opts.dataDir);
   const dirs = { prices: path.join(dataDir, 'prices'), trades: path.join(dataDir, 'trades'), raw: path.join(dataDir, 'raw') };
   await Promise.all(Object.values(dirs).map((d) => mkdir(d, { recursive: true })));
+
+  // Provenance is written before any market can reach markets.jsonl, and the run's end is recorded
+  // whatever happens, so a crashed or killed run with overridden bases still taints the data dir.
+  const runsFile = path.join(dataDir, 'collect-runs.jsonl');
+  const runLine = {
+    runId: randomUUID(), tool: 'research/collect.js', at: new Date().toISOString(), argv, bases,
+    synthetic: nonDefault ? 'API bases were overridden; treat this data as non-Polymarket unless they proxy Polymarket' : null,
+  };
+  const endLine = (status, extra) => `${JSON.stringify({ ...runLine, status, endedAt: new Date().toISOString(), ...extra })}\n`;
+  await appendFile(runsFile, `${JSON.stringify({ ...runLine, status: 'started' })}\n`);
+  const onSignal = (signal) => {
+    try {
+      appendFileSync(runsFile, endLine('interrupted', { signal }));
+    } finally {
+      process.exit(signal === 'SIGINT' ? 130 : 143);
+    }
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  let summary = null;
+  let error = null;
+  try {
+    summary = await collectInto({ opts, stdout, say, log, warn, bases, runLine, dataDir, dirs, t0 });
+    return summary;
+  } catch (err) {
+    error = err;
+    throw err;
+  } finally {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    try {
+      await appendFile(runsFile, summary ? endLine('completed', summary) : endLine('failed', { error: String(error?.message ?? error).slice(0, 300) }));
+    } catch (e) {
+      warn(`could not record the end of this run in ${runsFile}: ${e.message}`);
+    }
+  }
+}
+
+async function collectInto({ opts, stdout, say, log, warn, bases, runLine, dataDir, dirs, t0 }) {
   const marketsFile = path.join(dataDir, 'markets.jsonl');
 
   const http = createHttpClient({
@@ -795,7 +916,7 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
     discovery: { pages: 0, events: 0, markets: 0, candidates: 0 },
     skipped: {},
     prices: { fetched: 0, fromDisk: 0, emptyTokens: 0, splits: 0, maxFallback: 0 },
-    trades: { fetched: 0, fromDisk: 0, rows: 0, truncated: 0 },
+    trades: { fetched: 0, fromDisk: 0, rows: 0, truncated: 0, backfilled: 0, backfillFailed: 0 },
   };
   const ctx = {
     opts, bases, http, dirs, stats, log, warn,
@@ -809,6 +930,8 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
   };
 
   const existing = await loadExistingMarkets(marketsFile, warn);
+  const marketLimit = createLimiter(opts.concurrency);
+  await backfillTrades(ctx, marketsFile, marketLimit);
   const sinceTs = opts.since ? parseTs(opts.since) : null;
   const untilTs = opts.until ? parseTs(opts.until) + DAY : null;
   let kept = 0;
@@ -816,7 +939,6 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
   const total = () => existing.size + kept;
   let appendChain = Promise.resolve();
   const appendRecord = (rec) => (appendChain = appendChain.then(() => appendFile(marketsFile, `${JSON.stringify(rec)}\n`)));
-  const marketLimit = createLimiter(opts.concurrency);
   let lastLog = 0;
   const progress = (force = false) => {
     if (!force && Date.now() - lastLog < 5000) return;
@@ -873,10 +995,10 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
     await appendChain;
   }
 
-  const failures = (stats.skipped.price_fetch_failed || 0) + (stats.skipped.trades_fetch_failed || 0);
+  const failures = (stats.skipped.price_fetch_failed || 0) + (stats.skipped.trades_fetch_failed || 0) + stats.trades.backfillFailed;
   const summary = {
     ok: failures === 0,
-    synthetic: nonDefault ? 'API bases were overridden; treat this data as non-Polymarket unless they proxy Polymarket' : null,
+    synthetic: runLine.synthetic,
     dataDir,
     strategy: opts.strategy,
     bases,
@@ -895,9 +1017,8 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
   const skippedText = Object.entries(summary.skipped).map(([k, v]) => `${k} ${v}`).join(', ');
   say(`skipped: ${skippedText || 'none'}`);
   say(`prices: ${stats.prices.fetched} tokens fetched (${stats.prices.emptyTokens} empty, ${stats.prices.splits} range splits, ${stats.prices.maxFallback} interval=max fallbacks), ${stats.prices.fromDisk} from disk`);
-  if (opts.trades) say(`trades: ${stats.trades.fetched} markets fetched (${stats.trades.rows} trades, ${stats.trades.truncated} truncated), ${stats.trades.fromDisk} from disk`);
+  if (opts.trades) say(`trades: ${stats.trades.fetched} markets fetched (${stats.trades.rows} trades, ${stats.trades.truncated} truncated before the window start), ${stats.trades.fromDisk} from disk, ${stats.trades.backfilled} backfilled for markets collected earlier`);
   if (failures) warn(`${failures} market(s) failed to download; re-run the same command to retry them`);
-  await appendFile(path.join(dataDir, 'collect-runs.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), argv, ...summary })}\n`);
   stdout.write(`${JSON.stringify(summary)}\n`);
   return summary;
 }

@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fees, WINDOW_SEC } from '../../lib/load.mjs';
 import { buildObs, FRACS, chainlinkMarks, tapeTools, LAG } from './obs.mjs';
-import { clusterMeanTest, bootstrapDays, benjaminiHochberg, wilson, logisticFit, logit, sigmoid, r4, r2, mean } from './stats.mjs';
+import { clusterMeanTest, bootstrapDays, benjaminiHochberg, wilson, logisticFit, logit, sigmoid, r4, r2, mean, poissonBinomialTails } from './stats.mjs';
 
 const OUT = '/home/user/CENTISPORT/research/btc/reports/calibration';
 fs.mkdirSync(OUT, { recursive: true });
@@ -34,6 +34,8 @@ const SENS = [
   { name: 'minp', fee: 'minp', exec: 'interp', haircut: 0.01 },
   { name: 'flat2', fee: 'flat2', exec: 'interp', haircut: 0.01 },
   { name: 'haircut2c', fee: 'docs_always', exec: 'interp', haircut: 0.02 },
+  { name: 'haircut0.5c(empirical half-spread)', fee: 'docs_always', exec: 'interp', haircut: 0.005 },
+  { name: 'haircut0.2c(tick-level, extremes only)', fee: 'docs_always', exec: 'interp', haircut: 0.002 },
   { name: 'exec_snap(optimistic)', fee: 'docs_always', exec: 'snap', haircut: 0.01 },
   { name: 'exec_next(pessimistic)', fee: 'docs_always', exec: 'next', haircut: 0.01 },
   { name: 'zeroFee_zeroHaircut_snap', fee: 'zero', exec: 'snap', haircut: 0 },
@@ -76,13 +78,24 @@ function metrics(legs, cfg = HEAD, { boot = true, seed = 7 } = {}) {
   const n = tr.length; if (!n) return { n: 0 };
   const ct = clusterMeanTest(tr, (x) => x.day, (x) => x.y);
   const winRate = mean(tr.map((x) => x.win)), avgCost = mean(tr.map((x) => x.cost));
-  const out = { n, days: ct.days, winRate: r4(winRate), avgCost: r4(avgCost), edge: r4(winRate - avgCost), roi: r4(ct.mean), se: r4(ct.se), t: r2(ct.t), p: ct.pOne };
+  const wins = tr.reduce((s, x) => s + x.win, 0);
+  // p-value: the larger of (a) day-clustered t-test on per-$ PnL (one-sided) and (b) exact Poisson-binomial test of the win
+  // count against break-even probabilities p_i = all-in cost_i (valid at extreme prices where (a) degenerates, e.g. 47/47 wins).
+  const pb = poissonBinomialTails(tr.map((x) => Math.min(x.cost, 1)), wins).upper;
+  const zb = tr.reduce((s, x) => s + x.win - x.cost, 0) / Math.sqrt(Math.max(1e-12, tr.reduce((s, x) => s + Math.min(x.cost, 1) * (1 - Math.min(x.cost, 1)), 0)));
+  const out = { n, days: ct.days, winRate: r4(winRate), avgCost: r4(avgCost), edge: r4(winRate - avgCost), roi: r4(ct.mean), se: r4(ct.se), t: r2(ct.t), zBinom: r2(zb), tSel: Math.min(ct.t, zb), pCluster: ct.pOne, pBinom: pb, p: Math.max(ct.pOne, pb) };
+  const [wl, wh] = wilson(wins, n);
+  // binomial interval on the win rate (Wilson; conservative for heterogeneous p_i) -> edge per share; ROI via edge/avgCost
+  out.edgeCI_binom = [r4(wl - avgCost), r4(wh - avgCost)]; out.roiCI_binom = [r4((wl - avgCost) / avgCost), r4((wh - avgCost) / avgCost)];
   if (boot && ct.days >= 2) {
     const agg = new Map(); for (const x of tr) { const a = agg.get(x.day) || { sy: 0, n: 0, sw: 0, sc: 0 }; a.sy += x.y; a.n++; a.sw += x.win; a.sc += x.cost; agg.set(x.day, a); }
     const A = [...agg.values()];
     const ci = bootstrapDays(A, (s) => { let sy = 0, nn = 0; for (const a of s) { sy += a.sy; nn += a.n; } return sy / nn; }, { reps: BOOT, seed });
     const ciE = bootstrapDays(A, (s) => { let sw = 0, sc = 0, nn = 0; for (const a of s) { sw += a.sw; sc += a.sc; nn += a.n; } return (sw - sc) / nn; }, { reps: BOOT, seed: seed + 1 });
-    out.roiCI = ci.map(r4); out.edgeCI = ciE.map(r4);
+    out.roiCI_boot = ci.map(r4); out.edgeCI_boot = ciE.map(r4);
+    // reported CI = union of the day-bootstrap and the binomial (Wilson) interval: conservative at extreme win rates
+    out.roiCI = [Math.min(out.roiCI_boot[0], out.roiCI_binom[0]), Math.max(out.roiCI_boot[1], out.roiCI_binom[1])];
+    out.edgeCI = [Math.min(out.edgeCI_boot[0], out.edgeCI_binom[0]), Math.max(out.edgeCI_boot[1], out.edgeCI_binom[1])];
   }
   return out;
 }
@@ -99,10 +112,12 @@ const EDGES = [0, 0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0
 const binOf = (q) => { for (let i = EDGES.length - 2; i >= 0; i--) if (q >= EDGES[i]) return i; return 0; };
 function bestBand(trainLegs, cfg, { straddleOK }) {
   const nb = EDGES.length - 1; const dayIdx = new Map(); const rows = [];
-  for (const l of trainLegs) { const r = legPnl(l, cfg); if (!r) continue; if (!dayIdx.has(l.day)) dayIdx.set(l.day, dayIdx.size); rows.push([dayIdx.get(l.day), binOf(l.q), r.y]); }
+  for (const l of trainLegs) { const r = legPnl(l, cfg); if (!r) continue; if (!dayIdx.has(l.day)) dayIdx.set(l.day, dayIdx.size); const c = Math.min(r.cost, 1); rows.push([dayIdx.get(l.day), binOf(l.q), r.y, r.win - r.cost, c * (1 - c)]); }
   const D = dayIdx.size; if (D < 5) return null;
   const S = Array.from({ length: D }, () => new Float64Array(nb + 1)), C = Array.from({ length: D }, () => new Float64Array(nb + 1));
-  for (const [d, b, y] of rows) { S[d][b + 1] += y; C[d][b + 1] += 1; }
+  const EW = new Float64Array(nb + 1), VW = new Float64Array(nb + 1);
+  for (const [d, b, y, e, v] of rows) { S[d][b + 1] += y; C[d][b + 1] += 1; EW[b + 1] += e; VW[b + 1] += v; }
+  for (let b = 1; b <= nb; b++) { EW[b] += EW[b - 1]; VW[b] += VW[b - 1]; }
   for (let d = 0; d < D; d++) for (let b = 1; b <= nb; b++) { S[d][b] += S[d][b - 1]; C[d][b] += C[d][b - 1]; }
   let best = null;
   for (let i = 1; i < nb - 1; i++) for (let j = i + 1; j <= nb - 1; j++) { // exclude the outer [0,.02) and [.98,1] bins
@@ -111,7 +126,9 @@ function bestBand(trainLegs, cfg, { straddleOK }) {
     for (let d = 0; d < D; d++) { ds[d] = S[d][j] - S[d][i]; dc[d] = C[d][j] - C[d][i]; n += dc[d]; sy += ds[d]; if (dc[d]) used++; }
     if (n < 40 || used < 10) continue;
     const mu = sy / n; let ss = 0; for (let d = 0; d < D; d++) if (dc[d]) ss += (ds[d] - mu * dc[d]) ** 2;
-    const se = Math.sqrt(ss * used / (used - 1)) / n; const t = se > 0 ? mu / se : 0;
+    const se = Math.sqrt(ss * used / (used - 1)) / n; const tc = se > 0 ? mu / se : 0;
+    // selection statistic = min(day-clustered t, binomial z vs break-even); the binomial z stops all-win bands (zero variance) from looking infinitely good
+    const zb = (EW[j] - EW[i]) / Math.sqrt(Math.max(1e-12, VW[j] - VW[i])); const t = Math.min(tc, zb);
     if (!best || t > best.t) best = { lo: EDGES[i], hi: EDGES[j], n, roi: mu, t };
   }
   return best;
@@ -150,10 +167,12 @@ for (const tf of TFS) {
         const ct = clusterMeanTest(sel, (r) => r.day, (r) => r.y - r.p);
         const agg = new Map(); for (const r of sel) { const a = agg.get(r.day) || { y: 0, n: 0 }; a.y += r.y; a.n++; agg.set(r.day, a); }
         const bci = n >= 10 ? bootstrapDays([...agg.values()], (s) => { let y = 0, nn = 0; for (const a of s) { y += a.y; nn += a.n; } return y / nn; }, { reps: BOOT, seed: b + 1 }) : [null, null];
-        const row = { lo: EDGES[b], hi: Math.min(1, EDGES[b + 1]), n, meanP: r4(mp), winRate: r4(k / n), wilson: wilson(k, n).map(r4), boot: bci.map(r4), resid: r4(k / n - mp), pTwo: n >= 30 && ct.days >= 5 ? ct.pTwo : null };
+        const pbt = poissonBinomialTails(sel.map((r) => r.p), k); const pPB = Math.min(1, 2 * Math.min(pbt.upper, pbt.lower));
+        const pTwo = n >= 30 && ct.days >= 5 ? Math.max(ct.pTwo, pPB) : (n >= 10 ? pPB : null);
+        const row = { lo: EDGES[b], hi: Math.min(1, EDGES[b + 1]), n, meanP: r4(mp), winRate: r4(k / n), wilson: wilson(k, n).map(r4), boot: bci.map(r4), resid: r4(k / n - mp), pCluster: n >= 30 && ct.days >= 5 ? ct.pTwo : null, pPoissonBinom: pPB, pTwo };
         (folded ? tabF : tab).push(row);
         (folded ? csvF : csv).push([tf, fr.key, row.lo, row.hi, n, row.meanP, row.winRate, ...row.wilson, ...row.boot, row.resid, row.pTwo == null ? '' : row.pTwo.toExponential(3)].join(','));
-        if (folded && row.pTwo != null && row.lo >= 0.5 - 1e-9) calibBinsTests.push({ tf, dk: fr.key, lo: row.lo, hi: row.hi, n, resid: row.resid, p: row.pTwo }); // folded table is symmetric: test favourite half only
+        if (folded && row.pTwo != null && n >= 30 && row.lo >= 0.5 - 1e-9) calibBinsTests.push({ tf, dk: fr.key, lo: row.lo, hi: row.hi, n, resid: row.resid, p: row.pTwo }); // folded table is symmetric: test favourite half only
       }
     }
     R.calibration[fr.key] = tab; R.foldedCalibration[fr.key] = tabF;
@@ -163,7 +182,10 @@ for (const tf of TFS) {
 
   // ---------- favourite/longshot (logistic slope) + Up/Down skew ----------
   for (const fr of FRACS) {
-    const rows = obs.filter((o) => o.d[fr.key]); if (rows.length < 50) continue;
+    const rowsAll = obs.filter((o) => o.d[fr.key]); if (rowsAll.length < 50) continue;
+    // favourite/longshot slope is fitted on tradable prices only (0.02 <= p <= 0.98): clipping 0.5c/99.5c prices to a logit cap
+    // would itself bias the slope upward. Skew (mean residual) uses all rows.
+    const rows = rowsAll.filter((o) => o.d[fr.key].pSnap >= 0.02 && o.d[fr.key].pSnap <= 0.98); if (rows.length < 50) continue;
     const X = rows.map((o) => [logit(o.d[fr.key].pSnap)]), Y = rows.map((o) => o.upWon);
     const beta = logisticFit(X, Y);
     const byD = new Map(); rows.forEach((o, i) => { if (!byD.has(o.day)) byD.set(o.day, []); byD.get(o.day).push(i); });
@@ -175,14 +197,15 @@ for (const tf of TFS) {
       const b = logisticFit(xs, ys, { iters: 12 }); if (b) bs.push(b);
     }
     const ciA = [quant(bs.map((b) => b[0]), 0.025), quant(bs.map((b) => b[0]), 0.975)], ciB = [quant(bs.map((b) => b[1]), 0.025), quant(bs.map((b) => b[1]), 0.975)];
-    const sk = clusterMeanTest(rows, (o) => o.day, (o) => o.upWon - o.d[fr.key].pSnap);
-    const sdP = Math.sqrt(mean(rows.map((o) => (o.d[fr.key].pSnap - 0.5) ** 2)));
+    const sk = clusterMeanTest(rowsAll, (o) => o.day, (o) => o.upWon - o.d[fr.key].pSnap);
+    const sdP = Math.sqrt(mean(rowsAll.map((o) => (o.d[fr.key].pSnap - 0.5) ** 2)));
+    const betaAll = logisticFit(rowsAll.map((o) => [logit(o.d[fr.key].pSnap, 0.001)]), rowsAll.map((o) => o.upWon));
     R.tests[`flb_skew_${fr.key}`] = {
-      n: rows.length, priceDispersion: r4(sdP), logitIntercept: r4(beta[0]), interceptCI: ciA.map(r4), logitSlope: r4(beta[1]), slopeCI: ciB.map(r4),
+      n: rowsAll.length, nSlopeFit: rows.length, slopeAllPricesEps001: r4(betaAll[1]), priceDispersion: r4(sdP), logitIntercept: r4(beta[0]), interceptCI: ciA.map(r4), logitSlope: r4(beta[1]), slopeCI: ciB.map(r4),
       slopeInterp: beta[1] > 1 ? 'slope>1: outcomes more extreme than prices (favourites underpriced / longshots overpriced)' : 'slope<1: prices more extreme than outcomes (favourites overpriced)',
       meanResidUpMinusPrice: r4(sk.mean), residSE: r4(sk.se), residPtwo: sk.pTwo,
     };
-    say(`  ${tf} ${fr.key.padEnd(4)} n=${rows.length} sd(p-.5)=${r4(sdP)} logit slope ${r4(beta[1])} [${ciB.map(r4)}] intercept ${r4(beta[0])} [${ciA.map(r4)}]  mean(upWon-p)=${r4(sk.mean)} (p2=${sk.pTwo.toFixed(3)})`);
+    say(`  ${tf} ${fr.key.padEnd(4)} n=${rowsAll.length} (slope fit n=${rows.length}; all-price slope ${r4(betaAll[1])}) sd(p-.5)=${r4(sdP)} logit slope ${r4(beta[1])} [${ciB.map(r4)}] intercept ${r4(beta[0])} [${ciA.map(r4)}]  mean(upWon-p)=${r4(sk.mean)} (p2=${sk.pTwo.toFixed(3)})`);
   }
 
   // ---------- late-window reaction (logit regression with price-change term) ----------
@@ -211,7 +234,7 @@ for (const tf of TFS) {
 
   // ---------- rule variants ----------
   const inOOS = (l) => F.oosDays.has(l.day), inIS = (l) => F.isDays.has(l.day);
-  const BANDS = [[0.02, 0.05], [0.05, 0.1], [0.1, 0.2], [0.2, 0.3], [0.3, 0.4], [0.4, 0.5], [0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 0.95], [0.95, 0.98]];
+  const BANDS = [[0.02, 0.05], [0.05, 0.1], [0.1, 0.2], [0.2, 0.3], [0.3, 0.4], [0.4, 0.5], [0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 0.95], [0.95, 0.98], [0.98, 0.999]];
   const legsFor = (dk, side, mk = takerLeg) => {
     const out = [];
     for (const o of obs) { const d = o.d[dk]; if (!d) continue; for (const tok of side === 'tok' ? ['U', 'D'] : side === 'up' ? ['U'] : ['D']) { const l = mk(o, d, tok); if (l) out.push(l); } }
@@ -282,7 +305,7 @@ for (const tf of TFS) {
         let best = null;
         for (const thr of THR) {
           const tr = byThr.get(thr).filter((x) => fo.trainDays.has(x.day)); const m = metrics(tr, HEAD, { boot: false });
-          if (m.n >= 40 && m.days >= 10 && (!best || m.t > best.t)) best = { thr, t: m.t, roi: m.roi, n: m.n };
+          if (m.n >= 40 && m.days >= 10 && (!best || m.tSel > best.t)) best = { thr, t: m.tSel, roi: m.roi, n: m.n };
         }
         const use = best && best.t >= 1.5 && best.roi > 0; fi.push({ testFrom: fo.testFrom, chosen: best, traded: !!use });
         if (use) for (const x of byThr.get(best.thr)) if (fo.testDays.has(x.day)) oos.push(x);
@@ -294,6 +317,8 @@ for (const tf of TFS) {
   for (const [name, key, same] of [['mom1', 'prev1', true], ['rev1', 'prev1', false], ['mom3', 'prev3same', true], ['rev3', 'prev3same', false]]) {
     const legs = obs.filter((o) => o[key] != null && o.d.s0).map((o) => takerLeg(o, o.d.s0, (o[key] === 1) === same ? 'U' : 'D')).filter((x) => x.q >= 0.02 && x.q < 0.98);
     fixed({ family: 'F9_streak_taker', dk: 's0', side: name, params: {}, rule: `${tf} @s0: buy ${same ? 'the same direction as' : 'against'} the previous ${key === 'prev1' ? 'window' : '3 windows (all same)'} - taker` }, legs);
+    const mlegs = obs.filter((o) => o[key] != null && o.d.s0).map((o) => makerLeg(o, o.d.s0, (o[key] === 1) === same ? 'U' : 'D')).filter((x) => x && x.q >= 0.02 && x.q < 0.98);
+    fixed({ family: 'F9_streak_maker', dk: 's0', side: name, params: { delta: MAKER_DELTA }, rule: `${tf} @s0: rest a bid ${MAKER_DELTA * 100}c under the snapshot for the side ${same ? 'matching' : 'opposite to'} the previous ${key === 'prev1' ? 'window' : '3 windows'} - maker` }, mlegs);
   }
   R.timing = { secs: (Date.now() - t0) / 1000 };
 }
@@ -375,7 +400,7 @@ function tapeValidate(v) {
   }
   return out;
 }
-const interesting = tested.filter((v) => v.bhSig || (v.oos.roi > 0 && v.oos.t >= 1.5) || v.kind === 'walk-forward');
+const interesting = variants.filter((v) => v.oos.n > 0 && (v.bhSig || (v.oos.roi > 0 && v.oos.t >= 1.5) || v.kind === 'walk-forward' || (v.tested && (v.tf === '5m' || v.tf === '15m') && /^F[129]/.test(v.family)) || (v.tested && v.sens == null && v.oos.edge > 0)));
 for (const v of interesting) {
   v.sens = {};
   for (const s of SENS) { const m = metrics(v.oosLegs, s, { boot: false }); v.sens[s.name] = { n: m.n, roi: m.roi, edge: m.edge, t: m.t }; }
@@ -402,13 +427,15 @@ for (const x of results.calibrationBinTests.significant.slice(0, 25)) say(`  ${x
 
 // ---------- write variants ----------
 const vcsv = ['id,family,kind,tf,decision,side,params,is_n,is_roi,is_t,oos_n,oos_days,oos_winRate,oos_avgCost,oos_edge,oos_roi,oos_roi_lo,oos_roi_hi,oos_t,oos_p,tested,bh_q,bh_sig,trades_per_day,capacity_usd_day'];
-for (const v of variants) vcsv.push([JSON.stringify(v.id), v.family, v.kind, v.tf, v.dk, v.side, JSON.stringify(JSON.stringify(v.params)), v.is?.n ?? '', v.is?.roi ?? '', v.is?.t ?? '', v.oos.n, v.oos.days ?? '', v.oos.winRate ?? '', v.oos.avgCost ?? '', v.oos.edge ?? '', v.oos.roi ?? '', v.oos.roiCI?.[0] ?? '', v.oos.roiCI?.[1] ?? '', v.oos.t ?? '', v.oos.p != null ? v.oos.p.toExponential(3) : '', v.tested, v.bhQ != null ? v.bhQ.toFixed(4) : '', !!v.bhSig, v.tradesPerDay ?? '', v.capacityUSDperDay ?? ''].join(','));
+const csvQ = (x) => '"' + String(x).replace(/"/g, '""') + '"';
+for (const v of variants) vcsv.push([csvQ(v.id), v.family, v.kind, v.tf, v.dk, v.side, csvQ(JSON.stringify(v.params)), v.is?.n ?? '', v.is?.roi ?? '', v.is?.t ?? '', v.oos.n, v.oos.days ?? '', v.oos.winRate ?? '', v.oos.avgCost ?? '', v.oos.edge ?? '', v.oos.roi ?? '', v.oos.roiCI?.[0] ?? '', v.oos.roiCI?.[1] ?? '', v.oos.t ?? '', v.oos.p != null ? v.oos.p.toExponential(3) : '', v.tested, v.bhQ != null ? v.bhQ.toFixed(4) : '', !!v.bhSig, v.tradesPerDay ?? '', v.capacityUSDperDay ?? ''].join(','));
 fs.writeFileSync(path.join(OUT, 'variants.csv'), vcsv.join('\n') + '\n');
 const slim = (v) => ({ id: v.id, family: v.family, kind: v.kind, tf: v.tf, dk: v.dk, side: v.side, params: v.params, rule: v.rule, is: v.is, oos: v.oos, tested: v.tested, bhQ: v.bhQ, bhSig: v.bhSig, bhQ_wfOnly: v.bhQ_wfOnly, tradesPerDay: v.tradesPerDay, capacityUSDperDay: v.capacityUSDperDay, deployUSDperDay: v.deployUSDperDay, sens: v.sens, tape: v.tape, foldInfo: v.foldInfo });
 results.variantCounts = { defined: variants.length, tested: tested.length, bhSigAll: bh.nSig, bhThresholdP: bh.threshold, walkForwardTested: wfT.length, bhSigWalkForward: bhWF.nSig, byFamily: Object.fromEntries([...new Set(variants.map((v) => v.family))].map((f) => [f, { defined: variants.filter((v) => v.family === f).length, tested: tested.filter((v) => v.family === f).length }])) };
 results.walkForward = wfT.map(slim);
 results.topByOosT = tested.slice().sort((a, b) => b.oos.t - a.oos.t).slice(0, 40).map(slim);
 results.bhSignificant = tested.filter((v) => v.bhSig).map(slim);
+fs.writeFileSync(path.join(OUT, 'variants_detail.json'), JSON.stringify(interesting.map(slim)));
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 1));
 fs.writeFileSync(path.join(OUT, 'tests.json'), JSON.stringify({ perTf: Object.fromEntries(Object.entries(results.perTf).map(([k, v]) => [k, { upRate: v.upRate, tests: v.tests }])), chainlink: results.chainlink, calibrationBinTests: results.calibrationBinTests }, null, 1));
 

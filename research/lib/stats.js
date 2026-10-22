@@ -118,8 +118,8 @@ export function bootstrapPValue(replicates, nullValue = 0) {
   return n ? (1 + le) / (n + 1) : 1;
 }
 
-// Percentile CI, bootstrap SE and one-sided p from a replicate vector.
-export function summarizeReplicates(estimate, replicates, { alpha = 0.05, nullValue = 0 } = {}) {
+// Percentile CI, bootstrap SE and one-sided p (never below pFloor) from a replicate vector.
+export function summarizeReplicates(estimate, replicates, { alpha = 0.05, nullValue = 0, pFloor = 0 } = {}) {
   const v = Array.from(replicates).filter(Number.isFinite).sort((a, b) => a - b);
   if (!v.length || !Number.isFinite(estimate)) return { estimate: Number.isFinite(estimate) ? estimate : null, lo: null, hi: null, se: null, p: 1, nValid: v.length };
   return {
@@ -127,10 +127,16 @@ export function summarizeReplicates(estimate, replicates, { alpha = 0.05, nullVa
     lo: quantile(v, alpha / 2),
     hi: quantile(v, 1 - alpha / 2),
     se: v.length > 1 ? sd(v) : 0,
-    p: bootstrapPValue(v, nullValue),
+    p: Math.max(pFloor, bootstrapPValue(v, nullValue)),
     nValid: v.length,
   };
 }
+
+// With C clusters, a lucky run where every cluster lands on the same side makes every bootstrap
+// replicate agree, so the bootstrap p hits 1/(B+1). No valid cluster-level test can be more
+// confident than that all-signs pattern allows (the sign-flip floor 2^-C), so p is floored there:
+// 6 events can never give p < 1/64.
+export const clusterPFloor = (C) => (C > 0 ? 2 ** -C : 1);
 
 function groupClusters(items, keyOf) {
   const index = new Map(), clusters = [];
@@ -155,7 +161,7 @@ export function clusterBootstrap(items, keyOf, stat, { B = 2000, seed = 1, alpha
     for (let i = 0; i < C; i++) for (const it of clusters[randInt(rng, C)]) sample.push(it);
     reps[b] = stat(sample);
   }
-  return { nClusters: C, nItems: items.length, B: reps.length, ...summarizeReplicates(C ? stat(items) : NaN, reps, { alpha, nullValue }) };
+  return { nClusters: C, nItems: items.length, B: reps.length, ...summarizeReplicates(C ? stat(items) : NaN, reps, { alpha, nullValue, pFloor: clusterPFloor(C) }) };
 }
 
 // Fast cluster bootstrap for statistics that depend on the data only through per-cluster sums
@@ -187,7 +193,7 @@ export function clusterBootstrapSums(items, keyOf, toVec, stats, { B = 2000, see
     for (const k of names) reps[k][b] = stats[k](acc);
   }
   const out = { nClusters: C, nItems: items.length, B: C ? B : 0, stats: {} };
-  for (const k of names) out.stats[k] = summarizeReplicates(C ? stats[k](total) : NaN, reps[k], { alpha, nullValue });
+  for (const k of names) out.stats[k] = summarizeReplicates(C ? stats[k](total) : NaN, reps[k], { alpha, nullValue, pFloor: clusterPFloor(C) });
   return out;
 }
 

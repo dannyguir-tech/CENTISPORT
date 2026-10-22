@@ -1,0 +1,177 @@
+{
+ "above_daily_mono": {
+  "relations": 3171,
+  "points": 11284332,
+  "pointsMidViol": 138550,
+  "pointsExecViolHs": 15453,
+  "pointsExecViolHc1": 6044
+ },
+ "above_hourly_mono": {
+  "relations": 13500,
+  "points": 648102,
+  "pointsMidViol": 115226,
+  "pointsExecViolHs": 58766,
+  "pointsExecViolHc1": 58766
+ },
+ "hit_daily_mono": {
+  "relations": 3132,
+  "points": 3929577,
+  "pointsMidViol": 360099,
+  "pointsExecViolHs": 20681,
+  "pointsExecViolHc1": 4869
+ },
+ "hit_weekly_mono": {
+  "relations": 1890,
+  "points": 5167531,
+  "pointsMidViol": 212052,
+  "pointsExecViolHs": 71675,
+  "pointsExecViolHc1": 3933
+ },
+ "hit_monthly_mono": {
+  "relations": 699,
+  "points": 2913236,
+  "pointsMidViol": 49998,
+  "pointsExecViolHs": 5329,
+  "pointsExecViolHc1": 800
+ },
+ "range_allyes": {
+  "relations": 115,
+  "points": 411170,
+  "pointsMidViol": 39756,
+  "pointsExecViolHs": 127,
+  "pointsExecViolHc1": 100
+ },
+ "range_allno": {
+  "relations": 115,
+  "points": 411170,
+  "pointsMidViol": 369339,
+  "pointsExecViolHs": 9424,
+  "pointsExecViolHc1": 9356
+ },
+ "above_vs_range": {
+  "relations": 2300,
+  "points": 8219381,
+  "pointsMidViol": 1201539,
+  "pointsExecViolHs": 6293,
+  "pointsExecViolHc1": 3419
+ },
+ "hit_vs_above_daily": {
+  "relations": 1290,
+  "points": 859561,
+  "pointsMidViol": 5062,
+  "pointsExecViolHs": 371,
+  "pointsExecViolHc1": 2
+ },
+ "hit_vs_above_weekly": {
+  "relations": 1521,
+  "points": 1074325,
+  "pointsMidViol": 22809,
+  "pointsExecViolHs": 6139,
+  "pointsExecViolHc1": 210
+ },
+ "hit_vs_above_monthly": {
+  "relations": 2256,
+  "points": 853743,
+  "pointsMidViol": 3659,
+  "pointsExecViolHs": 2581,
+  "pointsExecViolHc1": 2280
+ },
+ "hit_nest_wd": {
+  "relations": 980,
+  "points": 334777,
+  "pointsMidViol": 57168,
+  "pointsExecViolHs": 16175,
+  "pointsExecViolHc1": 2019
+ },
+ "hit_nest_md": {
+  "relations": 1557,
+  "points": 149649,
+  "pointsMidViol": 10047,
+  "pointsExecViolHs": 2111,
+  "pointsExecViolHc1": 468
+ },
+ "hit_nest_mw": {
+  "relations": 517,
+  "points": 336880,
+  "pointsMidViol": 8295,
+  "pointsExecViolHs": 3056,
+  "pointsExecViolHc1": 1041
+ },
+ "daily_ud_vs_above": {
+  "relations": 222,
+  "points": 313418,
+  "pointsMidViol": 2084,
+  "pointsExecViolHs": 88,
+  "pointsExecViolHc1": 6
+ },
+ "hourly_ud_vs_above_hourly": {
+  "relations": 500,
+  "points": 28850,
+  "pointsMidViol": 3226,
+  "pointsExecViolHs": 1657,
+  "pointsExecViolHc1": 1657
+ },
+ "nest_cl_15m_5m": {
+  "relations": 4320,
+  "points": 20652,
+  "pointsMidViol": 293,
+  "pointsExecViolHs": 71,
+  "pointsExecViolHc1": 44
+ },
+ "nest_cl_4h_15m": {
+  "relations": 693,
+  "points": 10173,
+  "pointsMidViol": 166,
+  "pointsExecViolHs": 40,
+  "pointsExecViolHc1": 35
+ },
+ "nest_cl_4h_5m": {
+  "relations": 270,
+  "points": 1279,
+  "pointsMidViol": 26,
+  "pointsExecViolHs": 10,
+  "pointsExecViolHc1": 7
+ },
+ "nest_basis_1h_15m": {
+  "relations": 2787,
+  "points": 40875,
+  "pointsMidViol": 5436,
+  "pointsExecViolHs": 4322,
+  "pointsExecViolHc1": 4164
+ },
+ "nest_basis_1h_5m": {
+  "relations": 1080,
+  "points": 5121,
+  "pointsMidViol": 564,
+  "pointsExecViolHs": 482,
+  "pointsExecViolHc1": 461
+ },
+ "nest_basis_1d_4h": {
+  "relations": 211,
+  "points": 49252,
+  "pointsMidViol": 1848,
+  "pointsExecViolHs": 825,
+  "pointsExecViolHc1": 743
+ },
+ "nest_basis_1h_15m_b100": {
+  "relations": 1531,
+  "points": 22444,
+  "pointsMidViol": 145,
+  "pointsExecViolHs": 24,
+  "pointsExecViolHc1": 23
+ },
+ "nest_basis_1h_5m_b100": {
+  "relations": 640,
+  "points": 3046,
+  "pointsMidViol": 29,
+  "pointsExecViolHs": 18,
+  "pointsExecViolHc1": 17
+ },
+ "nest_basis_1d_4h_b100": {
+  "relations": 193,
+  "points": 44981,
+  "pointsMidViol": 374,
+  "pointsExecViolHs": 47,
+  "pointsExecViolHc1": 38
+ }
+}

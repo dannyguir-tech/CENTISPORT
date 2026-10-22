@@ -1,0 +1,48 @@
+{
+ "5m": {
+  "snap": {
+   "n": 1104,
+   "slope": 1.0494,
+   "intercept": -0.1267,
+   "slopeCI": [
+    0.9039,
+    1.2452
+   ]
+  },
+  "tape": {
+   "n": 973,
+   "slope": 1.0687,
+   "intercept": -0.0886,
+   "slopeCI": [
+    0.9187,
+    1.3213
+   ]
+  },
+  "medianAbsSnapMinusTape": 0.065,
+  "nObs": 1301,
+  "days": 13
+ },
+ "15m": {
+  "snap": {
+   "n": 1082,
+   "slope": 1.2276,
+   "intercept": -0.3137,
+   "slopeCI": [
+    1.0619,
+    1.4445
+   ]
+  },
+  "tape": {
+   "n": 1041,
+   "slope": 1.2279,
+   "intercept": -0.3245,
+   "slopeCI": [
+    1.0764,
+    1.4222
+   ]
+  },
+  "medianAbsSnapMinusTape": 0.035,
+  "nObs": 1199,
+  "days": 33
+ }
+}

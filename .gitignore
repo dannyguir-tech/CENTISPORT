@@ -14,3 +14,5 @@ yarn-error.log*
 research/data/
 research/reports/
 research/btc/data/
+# large intermediate analysis dumps (regenerable)
+research/btc/reports/**/*.jsonl

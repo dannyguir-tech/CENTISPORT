@@ -64,7 +64,7 @@ export function featW(tf, f) {
     if (!prev) continue;
     const ni = firstIdxAtOrAfter(ep, pt[0] + 1);
     const nxt = ni < ep.length && ep[ni][0] - pt[0] <= Math.max(120, 0.05 * L) && ep[ni][0] < r.windowEnd ? ep[ni] : null;
-    rows.push({ day: r.day, t: pt[0], p: pt[1], pOpen: open ? open[1] : 0.5, pPrev: prev[1], pNext: nxt ? nxt[1] : null, win: r.upWon, fee: r.fee, id: r.slug, feeType: r.fee?.feeType ?? null });
+    rows.push({ day: r.day, t: pt[0], p: pt[1], pOpen: open ? open[1] : 0.5, pPrev: prev[1], pNext: nxt ? nxt[1] : null, win: r.upWon, fee: r.fee, id: r.slug, feeType: r.fee?.feeType ?? null, ep, end: r.windowEnd });
   }
   return rows;
 }
@@ -93,9 +93,13 @@ export function featA(tf, CL) {
     if (!pt || pt[0] >= b.windowEnd) continue;
     const sig = CL.sigmaAt(b.windowStart);
     const zMag = a.priceToBeat && a.finalPrice && sig ? Math.log(a.finalPrice / a.priceToBeat) / (sig * Math.sqrt(L)) : null;
+    // last-minute move of the previous window's own Up price (path proxy for late BTC drift), known by b's start
+    const epa = a.path && a.path.length ? effPath(a.path) : null;
+    const la1 = epa ? lastAt(epa, a.windowEnd, 75) : null, la0 = la1 ? lastAt(epa, la1[0] - 60, 45) : null;
+    const lastMin = la1 && la0 ? Math.log(Math.min(0.995, Math.max(0.005, la1[1])) / (1 - Math.min(0.995, Math.max(0.005, la1[1])))) - Math.log(Math.min(0.995, Math.max(0.005, la0[1])) / (1 - Math.min(0.995, Math.max(0.005, la0[1])))) : null;
     const c0 = CL.get(b.windowStart), c1 = CL.get(b.windowStart - 300);
     const z5 = c0 && c1 && sig ? Math.log(c0 / c1) / (sig * Math.sqrt(300)) : null;
-    rows.push({ day: b.day, t: pt[0], wait: pt[0] - b.windowStart, p: pt[1], win: b.upWon, fee: b.fee, id: b.slug, feeType: b.fee?.feeType ?? null, prev: a.upWon ? 1 : -1, streak, zMag, z5 });
+    rows.push({ day: b.day, t: pt[0], wait: pt[0] - b.windowStart, p: pt[1], win: b.upWon, fee: b.fee, id: b.slug, feeType: b.fee?.feeType ?? null, prev: a.upWon ? 1 : -1, streak, zMag, z5, lastMin, ep, end: b.windowEnd });
   }
   return rows;
 }
@@ -130,7 +134,7 @@ export function featX(longTf, subTf, CL) {
       const zLast = clT && clP && sig ? Math.log(clT / clP) / (sig * Math.sqrt(300)) : null;
       dec.push({ j, t: pt[0], p: pt[1], c, zc, P: zc == null ? null : normCdf(zc), zLast });
     }
-    if (dec.length) rows.push({ day: r.day, win: r.upWon, fee: r.fee, id: r.slug, feeType: r.fee?.feeType ?? null, dec });
+    if (dec.length) rows.push({ day: r.day, win: r.upWon, fee: r.fee, id: r.slug, feeType: r.fee?.feeType ?? null, dec, ep, end: r.windowEnd });
   }
   return rows;
 }
@@ -160,6 +164,32 @@ export function featTape(tf, f) {
     const pt = firstAfter(ep, T + LATENCY, MAX_WAIT[tf]);
     if (!pt || pt[0] >= r.windowEnd) continue;
     rows.push({ day: r.day, t: pt[0], p: pt[1], ofi: net / tot, tot, win: r.upWon, fee: r.fee, id: r.slug, feeType: r.fee?.feeType ?? null });
+  }
+  return rows;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Early execution at the window open, tape subsample only: for window b (predecessor a), the
+// executable entry for side S is the FIRST real taker BUY fill of S with on-chain time in
+// [start+3s, start+20s] (that ask demonstrably existed then). Gives prevResult and zMag of a.
+// ---------------------------------------------------------------------------------------------
+export function featTapeOpen(tf, CL) {
+  const L = WINDOW_SEC[tf];
+  const all = loadUpDown(tf); const idx = new Map(all.map((r, i) => [r.conditionId, i]));
+  const rows = [];
+  for (const tp of loadTrades(tf)) {
+    const i = idx.get(tp.conditionId); if (i == null || i === 0) continue;
+    const a = all[i - 1], b = all[i];
+    if (a.windowEnd !== b.windowStart) continue;
+    const first = { U: null, D: null };
+    for (const x of tp.trades) {
+      const dt = x.t - b.windowStart;
+      if (dt < 3) continue; if (dt > 20) break;
+      if (x.side === 'B' && !first[x.o]) first[x.o] = x;
+    }
+    const sig = CL.sigmaAt(b.windowStart);
+    const zMag = a.priceToBeat && a.finalPrice && sig ? Math.log(a.finalPrice / a.priceToBeat) / (sig * Math.sqrt(L)) : null;
+    rows.push({ day: b.day, win: b.upWon, fee: b.fee, id: b.slug, feeType: b.fee?.feeType ?? null, prev: a.upWon ? 1 : -1, zMag, fU: first.U, fD: first.D });
   }
   return rows;
 }

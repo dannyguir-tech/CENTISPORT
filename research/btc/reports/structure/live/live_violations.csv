@@ -1,0 +1,5 @@
+ts,iso,source,family,id,legs,minPay,bestCost,margin,shares,profitUsd,costUsd,d,ptb
+1792668383,2026-10-22T11:26:23.000Z,poll,daily_ud_vs_above,bitcoin-up-or-down-on-october-22-2026|DOWN+YES>84000,2,1,0.9993,0.0007,118,0.0851,117.9149,,84515.75
+1792668403,2026-10-22T11:26:43.000Z,poll,daily_ud_vs_above,bitcoin-up-or-down-on-october-22-2026|DOWN+YES>84000,2,1,0.9982,0.0018,504,0.4094,503.5906,,84515.75
+1792668423,2026-10-22T11:27:03.000Z,poll,daily_ud_vs_above,bitcoin-up-or-down-on-october-22-2026|DOWN+YES>84000,2,1,0.9991,0.0009,110,0.094,109.906,,84515.75
+1792668443,2026-10-22T11:27:23.000Z,poll,daily_ud_vs_above,bitcoin-up-or-down-on-october-22-2026|DOWN+YES>84000,2,1,0.9991,0.0009,214,0.1829,213.8171,,84515.75

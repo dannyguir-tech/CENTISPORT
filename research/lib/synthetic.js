@@ -10,13 +10,27 @@
 // overpriced, unders underpriced) and adds informed wallets that buy the eventual winner without
 // moving the price. Both worlds share every random draw except those, so a seed gives paired worlds.
 //
+// The "stress" world keeps null-world prices and adds data defects the builder must neutralise
+// (from its own random stream, so the null and planted worlds are unchanged):
+//   - one-sided gaps: token 1's series misses 1-5h stretches, so its last quote is often stale;
+//   - impact flow: buyers of the token whose fair price rose arrive during each hour, before the
+//     next quote prints. Flow after a stale quote reveals the move; buying at the stale quote then
+//     looks profitable but was never on offer;
+//   - busy tapes: heavy live betting in front of the pre-game trades, paged with the collector's
+//     own tape rules (lib/tape.js) under tight page caps, so some tapes stop before the window.
+// Prices still reflect everything known at their timestamp, so no rule using only information up
+// to its fill price can beat costs; every survivor is false.
+//
 // truth.jsonl, one line per market: { conditionId, startTs, winnerIndex, informedTarget, q0 } where
 // q0[k] is outcome 0's true win probability k hours before start, using everything the generator
 // knows at that time (latent state plus any informed trade already printed). Outcome 1 is 1 - q0[k].
+// Busy markets also carry tokenIds and their full pre-game tape [[t, tokenIndex, side, size, price,
+// wallet], ...] so the self-test can check that trade features are exact or null.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeRng, normalCdf, randNormal } from './stats.js';
+import { createTape, TAPE_VERSION } from './tape.js';
 
 const HOUR = 3600;
 const DAY = 86400;
@@ -61,7 +75,20 @@ export const DEFAULTS = Object.freeze({
   underBias: 0.05,
   informedProb: 0.3,
   informedAccuracy: 0.68,
+  // stress world only
+  oneSidedGapProb: 0.25,    // per-hour chance a gap starts in token 1's series only
+  oneSidedGapMaxH: 5,
+  impactPerMove: 150,       // impact trades per unit of displayed price change in an hour
+  impactUsd: 1500,
+  busyProb: 0.06,           // markets with heavy in-game trading
+  busyInGameMin: 2500,
+  busyInGameMax: 6000,
+  tapePageSize: 500,        // collector paging applied to busy tapes (tight page cap on purpose)
+  tapeMaxPages: 8,
+  tapeMaxTrades: 3000,
 });
+
+export const WORLDS = Object.freeze(['null', 'planted', 'stress']);
 
 const FIRST = ['Marcus', 'Tyler', 'Andre', 'Jalen', 'Devon', 'Cole', 'Isaiah', 'Mason', 'Darius', 'Owen', 'Rafael', 'Luca', 'Niko', 'Theo', 'Samir', 'Victor', 'Elias', 'Jonah', 'Kai', 'Bruno'];
 const LAST = ['Carter', 'Brooks', 'Hayes', 'Ellis', 'Morrow', 'Vance', 'Okafor', 'Lindqvist', 'Moreau', 'Santos', 'Novak', 'Reyes', 'Kowalski', 'Adeyemi', 'Fischer', 'Duarte', 'Whitlock', 'Ivers', 'Castell', 'Bauer'];
@@ -332,6 +359,7 @@ function emitMarket(ev, spec, counter, o, ctx) {
   const { startTs } = ev;
   const L = spec.latent;
   const planted = o.world === 'planted';
+  const stress = o.world === 'stress' ? makeRng(o.seed, 'stress', counter) : null;
   const display = (q) => clamp(q + (planted ? plantedAdjust(q, spec.overSide, o) : 0), 0.003, 0.997);
 
   const conditionId = `0x${hex(rng, 56)}${counter.toString(16).padStart(8, '0')}`;
@@ -352,8 +380,10 @@ function emitMarket(ev, spec, counter, o, ctx) {
     return [r3(clamp(m + v / 2, 0.001, 0.999)), r3(clamp(1 - m + v / 2, 0.001, 0.999))];
   };
   const pre = [new Float64Array(K + 1), new Float64Array(K + 1)];
+  const stamp = new Float64Array(K + 1);
   const pts = [[], []];
   let gap = 0;
+  let gap1 = 0;
   for (let k = K; k >= 0; k--) {
     const [p0, p1] = quote(qPre[k]);
     pre[0][k] = p0;
@@ -363,13 +393,18 @@ function emitMarket(ev, spec, counter, o, ctx) {
     const startGap = rng() < o.gapProb;
     const gapLen = 1 + Math.floor(rng() * o.gapMaxH);
     const drop1 = desync && rng() < 0.1;
+    // A point's value only uses information up to its grid hour, and it is stamped at or after it.
+    stamp[k] = startTs - k * HOUR + jit;
+    let skip1 = false;
+    if (stress) {
+      const u = stress(), len = 1 + Math.floor(stress() * o.oneSidedGapMaxH);
+      if (gap1 > 0) { gap1--; skip1 = true; } else if (k > 0 && u < o.oneSidedGapProb) { gap1 = len - 1; skip1 = true; }
+    }
     if (k > openK) continue;
     if (gap > 0) { gap--; continue; }
     if (startGap && k > 0) { gap = gapLen - 1; continue; }
-    // A point's value only uses information up to its grid hour, and it is stamped at or after it.
-    const t = startTs - k * HOUR + jit;
-    pts[0].push({ t, p: p0 });
-    if (!drop1) pts[1].push({ t, p: p1 });
+    pts[0].push({ t: stamp[k], p: p0 });
+    if (!drop1 && !skip1) pts[1].push({ t: stamp[k], p: p1 });
   }
   const inGame = qIn.map((q) => quote(q));
   inGame.forEach(([p0, p1], h) => {
@@ -392,6 +427,16 @@ function emitMarket(ev, spec, counter, o, ctx) {
     return h <= 0 ? pre[tok][0] : inGame[Math.min(1, h - 1)][tok];
   };
   const tr = genTrades({ startTs, openK, winnerIndex, tokenIds, priceAt }, makeRng(o.seed, 'trades', counter), planted ? makeRng(o.seed, 'informed', counter) : null, o, ctx);
+  let tape = { trades: tr.trades, info: completeTapeInfo(tr.trades, startTs - K * HOUR, startTs + 3 * HOUR) };
+  let busyTape = null;
+  if (stress) {
+    addImpactFlow(tr.trades, { startTs, openK, tokenIds, pre, stamp, priceAt }, stress, o, ctx);
+    if (stress() < o.busyProb) {
+      busyTape = tr.trades.filter((t) => t.t <= startTs);
+      addLiveBurst(tr.trades, { startTs, tokenIds, priceAt }, stress, o, ctx);
+      tape = collectTape(tr.trades, { conditionId, tokenIds, fromT: startTs - K * HOUR, toT: startTs }, o);
+    } else tape.info = completeTapeInfo(tr.trades, startTs - K * HOUR, startTs + 3 * HOUR);
+  }
 
   // Truth: finest information available at each hour (latent + informed trade if already printed).
   const acc = o.informedAccuracy;
@@ -434,7 +479,69 @@ function emitMarket(ev, spec, counter, o, ctx) {
     negRisk: spec.negRisk,
     collectedAt: ctx.collectedAt,
   };
-  return { record, pts, trades: tr.trades, writeTrades: tr.collected, truth: { conditionId, startTs, winnerIndex, informedTarget: tr.informed ? tr.informed.target : null, q0 }, dirty };
+  if (tr.collected) record.tradesInfo = tape.info;
+  const truth = { conditionId, startTs, winnerIndex, informedTarget: tr.informed ? tr.informed.target : null, q0 };
+  if (busyTape && tr.collected) {
+    truth.tokenIds = tokenIds;
+    truth.tape = busyTape.map((t) => [t.t, t.asset === tokenIds[0] ? 0 : 1, t.side, t.size, t.price, t.wallet]);
+  }
+  return { record, pts, trades: tape.trades, writeTrades: tr.collected, truth, dirty, busy: !!busyTape };
+}
+
+// What collect.js records for a tape it read to the end: complete over [fromT, toT].
+function completeTapeInfo(trades, fromT, toT) {
+  return {
+    v: TAPE_VERSION, n: trades.length, fromT, toT, truncated: false, stop: 'end_of_tape', coverageFromT: fromT,
+    oldestT: trades.length ? trades[0].t : null, newestT: trades.length ? trades[trades.length - 1].t : null, pages: 1,
+  };
+}
+
+// Pages a full tape the way collect.js does (newest first, fixed page size and page cap) through the
+// shared tape rules, so busy markets get exactly the file and tradesInfo the collector would write.
+function collectTape(trades, { conditionId, tokenIds, fromT, toT }, o) {
+  const raw = trades.map((t, i) => ({ ...t, conditionId, transactionHash: `${conditionId}-${i}` })).sort((a, b) => b.t - a.t);
+  const normalize = (r) => ({ t: r.t, asset: r.asset, side: r.side, size: r.size, price: r.price, wallet: r.wallet });
+  const tape = createTape({ conditionId, tokenIds, fromT, toT, maxTrades: o.tapeMaxTrades, normalize });
+  let stop = 'end_of_tape';
+  for (let page = 0; ; page++) {
+    if (page >= o.tapeMaxPages) { stop = 'max_pages'; break; }
+    const rows = raw.slice(page * o.tapePageSize, (page + 1) * o.tapePageSize);
+    const state = tape.addPage(rows);
+    if (state !== 'more') { stop = state; break; }
+    if (rows.length < o.tapePageSize) break;
+  }
+  return tape.finish(stop);
+}
+
+// Buyers of the token whose displayed price rose from grid hour k to k-1 trade after hour k's quote
+// was stamped and no later than hour k-1, so a trade never reveals more than the newest quote
+// stamped at or after it; only a stale quote can be "beaten" by reading the flow after it.
+function addImpactFlow(trades, m, rng, o, ctx) {
+  const { startTs, openK, tokenIds, pre, stamp, priceAt } = m;
+  for (let k = Math.min(openK, o.preHours); k >= 1; k--) {
+    const move = pre[0][k - 1] - pre[0][k];
+    const n = Math.round(Math.abs(move) * o.impactPerMove);
+    const tok = move > 0 ? 0 : 1;
+    const lo = stamp[k] + 1, hi = startTs - (k - 1) * HOUR;
+    for (let i = 0; i < n; i++) {
+      const ts = lo + Math.floor(rng() * (hi - lo + 1));
+      const notional = Math.exp(Math.log(o.impactUsd) + 0.5 * randNormal(rng));
+      const price = priceAt(tok, ts);
+      trades.push({ t: ts, asset: tokenIds[tok], side: 'BUY', size: r2(notional / price), price, wallet: ctx.wallets[Math.floor(rng() * ctx.wallets.length)] });
+    }
+  }
+  trades.sort((x, y) => x.t - y.t);
+}
+
+function addLiveBurst(trades, m, rng, o, ctx) {
+  const { startTs, tokenIds, priceAt } = m;
+  const n = o.busyInGameMin + Math.floor(rng() * (o.busyInGameMax - o.busyInGameMin + 1));
+  for (let i = 0; i < n; i++) {
+    const ts = startTs + 1 + Math.floor(rng() * 2.5 * HOUR);
+    const tok = rng() < 0.5 ? 0 : 1;
+    trades.push({ t: ts, asset: tokenIds[tok], side: rng() < 0.6 ? 'BUY' : 'SELL', size: r2(20 / priceAt(tok, ts)), price: priceAt(tok, ts), wallet: ctx.wallets[Math.floor(rng() * ctx.wallets.length)] });
+  }
+  trades.sort((x, y) => x.t - y.t);
 }
 
 // Retail flow and uninformed whales in both worlds; informed wallets only in the planted world.
@@ -508,7 +615,7 @@ function genTrades(m, trng, irng, o, ctx) {
 // Writes markets.jsonl, prices/ and trades/ into dataDir and ground truth to truthFile (optional).
 export function generateWorld(opts = {}) {
   const o = { ...DEFAULTS, ...opts };
-  if (o.world !== 'null' && o.world !== 'planted') throw new Error(`world must be "null" or "planted", got "${o.world}"`);
+  if (!WORLDS.includes(o.world)) throw new Error(`world must be one of ${WORLDS.join(', ')}, got "${o.world}"`);
   if (!o.dataDir) throw new Error('generateWorld needs dataDir');
   if (!(Number.isInteger(o.events) && o.events > 0)) throw new Error('events must be a positive integer');
   const fromTs = Date.parse(`${o.from}T00:00:00Z`) / 1000;
@@ -531,7 +638,7 @@ export function generateWorld(opts = {}) {
   const summary = {
     synthetic: true, world: o.world, seed: o.seed, events: o.events, dataDir, truthFile: o.truthFile ? path.resolve(o.truthFile) : null,
     range: { from: isoTime(fromTs), to: isoTime(toTs) },
-    markets: 0, priceFiles: 0, tradeFiles: 0, informedMarkets: 0,
+    markets: 0, priceFiles: 0, tradeFiles: 0, informedMarkets: 0, busyMarkets: 0,
     bySport: {}, byClass: {}, classOf: {}, fallbackStart: [], dirty: Object.fromEntries(DIRTY.map((d) => [d, []])),
     params: Object.fromEntries(Object.keys(DEFAULTS).map((k) => [k, o[k]])),
   };
@@ -588,6 +695,7 @@ export function generateWorld(opts = {}) {
         summary.byClass[spec.cls] = (summary.byClass[spec.cls] || 0) + 1;
         summary.classOf[record.conditionId] = spec.cls;
         if (out.truth.informedTarget != null) summary.informedMarkets++;
+        if (out.busy) summary.busyMarkets++;
         if (out.dirty) summary.dirty[out.dirty].push(record.conditionId);
         else if (ev.fallback) summary.fallbackStart.push(record.conditionId);
       }
@@ -609,7 +717,7 @@ export function generateWorld(opts = {}) {
 
 // ---------- CLI ----------
 
-const USAGE = `Usage: node research/lib/synthetic.js --out <dataDir> [--world null|planted] [--events 2500] [--seed 1]
+const USAGE = `Usage: node research/lib/synthetic.js --out <dataDir> [--world null|planted|stress] [--events 2500] [--seed 1]
        [--truth <file>] [--<param> <value> ...]
 Writes SYNTHETIC markets.jsonl, prices/ and trades/ to <dataDir> (tooling validation only).
 --truth defaults to <dataDir>.truth.jsonl, outside the data dir. Any DEFAULTS key can be overridden in

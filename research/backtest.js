@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Walk-forward backtest of the hypothesis library on dataset.jsonl (see build-dataset.js).
 // Parameters are chosen on past folds only and judged on the next fold; only out-of-sample bets
-// are reported. Hypotheses never see labels: won/closePrice/clv are stripped before select().
+// are reported. Hypotheses never see labels: won/closePrice/clv/settleTs are stripped before select().
 // "No hypothesis survived" is a normal, expected outcome.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,9 +26,13 @@ export const DEFAULTS = Object.freeze({
   maxCost: 0.99,
   folds: 5,
   // Train rows must start this long before the test fold's first decision, so their outcomes
-  // were actually known (settled) when the parameters would have been chosen.
+  // were actually known (settled) when the parameters would have been chosen. Rows that carry a
+  // settleTs (closedTime) must also have settled by then, which covers multi-day events.
   embargoH: 24,
   minN: 50,
+  // Independent events a survivor needs out-of-sample: bets within an event are correlated, and the
+  // cluster bootstrap cannot be trusted (nor beat the 2^-events sign-flip floor) with few events.
+  minEvents: 30,
   fdr: 0.10,
   boot: 2000,
   seed: 1,
@@ -37,7 +41,7 @@ export const DEFAULTS = Object.freeze({
   only: null,
 });
 
-export const LABEL_FIELDS = Object.freeze(['won', 'closePrice', 'clv']);
+export const LABEL_FIELDS = Object.freeze(['won', 'closePrice', 'clv', 'settleTs']);
 // Word-bounded so real labels like "latest" or "soccer fixtures" are not flagged.
 const SYNTHETIC_RE = /\b(synth\w*|mock\w*|fake\w*|simulat\w*|dummy|test|demo|toy)\b/i;
 
@@ -60,25 +64,31 @@ function rowProblem(x) {
   if (!fin(x.price) || x.price <= 0 || x.price >= 1) return 'bad_price';
   if (fin(x.priceAgeSec) && x.priceAgeSec < 0) return 'price_after_decision';
   if (x.won !== 0 && x.won !== 1 && x.won !== true && x.won !== false) return 'bad_label';
+  if (x.settleTs != null && !fin(x.settleTs)) return 'bad_settle_time';
   return null;
 }
 
-// -> { f, won, closePrice, clv, fold }. f is a frozen copy WITHOUT the labels (LABEL_FIELDS) and
-// without lifetime gamma volume (it includes trading after the decision); f is the only object
-// hypotheses ever receive.
+// -> { f, won, closePrice, clv, settleTs, fold }. f is a frozen copy WITHOUT the labels
+// (LABEL_FIELDS) and without lifetime gamma volume (it includes trading after the decision); f is
+// the only object hypotheses ever receive.
 export function prepareRow(x) {
   // Rest-destructuring rather than `delete`: deleted keys push V8 objects into slow dictionary
   // mode, and select() reads these properties millions of times.
-  const { won, closePrice, clv, volume, ...f } = x;
+  const { won, closePrice, clv, settleTs, volume, ...f } = x;
   f.eventKey = String(f.eventKey == null || f.eventKey === '' ? f.conditionId || f.id : f.eventKey);
   return {
     f: Object.freeze(f),
     won: won === true || won === 1 ? 1 : 0,
     closePrice: fin(closePrice) ? closePrice : null,
     clv: fin(clv) ? clv : null,
+    settleTs: fin(settleTs) ? settleTs : null,
     fold: -1,
   };
 }
+
+// A training row's label must have been known at the test fold's first decision: its game started
+// at least embargoH earlier and, when the settlement time is known, it had settled.
+export const knownBy = (r, cutoff, embargoSec) => r.f.startTs + embargoSec <= cutoff && !(r.settleTs > cutoff);
 
 export async function loadDataset(file) {
   if (!fs.existsSync(file)) throw new Error(`dataset not found: ${file} — run research/build-dataset.js first or pass --data`);
@@ -179,7 +189,7 @@ export function walkForward(hyp, folds, o, hooks = {}) {
     const cutoff = folds[k].decisionMin;
     const train = [];
     for (let j = 0; j < k; j++) {
-      for (const r of folds[j].rows) if (offsets.has(r.f.offsetH) && r.f.startTs + embargoSec <= cutoff) train.push(r);
+      for (const r of folds[j].rows) if (offsets.has(r.f.offsetH) && knownBy(r, cutoff, embargoSec)) train.push(r);
     }
     hooks.onPhase?.('train', k);
     const chosen = chooseParams(hyp, cands, train, o);
@@ -221,7 +231,6 @@ function summarizeBets(bets, o, id) {
   );
   const pick = ({ estimate, lo, hi, se, p }) => ({ estimate, lo, hi, se, p });
   const roi = pick(boot.stats.roi);
-  const zSum = normalQuantile(1 - o.alpha / 2) + normalQuantile(0.8);
   return {
     n: bets.length,
     nEvents: boot.nClusters,
@@ -234,9 +243,18 @@ function summarizeBets(bets, o, id) {
     clv: { ...pick(boot.stats.clv), n: bets.filter((b) => b.clv != null).length },
     // ROI these exact bets would earn if every price were perfectly calibrated: the cost hurdle.
     hurdleRoi: mean(bets.map((b) => b.price / b.cost - 1)),
-    // Smallest true ROI this sample could detect (two-sided alpha, 80% power).
-    mde80: roi.se != null ? zSum * roi.se : null,
+    // Set by runBacktest once the size of the BH family is known (see mde80).
+    mde80: null,
+    mde80SingleTest: null,
   };
+}
+
+// True ROI at which a sample with this ROI standard error clears the rank-1 Benjamini-Hochberg
+// threshold (one-sided p <= q/m) with the given power. That is the most favourable case for one
+// real edge among m tested hypotheses; the CI and stress-spread checks only make detection harder.
+export function mde80(se, m, fdr, power = 0.8) {
+  if (!fin(se) || !(m >= 1)) return null;
+  return (normalQuantile(1 - fdr / m) + normalQuantile(power)) * se;
 }
 
 function effectiveOffsets(h, datasetOffsets) {
@@ -295,14 +313,20 @@ function evaluateHypothesis(h0, ctx, o) {
 function judge(r, o) {
   const fails = [];
   if (r.oos.n < o.minN) fails.push(`OOS n ${r.oos.n} < ${o.minN}`);
+  if (r.oos.nEvents < o.minEvents) fails.push(`OOS events ${r.oos.nEvents} < ${o.minEvents} (bets within an event are correlated; too few independent outcomes)`);
   if (!r.bh.significant) fails.push(`not significant after BH-FDR (q-adj ${fmtP(r.bh.pAdj)})`);
   if (!(r.oos.roi.lo > 0)) fails.push('95% CI of ROI reaches 0 or below');
   if (!(r.stress.roi > 0)) fails.push(`ROI not positive at ${r.stress.spread} spread`);
   const survives = fails.length === 0;
   let label = 'SURVIVES';
-  if (!survives) label = r.oos.n < o.minN ? 'too few bets' : r.oos.roi.estimate > 0 ? 'no edge (positive but not reliable)' : 'no edge';
+  if (!survives) {
+    label = r.oos.n < o.minN ? 'too few bets' : r.oos.nEvents < o.minEvents ? 'too few events'
+      : r.oos.roi.estimate > 0 ? 'no edge (positive but not reliable)' : 'no edge';
+  }
   return { survives, label, fails };
 }
+
+const canSurvive = (r, o) => r.oos.n >= o.minN && r.oos.nEvents >= o.minEvents;
 
 // ---------- descriptive tables ----------
 
@@ -332,8 +356,8 @@ export function calibration(rows, nBuckets = 10) {
   return out;
 }
 
-function summarizeData(file, rows, read, drops, folds) {
-  const markets = new Set(), events = new Set(), offsets = {}, sports = {}, marketTypes = {}, wonByMarketOffset = new Map();
+function summarizeData(file, rows, read, drops, folds, o) {
+  const markets = new Set(), events = new Set(), offsets = {}, sports = {}, marketTypes = {}, wonByMarketOffset = new Map(), lateSettling = new Set();
   let withTrades = 0, startMin = Infinity, startMax = -Infinity;
   for (const r of rows) {
     const f = r.f;
@@ -347,6 +371,7 @@ function summarizeData(file, rows, read, drops, folds) {
     startMax = Math.max(startMax, f.startTs);
     const k = `${f.conditionId}|${f.offsetH}`;
     wonByMarketOffset.set(k, (wonByMarketOffset.get(k) || 0) + r.won);
+    if (r.settleTs != null && r.settleTs - f.startTs > o.embargoH * HOUR) lateSettling.add(f.conditionId || f.id);
   }
   let labelAnomalies = 0;
   for (const v of wonByMarketOffset.values()) if (v > 1) labelAnomalies++;
@@ -357,6 +382,7 @@ function summarizeData(file, rows, read, drops, folds) {
     offsets, sports, marketTypes,
     tradeCoverage: rows.length ? withTrades / rows.length : 0,
     labelAnomalies,
+    lateSettlingMarkets: lateSettling.size,
     folds: folds.map((f) => ({ fold: f.fold, role: f.fold === 0 ? 'train only' : 'test (OOS)', nRows: f.rows.length, nEvents: f.nEvents, startFrom: iso(f.startMin), startTo: iso(f.startMax), firstDecision: iso(f.decisionMin) })),
   };
 }
@@ -408,10 +434,13 @@ export async function runBacktest(opts = {}) {
   tested.forEach((r, i) => {
     r.bh = { pAdj: bh.adjusted[i], significant: bh.rejected[i] };
     r.verdict = judge(r, o);
+    // A sample that cannot meet min-n / min-events cannot survive at any edge size.
+    r.oos.mde80 = canSurvive(r, o) ? mde80(r.oos.roi.se, tested.length, o.fdr) : null;
+    r.oos.mde80SingleTest = fin(r.oos.roi.se) ? (normalQuantile(1 - o.alpha / 2) + normalQuantile(0.8)) * r.oos.roi.se : null;
   });
   for (const r of results) if (r.status === 'skipped') r.verdict = { survives: false, label: 'skipped', fails: [r.skipReason] };
 
-  const data = summarizeData(dataFile, rows, read, drops, folds);
+  const data = summarizeData(dataFile, rows, read, drops, folds, o);
   const survivors = tested.filter((r) => r.verdict.survives);
   const provenance = loadProvenance(dataFile);
   const labelLooksSynthetic = SYNTHETIC_RE.test(o.sourceLabel);
@@ -429,13 +458,14 @@ export async function runBacktest(opts = {}) {
     verdict: null,
     config: {
       data: dataFile, fee: o.fee, spread: o.spread, stressSpread: o.stressSpread, sensitivitySpreads: o.sensitivitySpreads,
-      maxCost: o.maxCost, folds: o.folds, embargoH: o.embargoH, minN: o.minN, fdr: o.fdr, boot: o.boot, seed: o.seed,
+      maxCost: o.maxCost, folds: o.folds, embargoH: o.embargoH, minN: o.minN, minEvents: o.minEvents, fdr: o.fdr, boot: o.boot, seed: o.seed,
       alpha: o.alpha, minSportMarkets: o.minSportMarkets, only: o.only || null, sportVariantsFor: sports,
       costModel: 'cost = min(0.999, (price + spread) * (1 + fee)); skip if cost >= maxCost; flat $1 stake; pnl = won ? 1/cost - 1 : -1',
-      survivalRule: `OOS n >= ${o.minN} AND BH-significant at q=${o.fdr} AND 95% cluster-bootstrap CI lower bound of ROI > 0 AND ROI > 0 at spread ${o.stressSpread}`,
+      survivalRule: `OOS n >= ${o.minN} AND OOS events >= ${o.minEvents} AND BH-significant at q=${o.fdr} AND 95% cluster-bootstrap CI lower bound of ROI > 0 AND ROI > 0 at spread ${o.stressSpread}`,
+      mde80: `BH-aware: (z_{1-q/m} + z_0.8) x bootstrap SE of ROI, with m = ${tested.length} hypotheses tested; null when the sample cannot meet min-n / min-events. A best case, not a guarantee.`,
     },
     data,
-    bh: { m: bh.m, q: o.fdr, nRejected: bh.nRejected, minAttainableP: 1 / (o.boot + 1) },
+    bh: { m: bh.m, q: o.fdr, nRejected: bh.nRejected, minAttainableP: 1 / (o.boot + 1), pFloor: 'max(1/(B+1), 2^-events)' },
     hypotheses: results,
     calibration: calibration(rows),
     warnings: [],
@@ -477,6 +507,7 @@ function buildWarnings(rep, o) {
     w.push(`With --boot ${o.boot} the smallest attainable p (${fmtP(1 / (o.boot + 1))}) exceeds the first BH threshold (${fmtP(o.fdr / tested.length)}), so nothing can pass. Use --boot >= ${Math.ceil(tested.length / o.fdr)}.`);
   }
   if (rep.data.events < 300) w.push(`Only ${rep.data.events} events: far too few to detect realistic edges of a few percent ROI.`);
+  if (rep.data.lateSettlingMarkets) w.push(`${rep.data.lateSettlingMarkets} markets settled more than ${o.embargoH}h after their start (multi-day events or a stale start time); training only uses them once they had settled.`);
   if (rep.data.labelAnomalies) w.push(`${rep.data.labelAnomalies} (market, offset) groups have more than one winning outcome — check winnerIndex/labels upstream.`);
   if (o.only && o.only.length) w.push('--only narrowed the BH family. That is only valid if the subset was fixed before looking at any results.');
   const base = tested.find((r) => r.id === 'baseline-all');
@@ -505,12 +536,16 @@ function buildVerdict(rep, survivors, o) {
   } else if (sanityFailed) {
     text = '**Results are not trustworthy.** The sanity baseline (buy every outcome) came out profitable after costs, which should be impossible on correctly built data. Find the leakage or label problem before reading anything else.';
   } else if (!survivors.length) {
-    // "No evidence" is only as strong as the sample: state the smallest edge that could have shown up.
-    const mdes = tested.filter((r) => r.role === 'candidate' && fin(r.oos.mde80)).map((r) => r.oos.mde80).sort((a, b) => a - b);
-    const power = mdes.length
-      ? ` With these sample sizes the minimum detectable ROI (80% power) of the candidates ranged from ${pctAbs(mdes[0])} to ${pctAbs(mdes[mdes.length - 1])} (median ${pctAbs(mdes[Math.floor(mdes.length / 2)])}); smaller edges would not have shown up, so this is not evidence that they are absent.`
+    // "No evidence" is only as strong as the sample. MDE80 is a best case (BH rank-1 threshold, no
+    // CI or stress check), so it bounds what would likely be missed, not what would be caught.
+    const cands = tested.filter((r) => r.role === 'candidate');
+    const mdes = cands.filter((r) => fin(r.oos.mde80)).map((r) => r.oos.mde80).sort((a, b) => a - b);
+    const blind = cands.length - mdes.length;
+    let power = mdes.length
+      ? ` Candidate edges smaller than their BH-aware minimum detectable ROI (MDE80 ranged from ${pctAbs(mdes[0])} to ${pctAbs(mdes[mdes.length - 1])}, median ${pctAbs(mdes[Math.floor(mdes.length / 2)])}) would likely have been missed, so this is not evidence that such edges are absent. MDE80 is a best case for each hypothesis; it does not mean larger edges would reliably have been found.`
       : '';
-    text = `**No hypothesis survived.** ${tested.length} hypotheses were tested out-of-sample after costs (${costs}); none passed all of: n >= ${o.minN}, Benjamini-Hochberg significance at q = ${o.fdr}, a 95% cluster-bootstrap CI for ROI entirely above 0, and positive ROI at a ${o.stressSpread} spread. On this data there is no evidence of a repeatable edge. That is a legitimate result, not a tooling failure.${power}`;
+    if (blind) power += ` ${blind} candidate(s) had fewer than ${o.minN} bets or ${o.minEvents} events out-of-sample and could not have survived at any edge size.`;
+    text = `**No hypothesis survived.** ${tested.length} hypotheses were tested out-of-sample after costs (${costs}); none passed all of: n >= ${o.minN} bets on >= ${o.minEvents} events, Benjamini-Hochberg significance at q = ${o.fdr}, a 95% cluster-bootstrap CI for ROI entirely above 0, and positive ROI at a ${o.stressSpread} spread. On this data there is no evidence of a repeatable edge. That is a legitimate result, not a tooling failure.${power}`;
   } else {
     text = `**${survivors.length} of ${tested.length} hypotheses survived every check: ${survivors.map((r) => r.id).join(', ')}.** This is evidence from this dataset only. Before risking money, paper-trade each survivor forward at real order-book fills and confirm the edge persists.`;
   }
@@ -566,12 +601,13 @@ function toMarkdown(rep) {
   L.push(`- Rows by sport: ${sports}. Trade features on ${pct(d.tradeCoverage, 0).replace('+', '')} of rows.`);
   L.push(`- Costs: entry cost = min(0.999, (price + ${c.spread}) x (1 + ${c.fee})); rows with cost >= ${c.maxCost} skipped; flat $1 stake.`);
   L.push(`- Walk-forward: ${c.folds} time-ordered folds, whole events per fold; fold 0 is train-only. For each later fold, parameters (grid x decision offset) are chosen on earlier folds only (best train ROI with n >= ${c.minN}), with a ${c.embargoH}h embargo before the fold's first decision. Only out-of-sample bets are reported.`);
-  L.push(`- Statistics: 95% CIs by cluster bootstrap over eventKey (B = ${c.boot}, seed ${c.seed}); one-sided p for ROI > 0 (floor 1/(B+1) = ${fmtP(rep.bh.minAttainableP)}); Benjamini-Hochberg FDR q = ${c.fdr} across the ${rep.bh.m} hypotheses tested in this run.`);
+  L.push(`- Walk-forward training also skips rows whose market had not settled (closedTime) by the fold's first decision.`);
+  L.push(`- Statistics: 95% CIs by cluster bootstrap over eventKey (B = ${c.boot}, seed ${c.seed}); one-sided p for ROI > 0, floored at max(1/(B+1) = ${fmtP(rep.bh.minAttainableP)}, 2^-events) because no resampling test over few independent events can be more confident than that; Benjamini-Hochberg FDR q = ${c.fdr} across the ${rep.bh.m} hypotheses tested in this run.`);
   L.push(`- SURVIVES requires: ${c.survivalRule}.`);
   L.push(`- Per-sport variants: ${c.sportVariantsFor.length ? c.sportVariantsFor.join(', ') : 'none'} (sports with >= ${c.minSportMarkets} markets).`);
 
   L.push('', '## Results (out-of-sample only)', '');
-  L.push('ROI is profit per $1 staked. CLV = close price minus entry price (positive means the market moved your way). Hurdle = ROI these bets would earn if prices were perfectly calibrated. MDE80 = smallest true ROI this sample would detect with 80% power; a "no edge" row says nothing about edges smaller than that. The spread columns re-cost the same out-of-sample picks at each haircut.', '');
+  L.push(`ROI is profit per $1 staked. CLV = close price minus entry price (positive means the market moved your way). Hurdle = ROI these bets would earn if prices were perfectly calibrated. MDE80 = true ROI at which this sample would clear the first Benjamini-Hochberg threshold (one-sided p <= q/m, m = ${rep.bh.m}) with 80% power. It is a best case: a "no edge" row says nothing about edges below it (they would likely be missed), and the CI and stress checks make detection harder still. n/a means the sample cannot meet min-n / min-events at all. The spread columns re-cost the same out-of-sample picks at each haircut.`, '');
   const spreads = rep.hypotheses.find((r) => r.sensitivity)?.sensitivity.map((s) => s.spread) || [];
   L.push(`| Hypothesis | Bets (events) | ROI | 95% CI | MDE80 | p | BH q-adj | CLV | Hurdle | ROI at spread ${spreads.join(' / ')} | Verdict |`);
   L.push('|---|---|---|---|---|---|---|---|---|---|---|');
@@ -589,7 +625,7 @@ function toMarkdown(rep) {
     for (const r of survivors) {
       L.push(`### ${esc(r.id)}: ${esc(r.name)}`, '', esc(r.rationale), '');
       L.push(`- OOS: ${r.oos.n} bets on ${r.oos.nEvents} events, win rate ${num(r.oos.winRate)} vs avg cost ${num(r.oos.avgCost)}; edge captured ${num(r.oos.edgeCaptured.estimate)} (CI ${num(r.oos.edgeCaptured.lo)} to ${num(r.oos.edgeCaptured.hi)}); mean CLV ${num(r.oos.clv.estimate, 4)} (CI ${num(r.oos.clv.lo, 4)} to ${num(r.oos.clv.hi, 4)}, n ${r.oos.clv.n}).`);
-      L.push(`- Minimum detectable ROI at this sample size (80% power): ${pct(r.oos.mde80)}. Distinct parameter choices across folds: ${r.distinctChoices}.`);
+      L.push(`- BH-aware minimum detectable ROI at this sample size (80% power, best case): ${pct(r.oos.mde80)}. Distinct parameter choices across folds: ${r.distinctChoices}.`);
       for (const f of r.folds) L.push(`- Fold ${f.fold}: ${paramStr(f.chosen)}${f.chosen ? ` (train n ${f.chosen.trainN}, ROI ${pct(f.chosen.trainRoi)})` : ''}; test ${f.nBets} bets, ROI ${pct(f.roi)}.`);
       L.push('');
     }
@@ -632,7 +668,9 @@ const USAGE = `Usage: node research/backtest.js --source-label "<where the data 
   --stress-spread 0.02     spread at which a survivor must still be profitable
   --folds 5                time-ordered walk-forward folds (fold 0 is train-only)
   --embargo-h 24           train rows must start this many hours before the test fold's first decision
+                           (and, when the dataset has settleTs, have settled by it)
   --min-n 50               min bets for a train parameter choice and for an OOS survivor
+  --min-events 30          min independent events (eventKey) behind an OOS survivor
   --fdr 0.10               Benjamini-Hochberg false discovery rate
   --boot 2000              bootstrap replicates
   --seed 1                 RNG seed
@@ -642,7 +680,7 @@ const USAGE = `Usage: node research/backtest.js --source-label "<where the data 
   --name <base>            report file base name (default backtest-<UTC timestamp>)
   --list                   print the base hypothesis ids and exit`;
 
-const VALUE_OPTS = new Set(['data', 'source-label', 'fee', 'spread', 'stress-spread', 'folds', 'embargo-h', 'min-n', 'fdr', 'boot', 'seed', 'min-sport-markets', 'only', 'out', 'name']);
+const VALUE_OPTS = new Set(['data', 'source-label', 'fee', 'spread', 'stress-spread', 'folds', 'embargo-h', 'min-n', 'min-events', 'fdr', 'boot', 'seed', 'min-sport-markets', 'only', 'out', 'name']);
 
 function parseArgs(argv) {
   const a = {};
@@ -685,6 +723,7 @@ export function optsFromArgs(argv) {
   if (a.folds != null) o.folds = numArg('folds', a.folds, { min: 2, int: true });
   if (a['embargo-h'] != null) o.embargoH = numArg('embargo-h', a['embargo-h']);
   if (a['min-n'] != null) o.minN = numArg('min-n', a['min-n'], { min: 1, int: true });
+  if (a['min-events'] != null) o.minEvents = numArg('min-events', a['min-events'], { min: 1, int: true });
   if (a.fdr != null) o.fdr = numArg('fdr', a.fdr, { min: 0, max: 1, exclusiveMin: true });
   if (a.boot != null) o.boot = numArg('boot', a.boot, { min: 1, int: true });
   if (a.seed != null) o.seed = numArg('seed', a.seed, { min: -Infinity });

@@ -118,7 +118,7 @@ export const BASE_HYPOTHESES = Object.freeze([
   }),
   H({
     id: 'overround-cheap-side', name: 'Buy the cheap side of a mispriced pair', requires: ['overround', 'complementPrice'],
-    rationale: 'Two-way prices should sum to about 1. mode "under": this side is cheaper than 1 - complement by th (a stale quote), so buy it; when the pair is underround both sides qualify. mode "over-dog": the pair is overround by th, so buy the underdog on the theory that the favorite carries the excess.',
+    rationale: 'Two-way prices quoted at the same time should sum to about 1 (the builder only pairs a price with a complement point no fresher than it and within --max-sync-gap-min). mode "under": the pair is underround by th, so this side looks cheap against 1 - complement; buy it. mode "over-dog": the pair is overround by th, so buy the underdog on the theory that the favorite carries the excess.',
     paramGrid: [...grid({ mode: ['under'], th: [0.01, 0.02, 0.04] }), ...grid({ mode: ['over-dog'], th: [0.02, 0.04] })],
     select: (r, p) => has(r.overround) && has(r.complementPrice)
       && (p.mode === 'under' ? r.overround <= -p.th : r.overround >= p.th && r.price < r.complementPrice),

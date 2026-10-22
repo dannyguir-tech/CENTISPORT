@@ -1,6 +1,8 @@
 // Run: node --test research/test/build-dataset.test.js
 // Hand-made fixture with exact expected features, plus leakage tests: data injected one second
-// after a decision time must not change any feature at that (or any earlier) decision.
+// after a decision time must not change any feature at that (or any earlier) decision. Features are
+// as of the row's price point: the complement is never fresher than it, and the 24h trade window
+// ends at its timestamp.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +18,7 @@ const SCRIPT = path.join(HERE, '..', 'build-dataset.js');
 const H = 3600;
 const S = Date.UTC(2025, 0, 10) / 1000; // game start for the fixture
 const OFFSETS = [1, 3, 12, 24];
-const LABELS = new Set(['won', 'closePrice', 'clv']);
+const LABELS = new Set(['won', 'closePrice', 'clv', 'settleTs']);
 const r2 = (x) => Math.round(x * 100) / 100;
 const pA = (k) => r2(0.40 + 0.01 * (30 - k));
 
@@ -50,11 +52,25 @@ function market(over) {
   };
 }
 
+const T = (t, asset, side, size, price, wallet) => ({ t, asset, side, size, price, wallet });
+const C1_TRADES = [
+  T(S - 2 * H, 'tA', 'BUY', 100, 0.68, 'w1'),
+  T(S - 3 * H, 'tA', 'BUY', 2000, 0.67, 'w2'),
+  T(S - 5 * H, 'tB', 'BUY', 500, 0.35, 'w3'),
+  T(S - 10 * H, 'tA', 'SELL', 50, 0.60, 'w1'),
+  T(S - 26 * H, 'tA', 'BUY', 10000, 0.44, 'w4'),
+  T(S - 1800, 'tB', 'BUY', 1000, 0.30, 'w5'),
+  T(S - 4 * H, 'tA', 'BUY', 10, 0.66, null),
+];
+// What collect.js records for a complete tape over [S - 78h, S] (lib/tape.js).
+const C1_TAPE = { v: 2, n: 7, fromT: S - 78 * H, toT: S, truncated: false, stop: 'window_start', coverageFromT: S - 78 * H, oldestT: S - 26 * H, newestT: S - 1800, pages: 1 };
+
 function makeFixture(dir) {
   const ev = 'nba-lal-bos-2025-01-10';
   const markets = [
     market({ conditionId: 'c1', question: 'Lakers vs. Celtics', eventSlug: ev, outcomes: ['Lakers', 'Celtics'], tokenIds: ['tA', 'tB'], winnerIndex: 0, volume: 123456,
-      times: { gameStartTime: '2025-01-10 00:00:00+00', startDate: '2025-01-03T00:00:00Z', endDate: '2025-01-17T00:00:00Z', closedTime: '2025-01-10 03:30:00+00', eventStartDate: '2025-01-08T12:00:00Z', eventEndDate: null } }),
+      times: { gameStartTime: '2025-01-10 00:00:00+00', startDate: '2025-01-03T00:00:00Z', endDate: '2025-01-17T00:00:00Z', closedTime: '2025-01-10 03:30:00+00', eventStartDate: '2025-01-08T12:00:00Z', eventEndDate: null },
+      tradesInfo: C1_TAPE }),
     market({ conditionId: 'c2', question: 'Lakers vs. Celtics: O/U 220.5', eventSlug: ev, outcomes: ['Over', 'Under'], tokenIds: ['tO', 'tU'], winnerIndex: 1,
       times: { gameStartTime: null, startDate: null, endDate: null, closedTime: '2025-01-10T04:00:00Z', eventStartDate: '2025-01-10T00:00:00Z', eventEndDate: null } }),
     market({ conditionId: 'c3', times: { gameStartTime: null, endDate: '2025-01-10T00:00:00Z', closedTime: '2025-01-10T04:00:00Z' } }),
@@ -84,15 +100,8 @@ function makeFixture(dir) {
   writePrices(dir, 'tU', u);
   writePrices(dir, 'tS1', [{ t: S - 2 * H, p: 0.55 }, { t: S - 1800, p: 0.56 }]);
 
-  const T = (t, asset, side, size, price, wallet) => ({ t, asset, side, size, price, wallet });
   writeJsonl(path.join(dir, 'trades', 'c1.jsonl'), [
-    T(S - 2 * H, 'tA', 'BUY', 100, 0.68, 'w1'),
-    T(S - 3 * H, 'tA', 'BUY', 2000, 0.67, 'w2'),
-    T(S - 5 * H, 'tB', 'BUY', 500, 0.35, 'w3'),
-    T(S - 10 * H, 'tA', 'SELL', 50, 0.60, 'w1'),
-    T(S - 26 * H, 'tA', 'BUY', 10000, 0.44, 'w4'),
-    T(S - 1800, 'tB', 'BUY', 1000, 0.30, 'w5'),
-    T(S - 4 * H, 'tA', 'BUY', 10, 0.66, null),
+    ...C1_TRADES,
     T(S - 4 * H, 'tZ', 'BUY', 99999, 0.5, 'w9'), // unknown asset: ignored
     '{broken',
   ]);
@@ -166,26 +175,33 @@ test('summary counts rows per offset and drops by reason', () => {
 test('row schema has exactly the spec fields in order', () => {
   const keys = ['id', 'eventKey', 'conditionId', 'outcomeIndex', 'outcome', 'startTs', 'decisionTs', 'offsetH', 'sport', 'marketType',
     'sideType', 'line', 'price', 'priceAgeSec', 'price_m6h', 'price_m24h', 'mom6h', 'mom24h', 'complementPrice', 'overround',
-    'nTrades24h', 'netBuyNotional24h', 'largeNetNotional24h', 'distinctWallets24h', 'topWalletShare24h', 'won', 'closePrice', 'clv'];
+    'nTrades24h', 'netBuyNotional24h', 'largeNetNotional24h', 'distinctWallets24h', 'topWalletShare24h', 'won', 'closePrice', 'clv', 'settleTs'];
   for (const r of baseRows.values()) assert.deepEqual(Object.keys(r), keys);
 });
 
 test('moneyline market with trades: exact features', () => {
   const common = { eventKey: 'nba-lal-bos-2025-01-10', conditionId: 'c1', startTs: S, sport: 'nba', marketType: 'moneyline', sideType: 'team', line: null };
+  // tA's points sit 300 s before each hour, tB's on the hour. As of tA's point the newest tB point is
+  // 55 min older (> --max-sync-gap-min 30), and the fresher one must not be used: no complement.
   assertRow(baseRows.get('c1|0|1'), { ...common, id: 'c1|0|1', outcomeIndex: 0, outcome: 'Lakers', decisionTs: S - H, offsetH: 1,
-    price: 0.69, priceAgeSec: 300, price_m6h: 0.63, price_m24h: 0.45, mom6h: 0.06, mom24h: 0.24, complementPrice: 0.33, overround: 0.02,
+    price: 0.69, priceAgeSec: 300, price_m6h: 0.63, price_m24h: 0.45, mom6h: 0.06, mom24h: 0.24, complementPrice: null, overround: null,
     nTrades24h: 5, netBuyNotional24h: 68 + 1340 - 175 - 30 + 6.6, largeNetNotional24h: 1340, distinctWallets24h: 3, topWalletShare24h: 1340 / 1613,
-    won: 1, closePrice: 0.70, clv: 0.01 });
+    won: 1, closePrice: 0.70, clv: 0.01, settleTs: S + 3.5 * H });
+  // tB's point is on the hour; tA's point 300 s earlier is synchronous enough.
   assertRow(baseRows.get('c1|1|1'), { ...common, id: 'c1|1|1', outcomeIndex: 1, outcome: 'Celtics', decisionTs: S - H,
     price: 0.33, priceAgeSec: 0, price_m6h: 0.39, price_m24h: 0.57, mom6h: -0.06, mom24h: -0.24, complementPrice: 0.69, overround: 0.02,
     nTrades24h: 5, netBuyNotional24h: -(68 + 1340 - 175 - 30 + 6.6), largeNetNotional24h: -1340, distinctWallets24h: 3, topWalletShare24h: 1340 / 1613,
     won: 0, closePrice: 0.32, clv: -0.01 });
-  // t == decisionTs is included (S-3h trade), window is (decisionTs-24h, decisionTs]
+  // The window is (price time - 24h, price time]: the S-3h trade is after tA's S-3h-300 point, so it
+  // is not used (it could reveal a move the fill price does not reflect) ...
   assertRow(baseRows.get('c1|0|3'), { decisionTs: S - 3 * H, price: 0.67, priceAgeSec: 300, price_m6h: 0.61, price_m24h: 0.43,
-    nTrades24h: 5, netBuyNotional24h: 1340 + 6.6 - 175 - 30 + 4400, largeNetNotional24h: 5740, distinctWallets24h: 4, topWalletShare24h: 4400 / 5945, id: 'c1|0|3' });
+    nTrades24h: 4, netBuyNotional24h: 6.6 - 175 - 30 + 4400, largeNetNotional24h: 4400, distinctWallets24h: 3, topWalletShare24h: 4400 / 4605, id: 'c1|0|3' });
+  // ... while for tB, whose point is at exactly S-3h, a trade at t == price time is included.
+  assertRow(baseRows.get('c1|1|3'), { id: 'c1|1|3', priceAgeSec: 0, nTrades24h: 5, largeNetNotional24h: -5740, distinctWallets24h: 4 });
   assertRow(baseRows.get('c1|0|12'), { id: 'c1|0|12', price: 0.58, nTrades24h: 1, netBuyNotional24h: 4400, largeNetNotional24h: 4400, distinctWallets24h: 1, topWalletShare24h: 1 });
-  assertRow(baseRows.get('c1|0|24'), { id: 'c1|0|24', price: 0.46, price_m6h: 0.40, mom6h: 0.06, price_m24h: null, mom24h: null, complementPrice: 0.56, overround: 0.02,
+  assertRow(baseRows.get('c1|0|24'), { id: 'c1|0|24', price: 0.46, price_m6h: 0.40, mom6h: 0.06, price_m24h: null, mom24h: null, complementPrice: null, overround: null,
     nTrades24h: 1, netBuyNotional24h: 4400, closePrice: 0.70, clv: 0.24 });
+  assertRow(baseRows.get('c1|1|24'), { id: 'c1|1|24', priceAgeSec: 0, complementPrice: 0.46, overround: 0.02 });
 });
 
 test('totals market via eventStartDate, stale complement, no trades -> null trade features', () => {
@@ -228,8 +244,11 @@ for (const h of OFFSETS) {
     const r = rows.get(`c1|0|${h}`);
     assert.equal(r.price, 0.01);
     assert.equal(r.priceAgeSec, 0);
-    assert.equal(r.nTrades24h, baseRows.get(`c1|0|${h}`).nTrades24h + 2);
-    assert.equal(r.distinctWallets24h, baseRows.get(`c1|0|${h}`).distinctWallets24h + 2);
+    // The injected point is now the price point, so the window is (decisionTs - 24h, decisionTs].
+    const d = S - h * H;
+    const inWindow = C1_TRADES.filter((t) => t.t > d - 24 * H && t.t <= d);
+    assert.equal(r.nTrades24h, inWindow.length + 2);
+    assert.equal(r.distinctWallets24h, new Set(inWindow.map((t) => t.wallet).filter(Boolean)).size + 2);
   });
 }
 
@@ -302,4 +321,108 @@ test('provenance: collect-runs.jsonl and [SYNTHETIC] markers decide the status',
   // buildDataset records it in the summary (the hand-made fixture has no collect-runs.jsonl).
   const summary = JSON.parse(fs.readFileSync(path.join(base, 'dataset.summary.json'), 'utf8'));
   assert.equal(summary.provenance.status, 'unknown');
+});
+
+// ---------- trade-tape coverage (review R1 / DI-1) ----------
+
+function withC1Tape(name, tradesInfo) {
+  const dir = tmpDir(name);
+  fs.cpSync(base, dir, { recursive: true });
+  const mf = path.join(dir, 'markets.jsonl');
+  const lines = fs.readFileSync(mf, 'utf8').split('\n').map((l) => {
+    try {
+      const m = JSON.parse(l);
+      if (m.conditionId !== 'c1' || m.question === 'duplicate line') return l;
+      if (tradesInfo === undefined) delete m.tradesInfo;
+      else m.tradesInfo = tradesInfo;
+      return JSON.stringify(m);
+    } catch { return l; }
+  });
+  fs.writeFileSync(mf, lines.join('\n'));
+  return dir;
+}
+const flowOf = (r) => ({ nTrades24h: r.nTrades24h, netBuyNotional24h: r.netBuyNotional24h, largeNetNotional24h: r.largeNetNotional24h, distinctWallets24h: r.distinctWallets24h, topWalletShare24h: r.topWalletShare24h });
+const NULL_FLOW = { nTrades24h: null, netBuyNotional24h: null, largeNetNotional24h: null, distinctWallets24h: null, topWalletShare24h: null };
+
+test('truncated tape: rows whose 24h window starts before coverageFromT get null trade features, others stay exact', async () => {
+  const dir = withC1Tape('tape-truncated', { ...C1_TAPE, truncated: true, stop: 'max_pages', coverageFromT: S - 30 * H });
+  const s = await buildDataset({ dataDir: dir, offsets: OFFSETS });
+  const rows = byId(readRows(path.join(dir, 'dataset.jsonl')));
+  // Windows end at the price point: c1|0|3 covers (S-27h-300, S-3h-300], inside the coverage.
+  for (const id of ['c1|0|1', 'c1|1|1', 'c1|0|3', 'c1|1|3']) assert.deepEqual(flowOf(rows.get(id)), flowOf(baseRows.get(id)), id);
+  for (const id of ['c1|0|12', 'c1|1|12', 'c1|0|24', 'c1|1|24']) assert.deepEqual(flowOf(rows.get(id)), NULL_FLOW, `${id} must be null, not 0`);
+  assert.equal(s.featureNulls.trades_window_not_covered, 4);
+  assert.equal(s.marketsTradesTruncated, 1);
+  // Unknown coverage (unsorted tape) -> nothing trusted.
+  const unk = withC1Tape('tape-unknown', { ...C1_TAPE, truncated: true, stop: 'max_trades', coverageFromT: null });
+  await buildDataset({ dataDir: unk, offsets: OFFSETS });
+  for (const r of readRows(path.join(unk, 'dataset.jsonl')).filter((x) => x.conditionId === 'c1')) assert.deepEqual(flowOf(r), NULL_FLOW, r.id);
+});
+
+test('tape that ends before the price point (toT) is not trusted for that row', async () => {
+  const dir = withC1Tape('tape-tot', { ...C1_TAPE, toT: S - 2 * H });
+  await buildDataset({ dataDir: dir, offsets: OFFSETS });
+  const rows = byId(readRows(path.join(dir, 'dataset.jsonl')));
+  assert.deepEqual(flowOf(rows.get('c1|1|1')), NULL_FLOW, 'price point at S-1h is after the tape end');
+  assert.deepEqual(flowOf(rows.get('c1|1|3')), flowOf(baseRows.get('c1|1|3')));
+});
+
+test('tape without collector coverage info falls back to its oldest trade (null rather than an undercount)', async () => {
+  for (const [name, info] of [['tape-missing', undefined], ['tape-legacy', { n: 7, truncated: true, oldestT: S - 26 * H, newestT: S - 1800 }]]) {
+    const dir = withC1Tape(name, info);
+    const s = await buildDataset({ dataDir: dir, offsets: OFFSETS });
+    const rows = byId(readRows(path.join(dir, 'dataset.jsonl')));
+    assert.deepEqual(flowOf(rows.get('c1|0|1')), flowOf(baseRows.get('c1|0|1')), `${name}: (S-25h-300, S-1h-300] is after the oldest trade`);
+    for (const id of ['c1|0|3', 'c1|0|12', 'c1|0|24']) assert.deepEqual(flowOf(rows.get(id)), NULL_FLOW, `${name}: ${id}`);
+    assert.equal(s.marketsTradesLegacy, 1);
+  }
+});
+
+// ---------- complement synchronisation (review R2) ----------
+
+test('complement is taken as of the row price point and only within --max-sync-gap-min', async () => {
+  const dir = tmpDir('sync');
+  writeJsonl(path.join(dir, 'markets.jsonl'), [market({ conditionId: 's1', question: 'Knicks vs. Heat', outcomes: ['Knicks', 'Heat'], tokenIds: ['sK', 'sH'],
+    times: { gameStartTime: '2025-01-10T00:00:00Z', closedTime: '2025-01-10T03:00:00Z' } })]);
+  // sK goes quiet 3h before start (stale 2h at the 1h decision); sH keeps printing and moves.
+  writePrices(dir, 'sK', [{ t: S - 6 * H, p: 0.5 }, { t: S - 3 * H, p: 0.5 }]);
+  writePrices(dir, 'sH', [{ t: S - 6 * H, p: 0.5 }, { t: S - 3 * H, p: 0.5 }, { t: S - 2 * H, p: 0.6 }, { t: S - H, p: 0.7 }]);
+  const s = await buildDataset({ dataDir: dir, offsets: [1, 3] });
+  const rows = byId(readRows(path.join(dir, 'dataset.jsonl')));
+  // Stale sK row: the fresher sH quotes (which reveal the move) must not be paired with it.
+  assertRow(rows.get('s1|0|1'), { id: 's1|0|1', price: 0.5, priceAgeSec: 2 * H, complementPrice: 0.5, overround: 0 });
+  // Fresh sH row: sK's last point is 2h older -> not synchronous -> no complement.
+  assertRow(rows.get('s1|1|1'), { id: 's1|1|1', price: 0.7, priceAgeSec: 0, complementPrice: null, overround: null });
+  assertRow(rows.get('s1|0|3'), { id: 's1|0|3', complementPrice: 0.5, overround: 0 });
+  assert.equal(s.featureNulls.complement_not_synchronous, 1);
+  // A wider tolerance lets the fresh row use the older complement, never the other way round.
+  await buildDataset({ dataDir: dir, offsets: [1], maxSyncGapMin: 180 });
+  const wide = byId(readRows(path.join(dir, 'dataset.jsonl')));
+  assertRow(wide.get('s1|1|1'), { id: 's1|1|1', complementPrice: 0.5, overround: 0.2 });
+  assertRow(wide.get('s1|0|1'), { id: 's1|0|1', complementPrice: 0.5, overround: 0 });
+});
+
+test('settleTs is the parsed closedTime (label only) and null when unknown', () => {
+  assert.equal(baseRows.get('c1|0|1').settleTs, S + 3.5 * H);
+  assert.equal(baseRows.get('c10|0|1').settleTs, S + 3 * H);
+});
+
+test('provenance groups collect.js runs by runId; a crashed run with overridden bases still taints the dir', () => {
+  const dir = tmpDir('prov-runs');
+  const real = { gamma: 'https://gamma-api.polymarket.com', clob: 'https://clob.polymarket.com', data: 'https://data-api.polymarket.com' };
+  const line = (o) => JSON.stringify(o) + '\n';
+  fs.writeFileSync(path.join(dir, 'collect-runs.jsonl'), line({ runId: 'a', status: 'started', synthetic: null, bases: real }) + line({ runId: 'a', status: 'completed', synthetic: null, bases: real }));
+  let p = readProvenance(dir);
+  assert.deepEqual([p.status, p.collectRuns, p.unfinishedRuns], ['polymarket-api', 1, 0]);
+  // A default-base run that never finished: still Polymarket data, but reported.
+  fs.appendFileSync(path.join(dir, 'collect-runs.jsonl'), line({ runId: 'b', status: 'started', synthetic: null, bases: real }));
+  p = readProvenance(dir);
+  assert.deepEqual([p.status, p.collectRuns, p.unfinishedRuns], ['polymarket-api', 2, 1]);
+  assert.ok(p.reasons.some((r) => /never recorded an end/.test(r)));
+  // A run whose only line is "started" with a non-default base and no synthetic flag: synthetic.
+  fs.appendFileSync(path.join(dir, 'collect-runs.jsonl'), line({ runId: 'c', status: 'started', synthetic: null, bases: { ...real, clob: 'http://replay-proxy:9000' } }));
+  p = readProvenance(dir);
+  assert.equal(p.status, 'synthetic');
+  assert.equal(p.syntheticRuns, 1);
+  assert.ok(p.reasons.some((r) => /non-default API bases \(http:\/\/replay-proxy:9000\)/.test(r)));
 });

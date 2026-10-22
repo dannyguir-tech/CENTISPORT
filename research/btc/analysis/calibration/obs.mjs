@@ -115,23 +115,24 @@ export function chainlinkMarks(tf, marksFrac) {
  */
 export function tapeTools(tf) {
   const tapes = tradesByCondition(tf);
+  const idx = new Map();
+  const arr = (cid) => { if (!idx.has(cid)) { const tp = tapes.get(cid); idx.set(cid, tp ? Float64Array.from(tp.trades.map((x) => x.t)) : null); } return idx.get(cid); };
+  const firstAfter = (ts, u) => { let lo = 0, hi = ts.length; while (lo < hi) { const m = (lo + hi) >> 1; if (ts[m] < u) lo = m + 1; else hi = m; } return lo; };
   return {
     has: (cid) => tapes.has(cid),
     askProxy(cid, tok, u) {
-      const tape = tapes.get(cid); if (!tape) return null;
+      const tape = tapes.get(cid); if (!tape) return null; const ts = arr(cid);
       const v = [];
-      for (const x of tape.trades) {
-        if (x.t < u) continue; if (x.t > u + 10) break;
-        const tokPx = x.o === tok ? x.p : 1 - x.p; const buysTok = (x.o === tok) === (x.side === 'B');
+      for (let i = firstAfter(ts, u); i < ts.length && ts[i] <= u + 10; i++) {
+        const x = tape.trades[i]; const tokPx = x.o === tok ? x.p : 1 - x.p; const buysTok = (x.o === tok) === (x.side === 'B');
         if (buysTok) v.push(tokPx);
       }
       if (!v.length) return null; v.sort((a, b) => a - b); return v[v.length >> 1];
     },
     makerFilled(cid, tok, u, L, E) {
-      const tape = tapes.get(cid); if (!tape) return null;
-      for (const x of tape.trades) {
-        if (x.t <= u) continue; if (x.t > E) break;
-        const tokPx = x.o === tok ? x.p : 1 - x.p; if (tokPx <= L - 0.005) return true;
+      const tape = tapes.get(cid); if (!tape) return null; const ts = arr(cid);
+      for (let i = firstAfter(ts, u + 1e-6); i < ts.length && ts[i] <= E; i++) {
+        const x = tape.trades[i]; const tokPx = x.o === tok ? x.p : 1 - x.p; if (tokPx <= L - 0.005) return true;
       }
       return false;
     },

@@ -7,9 +7,9 @@ import path from 'node:path';
 import { loadUpDown, loadTrades, loadLive, WINDOW_SEC } from '../../lib/load.mjs';
 import {
   mkTrade, summarize, walkForward, bootstrap, benjaminiHochberg, logisticBoot, logit, fmt, median, mean,
-  HEADLINE, HAIRCUT, FEE_MODELS, LAG, LATENCY, BAND, pnlOf,
+  HEADLINE, HAIRCUT, FEE_MODELS, LAG, LATENCY, BAND, pnlOf, makerTrade, MAKER_OFFSET, MAKER_THROUGH,
 } from './lib.mjs';
-import { buildCL, featW, featA, featX, featTape, MAX_WAIT, VEL_LOOK } from './features.mjs';
+import { buildCL, featW, featA, featX, featTape, featTapeOpen, MAX_WAIT, VEL_LOOK } from './features.mjs';
 
 const OUT = '/home/user/CENTISPORT/research/btc/reports/momentum';
 fs.mkdirSync(OUT, { recursive: true });
@@ -75,6 +75,7 @@ const baseRates = [];
 
 const daysOf = (rows) => [...new Set(rows.map((r) => r.day))].sort();
 const countByDay = (rows) => { const m = new Map(); for (const r of rows) m.set(r.day, (m.get(r.day) || 0) + 1); return m; };
+const MAKER_TXT = `MAKER: instead of taking, post a resting bid for that side at mid-${MAKER_OFFSET} at the decision time; counted as filled only if a later snapshot (before end-10s) shows that side's mid <= limit-${MAKER_THROUGH}; fill at the limit, no fee, maker rebate ignored. Fill model is approximate (1/min snapshots, queue position unknown).`;
 const binOf = (p) => Math.min(9, Math.max(0, Math.floor(p * 10)));
 
 function addVariant(v) { variants.push(v); }
@@ -103,7 +104,8 @@ for (const tf of TFS) {
     for (const [k, c] of [...cells.entries()].sort()) { const [b, vs] = k.split('|'); calibW.push([tf, f, `${(b / 10).toFixed(1)}-${((+b + 1) / 10).toFixed(1)}`, vs, c.n, (c.sp / c.n).toFixed(4), (c.sw / c.n).toFixed(4), (c.sw / c.n - c.sp / c.n).toFixed(4)]); }
 
     const days = daysOf(rows), nWin = countByDay(rows);
-    for (const kind of ['lvl', 'vel']) for (const dir of ['mom', 'rev']) {
+    for (const maker of [false, true]) for (const kind of ['lvl', 'vel']) for (const dir of ['mom', 'rev']) {
+      if (maker && dir === 'rev') continue;
       const thetas = kind === 'lvl' ? TH_LVL : TH_VEL;
       const tradesFor = (th) => {
         const out = [];
@@ -111,16 +113,17 @@ for (const tf of TFS) {
           const s = kind === 'lvl' ? r.p - r.pOpen : r.p - r.pPrev;
           let up; if (s > th) up = dir === 'mom'; else if (s < -th) up = dir !== 'mom'; else continue;
           const side = up ? 'U' : 'D';
-          const t = mkTrade({ day: r.day, t: r.t, side, pUp: r.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { pRefNext: r.pNext == null ? null : (up ? r.pNext : 1 - r.pNext), feeType: r.feeType } });
+          const base = mkTrade({ day: r.day, t: r.t, side, pUp: r.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { pRefNext: r.pNext == null ? null : (up ? r.pNext : 1 - r.pNext), feeType: r.feeType } });
+          const t = maker ? makerTrade(base, r.ep, r.t, r.end) : base;
           if (t) out.push(t);
         }
         return out;
       };
       const sig = kind === 'lvl' ? `Up mid moved > theta from the pre-window quote (p - pOpen)` : `Up mid moved > theta over the last ${VEL_LOOK[tf]}s (p - p[t-${VEL_LOOK[tf]}s])`;
       addVariant({
-        id: `W-${kind}-${dir}-${tf}-f${f}`, family: 'W', tf, thetas, tradesFor, days, nWin,
-        hypothesis: `Within-window ${dir === 'mom' ? 'momentum' : 'reversal'}: ${kind === 'lvl' ? 'the Up move since the open' : 'the recent Up-price move'} ${dir === 'mom' ? 'continues' : 'reverts'} beyond the current price (${tf}, decision at ${Math.round(f * 100)}% of window).`,
-        rule: `At the last price snapshot with real time <= windowStart+${f * WINDOW_SEC[tf]}s (staleness <= ${Math.max(90, 0.05 * WINDOW_SEC[tf])}s): if ${sig} > +theta buy ${dir === 'mom' ? 'UP' : 'DOWN'}; if < -theta buy ${dir === 'mom' ? 'DOWN' : 'UP'}; taker at mid+${HAIRCUT}, token mid in [${BAND}]; hold to resolution. theta from {${thetas.join(',')}} chosen walk-forward.`,
+        id: `${maker ? 'M' : ''}W-${kind}-${dir}-${tf}-f${f}`, family: maker ? 'MW' : 'W', tf, thetas, tradesFor, days, nWin, maker,
+        hypothesis: `${maker ? '[maker] ' : ''}Within-window ${dir === 'mom' ? 'momentum' : 'reversal'}: ${kind === 'lvl' ? 'the Up move since the open' : 'the recent Up-price move'} ${dir === 'mom' ? 'continues' : 'reverts'} beyond the current price (${tf}, decision at ${Math.round(f * 100)}% of window).`,
+        rule: `At the last price snapshot with real time <= windowStart+${f * WINDOW_SEC[tf]}s (staleness <= ${Math.max(90, 0.05 * WINDOW_SEC[tf])}s): if ${sig} > +theta buy ${dir === 'mom' ? 'UP' : 'DOWN'}; if < -theta buy ${dir === 'mom' ? 'DOWN' : 'UP'}; ${maker ? MAKER_TXT : `taker at mid+${HAIRCUT}`}, token mid in [${BAND}]; hold to resolution. theta from {${thetas.join(',')}} chosen walk-forward.`,
       });
     }
   }
@@ -131,6 +134,7 @@ for (const tf of TFS) {
 // =============================================================================================
 const TH_STREAK = [2, 3, 4, 5, 6];
 const TH_Z = [0, 0.5, 1.0, 1.5, 2.0, 2.5];
+const TH_LM = [0.25, 0.5, 1.0, 1.5, 2.0, 3.0];
 for (const tf of TFS) {
   const rows = featA(tf, CL);
   log(`A ${tf}: ${rows.length} window pairs, zMag on ${rows.filter((r) => r.zMag != null).length}, z5 on ${rows.filter((r) => r.z5 != null).length}, median exec wait ${median(rows.map((r) => r.wait))}s`);
@@ -142,6 +146,8 @@ for (const tf of TFS) {
   diagnostics.across.push({ tf, model: 'win_b ~ logit(p_open_b) + prevResult_a(+-1)', ...logisticBoot(dr, (r) => [1, r.lp, r.prev], ['const', 'logit_p_open', 'prev'], { B: 200 }) });
   const drz = dr.filter((r) => r.z != null);
   if (drz.length > 150) diagnostics.across.push({ tf, model: 'win_b ~ logit(p_open_b) + zMag_a', ...logisticBoot(drz, (r) => [1, r.lp, r.z], ['const', 'logit_p_open', 'zMag_prev'], { B: 200 }) });
+  const drl = rows.filter((r) => r.lastMin != null).map((r) => ({ day: r.day, y: r.win ? 1 : 0, lp: logit(r.p), lm: r.lastMin }));
+  if (drl.length > 150 && (tf === '5m' || tf === '15m')) diagnostics.across.push({ tf, model: 'win_b ~ logit(p_open_b) + lastMinute dlogit of window a', ...logisticBoot(drl, (r) => [1, r.lp, r.lm], ['const', 'logit_p_open', 'lastMin_prev'], { B: 200 }) });
   const dr5 = dr.filter((r) => r.z5 != null);
   if (dr5.length > 150 && tf !== '5m') diagnostics.across.push({ tf, model: 'win_b ~ logit(p_open_b) + z5 (Chainlink 5-min return into b start)', ...logisticBoot(dr5, (r) => [1, r.lp, r.z5], ['const', 'logit_p_open', 'z5'], { B: 200 }) });
   for (const pv of [1, -1]) for (let b = 0; b < 10; b++) {
@@ -152,17 +158,21 @@ for (const tf of TFS) {
 
   const mk = (rowsK, sigFn, thetas, kindName, dir, hyp, ruleTxt) => {
     const days = daysOf(rowsK), nWin = countByDay(rowsK);
-    const tradesFor = (th) => {
-      const out = [];
-      for (const r of rowsK) {
-        const s = sigFn(r); if (s == null) continue;
-        let up; if (s >= th && s > 0) up = dir === 'mom'; else if (s <= -th && s < 0) up = dir !== 'mom'; else if (th === 0 && s === 0) continue; else continue;
-        const t = mkTrade({ day: r.day, t: r.t, side: up ? 'U' : 'D', pUp: r.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { feeType: r.feeType } });
-        if (t) out.push(t);
-      }
-      return out;
-    };
-    addVariant({ id: `A-${kindName}-${dir}-${tf}`, family: 'A', tf, thetas, tradesFor, days, nWin, hypothesis: hyp, rule: ruleTxt });
+    for (const maker of [false, true]) {
+      const tradesFor = (th) => {
+        const out = [];
+        for (const r of rowsK) {
+          const s = sigFn(r); if (s == null) continue;
+          let up; if (s >= th && s > 0) up = dir === 'mom'; else if (s <= -th && s < 0) up = dir !== 'mom'; else continue;
+          const base = mkTrade({ day: r.day, t: r.t, side: up ? 'U' : 'D', pUp: r.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { feeType: r.feeType } });
+          const t = maker ? makerTrade(base, r.ep, r.t, r.end) : base;
+          if (t) out.push(t);
+        }
+        return out;
+      };
+      addVariant({ id: `${maker ? 'M' : ''}A-${kindName}-${dir}-${tf}`, family: maker ? 'MA' : 'A', tf, thetas, tradesFor, days, nWin, maker,
+        hypothesis: (maker ? '[maker] ' : '') + hyp, rule: maker ? ruleTxt.replace(`taker at mid+${HAIRCUT}`, MAKER_TXT) : ruleTxt });
+    }
   };
   const execTxt = `at the first price snapshot of the new window with real time >= windowStart+${LATENCY}s (<= +${MAX_WAIT[tf]}s), taker at mid+${HAIRCUT}, token mid in [${BAND}], hold to resolution`;
   for (const dir of ['mom', 'rev']) {
@@ -171,6 +181,8 @@ for (const tf of TFS) {
     mk(rows, (r) => r.streak, TH_STREAK, 'streak', dir, `After a run of identical ${tf} results, the next window ${dir === 'mom' ? 'continues' : 'reverses'} beyond its opening price.`, `If the last n >= theta ${tf} results were identical, buy the ${word} side, ${execTxt}. theta from {${TH_STREAK}} walk-forward.`);
     const rz = rows.filter((r) => r.zMag != null);
     if (rz.length > 150) mk(rz, (r) => r.zMag, TH_Z, 'mag', dir, `A large previous-window BTC move (resolution-source return / sigma) predicts ${dir === 'mom' ? 'continuation' : 'reversal'} in the next ${tf} window beyond its opening price.`, `z = ln(finalPrice/priceToBeat of previous ${tf} window) / (trailing 3-day realized sigma * sqrt(${WINDOW_SEC[tf]}s)); if |z| >= theta buy the ${word} side to sign(z), ${execTxt}. theta from {${TH_Z}} walk-forward.`);
+    const rl = rows.filter((r) => r.lastMin != null);
+    if ((tf === '5m' || tf === '15m') && rl.length > 150) mk(rl, (r) => r.lastMin, TH_LM, 'lastmin', dir, `The previous ${tf} window's last-minute Up-price move (proxy for late BTC drift into the new strike) predicts ${dir === 'mom' ? 'continuation' : 'reversal'} beyond the opening price.`, `d = logit(pUp_prev at its last snapshot <= end) - logit(pUp_prev 60s earlier); if |d| >= theta buy the ${word} side to sign(d), ${execTxt}. theta from {${TH_LM}} walk-forward.`);
     const r5 = rows.filter((r) => r.z5 != null);
     if (tf !== '5m' && r5.length > 150) mk(r5, (r) => r.z5, TH_Z, 'last5', dir, `The last 5 minutes of Chainlink BTC move before a ${tf} window opens predicts ${dir === 'mom' ? 'continuation' : 'reversal'} beyond the opening price.`, `z5 = ln(CL(start)/CL(start-300s)) / (sigma*sqrt(300)); if |z5| >= theta buy the ${word} side to sign(z5), ${execTxt}. theta from {${TH_Z}} walk-forward.`);
   }
@@ -201,24 +213,31 @@ for (const [lt, st] of PAIRS) {
   }
 
   const execTxt = `at the first ${lt} price snapshot with real time >= boundary+${LATENCY}s (<= +${MAX_WAIT[lt]}s), taker at mid+${HAIRCUT}, token mid in [${BAND}], at most one entry per ${lt} window (first trigger), hold to resolution`;
-  const mkX = (rowsK, pick, thetas, kindName, hyp, ruleTxt) => {
+  const mkX = (rowsK, pick, thetas, kindName, hyp, ruleTxt, makerToo = false) => {
     const days = daysOf(rowsK), nWin = countByDay(rowsK);
-    const tradesFor = (th) => {
-      const out = [];
-      for (const r of rowsK) {
-        for (const d of r.dec) {
-          const up = pick(d, th); if (up == null) continue;
-          const t = mkTrade({ day: r.day, t: d.t, side: up ? 'U' : 'D', pUp: d.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { feeType: r.feeType, j: d.j } });
-          if (t) { out.push(t); break; }
+    for (const maker of makerToo ? [false, true] : [false]) {
+      const tradesFor = (th) => {
+        const out = [];
+        for (const r of rowsK) {
+          for (const d of r.dec) {
+            const up = pick(d, th); if (up == null) continue;
+            const base = mkTrade({ day: r.day, t: d.t, side: up ? 'U' : 'D', pUp: d.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { feeType: r.feeType, j: d.j } });
+            if (!base) continue;
+            // maker: one resting order per long window, placed at the first trigger
+            const t = maker ? makerTrade(base, r.ep, d.t, r.end) : base;
+            if (t) out.push(t);
+            break;
+          }
         }
-      }
-      return out;
-    };
-    addVariant({ id: `X-${kindName}-${lt}-from-${st}`, family: 'X', tf: lt, thetas, tradesFor, days, nWin, hypothesis: hyp, rule: ruleTxt });
+        return out;
+      };
+      addVariant({ id: `${maker ? 'M' : ''}X-${kindName}-${lt}-from-${st}`, family: maker ? 'MX' : 'X', tf: lt, thetas, tradesFor, days, nWin, maker,
+        hypothesis: (maker ? '[maker] ' : '') + hyp, rule: maker ? ruleTxt.replace(`taker at mid+${HAIRCUT}`, MAKER_TXT) : ruleTxt });
+    }
   };
   const thC = [1, 2, 3, 4, 6, 8].filter((x) => x <= m - 1);
-  mkX(rows, (d, th) => (d.c >= th ? true : d.c <= -th ? false : null), thC, 'cnt-mom', `Finished ${st} results inside a ${lt} window predict the ${lt} outcome beyond its current price (follow the sub-windows).`, `At each ${st} boundary inside the ${lt} window, c = #Up - #Down of finished ${st} windows; if c >= theta buy UP, if c <= -theta buy DOWN, ${execTxt}. theta from {${thC}} walk-forward.`);
-  mkX(rows, (d, th) => (d.c >= th ? false : d.c <= -th ? true : null), thC, 'cnt-rev', `Finished ${st} results inside a ${lt} window are over-priced in the ${lt} market (fade the sub-windows).`, `At each ${st} boundary, if c >= theta buy DOWN, if c <= -theta buy UP, ${execTxt}. theta from {${thC}} walk-forward.`);
+  mkX(rows, (d, th) => (d.c >= th ? true : d.c <= -th ? false : null), thC, 'cnt-mom', `Finished ${st} results inside a ${lt} window predict the ${lt} outcome beyond its current price (follow the sub-windows).`, `At each ${st} boundary inside the ${lt} window, c = #Up - #Down of finished ${st} windows; if c >= theta buy UP, if c <= -theta buy DOWN, ${execTxt}. theta from {${thC}} walk-forward.`, true);
+  mkX(rows, (d, th) => (d.c >= th ? false : d.c <= -th ? true : null), thC, 'cnt-rev', `Finished ${st} results inside a ${lt} window are over-priced in the ${lt} market (fade the sub-windows).`, `At each ${st} boundary, if c >= theta buy DOWN, if c <= -theta buy UP, ${execTxt}. theta from {${thC}} walk-forward.`, true);
   const rg = rows.map((r) => ({ ...r, dec: r.dec.filter((d) => d.P != null) })).filter((r) => r.dec.length);
   if (rg.length > 100) mkX(rg, (d, th) => (d.P - d.p > th ? true : d.p - d.P > th ? false : null), TH_GAP, 'gap', `The ${lt} market lags the Chainlink BTC move measured at ${st} boundaries (driftless random-walk fair value vs market).`, `At each ${st} boundary Tj: P = Phi(ln(CL(Tj)/CL(start)) / (sigma3d*sqrt(end - t_exec - 20s))); if P - p_mid > theta buy UP, if p_mid - P > theta buy DOWN, ${execTxt}. theta from {${TH_GAP}} walk-forward.`);
   if (st === '5m') {
@@ -245,6 +264,68 @@ for (const tf of ['5m', '15m']) {
     addVariant({ id: `T-ofi-${dir}-${tf}`, family: 'T', tf, thetas: TH_OFI, tradesFor, days, nWin, minAbs: 8,
       hypothesis: `Taker order-flow imbalance in the first half of a ${tf} window ${dir === 'mom' ? 'continues' : 'reverts'} beyond the price (tape subsample only).`,
       rule: `OFI = (Up-equivalent taker buy notional - sell notional)/total over [start, start+${WINDOW_SEC[tf] / 2}s]; if OFI > theta buy ${dir === 'mom' ? 'UP' : 'DOWN'}, if < -theta buy ${dir === 'mom' ? 'DOWN' : 'UP'}, at first price snapshot with real time >= mid-window+${LATENCY}s; taker at mid+${HAIRCUT}. theta from {${TH_OFI}} walk-forward.` });
+  }
+}
+
+// FAMILY TA: across-window rules executed at the very open on real tape fills (subsample)
+for (const tf of ['5m', '15m']) {
+  const rows = featTapeOpen(tf, CL);
+  log(`TA ${tf}: ${rows.length} tape windows, with an early Up fill ${rows.filter((r) => r.fU).length}, Down fill ${rows.filter((r) => r.fD).length}`);
+  const days = daysOf(rows), nWin = countByDay(rows);
+  for (const kind of ['prev', 'mag']) for (const dir of ['mom', 'rev']) {
+    const thetas = kind === 'prev' ? [1] : TH_Z;
+    const tradesFor = (th) => {
+      const out = [];
+      for (const r of rows) {
+        const s = kind === 'prev' ? r.prev : r.zMag; if (s == null) continue;
+        let up; if (s >= th && s > 0) up = dir === 'mom'; else if (s <= -th && s < 0) up = dir !== 'mom'; else continue;
+        const f = up ? r.fU : r.fD; if (!f) continue;
+        if (!(f.p >= BAND[0] && f.p <= BAND[1])) continue;
+        out.push({ day: r.day, t: f.t, side: up ? 'U' : 'D', pRef: f.p, ex: f.p, win: (up ? r.win : !r.win) ? 1 : 0, fee: r.fee, id: r.id, feeType: r.feeType });
+      }
+      return out;
+    };
+    addVariant({ id: `TA-${kind}-${dir}-${tf}`, family: 'TA', tf, thetas, tradesFor, days, nWin, minAbs: 8,
+      hypothesis: `Previous ${tf} window ${kind === 'prev' ? 'result' : 'move size'} predicts ${dir === 'mom' ? 'continuation' : 'reversal'} when entering in the first seconds of the next window (tape subsample).`,
+      rule: `${kind === 'prev' ? 'Side = previous result' : 'If |zMag of previous window| >= theta, side = sign(zMag)'}${dir === 'rev' ? ' reversed' : ''}; entry = the first real taker BUY fill of that side with on-chain time in [start+3s, start+20s] (+0.2c slippage + taker fee); hold to resolution.${kind === 'mag' ? ` theta from {${TH_Z}} walk-forward.` : ''}` });
+  }
+}
+
+// FAMILY TM: maker fills checked against the real taker tape (subsample), across-window prev rule.
+// Post a bid for the side at (first in-window snapshot mid - 0.5c) at that snapshot's real time; filled if a
+// later taker fill would have crossed it: a taker SELL of that side at <= limit, or a taker BUY of the
+// other side at >= 1 - limit ('at' = reaches our level, optimistic about queue; 'thru' = 1c through, pessimistic).
+{
+  const aRows = { '5m': featA('5m', CL), '15m': featA('15m', CL) };
+  for (const tf of ['5m', '15m']) {
+    const tapes = new Map(loadTrades(tf).map((tp) => [tp.slug, tp]));
+    const rows = aRows[tf].filter((r) => tapes.has(r.id));
+    log(`TM ${tf}: ${rows.length} windows with tape`);
+    const days = daysOf(rows), nWin = countByDay(rows);
+    for (const fillMode of ['at', 'thru']) for (const dir of ['mom', 'rev']) {
+      const tradesFor = () => {
+        const out = [];
+        for (const r of rows) {
+          const up = (r.prev > 0) === (dir === 'mom');
+          const base = mkTrade({ day: r.day, t: r.t, side: up ? 'U' : 'D', pUp: r.p, win: up ? r.win : !r.win, fee: r.fee, id: r.id, extra: { feeType: r.feeType } });
+          if (!base) continue;
+          const L = Math.round((base.pRef - MAKER_OFFSET) * 1000) / 1000;
+          const tol = fillMode === 'at' ? 1e-9 : -0.01 + 1e-9;
+          const S = base.side;
+          let filled = null;
+          for (const x of tapes.get(r.id).trades) {
+            if (x.t < r.t + 2) continue; if (x.t > r.end - 10) break;
+            const hit = (x.o === S && x.side === 'S' && x.p <= L + tol) || (x.o !== S && x.side === 'B' && 1 - x.p <= L + tol);
+            if (hit) { filled = x; break; }
+          }
+          if (filled) out.push({ ...base, pRef: L, mk: true, fillDelay: filled.t - r.t });
+        }
+        return out;
+      };
+      addVariant({ id: `TM-prev-${dir}-${tf}-${fillMode}`, family: 'TM', tf, thetas: [1], tradesFor, days, nWin, maker: true, minAbs: 8,
+        hypothesis: `[maker, tape-checked fills] Previous ${tf} result predicts ${dir === 'mom' ? 'continuation' : 'reversal'}; capture it with a resting bid instead of crossing the spread.`,
+        rule: `At the first snapshot of the new ${tf} window with real time >= start+${LATENCY}s, post a bid for the ${dir === 'mom' ? 'same' : 'opposite'} side as the previous result at mid-${MAKER_OFFSET}; filled if a later real taker fill (before end-10s) ${fillMode === 'at' ? 'reaches' : 'trades 1c through'} that price (taker SELL of the side, or taker BUY of the complement at >= 1-limit); no fee, rebate ignored; hold to resolution.` });
+    }
   }
 }
 
@@ -276,8 +357,9 @@ for (const v of variants) {
   const cap = CAP[v.tf];
   const capNotionalPerDay = tpd * cap;
   const capProfitPerDay = H.roi != null && H.roi > 0 ? capNotionalPerDay * H.roi : 0;
+  const makerInfo = v.maker ? { avgFillDelaySec: fmt(mean(oos.map((t) => t.fillDelay)), 0) } : null;
   results.push({
-    id: v.id, family: v.family, tf: v.tf, hypothesis: v.hypothesis, rule: v.rule,
+    id: v.id, family: v.family, tf: v.tf, side: v.maker ? 'maker' : 'taker', makerInfo, hypothesis: v.hypothesis, rule: v.rule,
     thetaGrid: v.thetas, wfChoices: wf.choices, trainDays: `${wf.trainDays[0]}..${wf.trainDays[wf.trainDays.length - 1]} (${wf.trainDays.length}d)`,
     oosDays: `${wf.oosDays[0]}..${wf.oosDays[wf.oosDays.length - 1]} (${wf.oosDays.length}d)`, nOosDays: wf.oosDays.length,
     oosN: H.n, winRate: fmt(H.winRate), avgRef: fmt(H.avgRef), avgCost: fmt(H.avgCost), edge: fmt(H.edge),
@@ -291,7 +373,7 @@ const bh = benjaminiHochberg(results.map((r) => r.pOneSided ?? 1), 0.10);
 results.forEach((r, i) => { r.bhAdjP = fmt(bh.adj[i], 4); r.bhSignificant = bh.sig[i]; });
 for (const r of results) {
   const posCI = r.ci95[0] != null && r.ci95[0] > 0;
-  r.verdict = r.bhSignificant && posCI && r.roi.minp > 0 && (r.roiHaircut20 ?? -1) > 0 ? 'candidate-edge'
+  r.verdict = r.bhSignificant && posCI && (r.side === 'maker' || (r.roi.minp > 0 && (r.roiHaircut20 ?? -1) > 0)) ? 'candidate-edge'
     : (r.oosN < 100 || (r.ci95[1] != null && r.ci95[1] > 0.05 && r.roi[HEADLINE] > 0)) ? 'inconclusive' : 'no-edge';
 }
 log('done evaluating');
@@ -310,6 +392,8 @@ const meta = {
   },
   liveDepth: depth, tapeFlowPerMinPerSide: flow, capPerTrade: CAP,
   variantsTested: results.length,
+  variantsByFamily: results.reduce((a, r) => { a[r.family] = (a[r.family] || 0) + 1; return a; }, {}),
+  thetaValuesTriedTotal: results.reduce((s, r) => s + r.thetaGrid.length, 0),
 };
 fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ meta, results }, null, 1));
 fs.writeFileSync(path.join(OUT, 'diagnostics.json'), JSON.stringify(diagnostics, null, 1));

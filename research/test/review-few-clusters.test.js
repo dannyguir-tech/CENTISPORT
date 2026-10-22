@@ -1,23 +1,20 @@
-// REVIEW REPRO (statistical rigor): the SURVIVES rule counts bets, not independent events.
+// Review R3 (permanent): SURVIVES must rest on enough independent events, not just bets.
 //
-// judge() in backtest.js requires OOS n >= --min-n BETS, but the cluster bootstrap resamples
-// EVENTS. When a hypothesis's bets sit in a handful of events (player props: dozens of correlated
-// markets per game), a lucky run where every event goes the right way makes every bootstrap
-// replicate positive, so p hits the floor 1/(B+1) = 0.0005 and the CI excludes 0. A valid
-// cluster-level test cannot be more confident than 2^-C with C clusters (all-positive sign
-// pattern), so 6 events can never justify p < 0.0156.
-//
-// Run: node --test research/test/review-few-clusters.test.mjs
-// Expected today: both tests FAIL.
+// The cluster bootstrap resamples events. When a hypothesis's bets sit in a handful of events
+// (player props: dozens of correlated markets per game), a lucky run where every event goes the
+// same way makes every replicate positive, so p used to hit 1/(B+1) and the CI excluded 0. No valid
+// cluster-level test can be more confident than 2^-C with C events (6 events: 1/64). The p-value is
+// now floored at 2^-C and a survivor needs --min-events (30) out-of-sample events.
+// SYNTHETIC data only. Run: node --test research/test/review-few-clusters.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clusterBootstrapSums, makeRng } from '../lib/stats.js';
+import { clusterBootstrapSums, clusterPFloor, makeRng } from '../lib/stats.js';
 import { betPnl, entryCost, runBacktest, DEFAULTS } from '../backtest.js';
 
-test('cluster-bootstrap p must be (near) valid at the BH threshold when there are few events', () => {
+test('cluster-bootstrap p is (near) valid at the BH threshold when there are few events', () => {
   // Null with NEGATIVE true ROI: fair price 0.5, cost 0.5151 => true ROI -2.9%. 5 events x 12 bets,
   // perfectly correlated within an event. A valid level-0.002 test rejects at most 0.2% of the time.
   const C = 5, k = 12, R = 1500, level = 0.002;
@@ -28,14 +25,24 @@ test('cluster-bootstrap p must be (near) valid at the BH threshold when there ar
     const bets = [];
     for (let e = 0; e < C; e++) { const w = rng() < 0.5 ? 1 : 0; for (let j = 0; j < k; j++) bets.push({ e, pnl: betPnl(w, cost) }); }
     const s = clusterBootstrapSums(bets, (b) => b.e, (b) => [1, b.pnl], { roi: (x) => x[1] / x[0] }, { B: DEFAULTS.boot, seed: rep }).stats.roi;
+    assert.ok(s.p >= 2 ** -C, `p ${s.p} below the 2^-${C} floor`);
     if (s.p <= level && s.lo > 0) rejects++;
   }
   const rate = rejects / R;
-  console.log(`C=${C} events, n=${C * k} bets, true ROI ${(100 * (0.5 / cost - 1)).toFixed(1)}%: P(p <= ${level} and CI lo > 0) = ${(100 * rate).toFixed(2)}% (valid test: <= ${100 * level}%)`);
   assert.ok(rate <= 2 * level, `false-positive rate ${(100 * rate).toFixed(2)}% at nominal ${100 * level}%`);
 });
 
-test('a survivor backed by only 6 independent events must not pass', async () => {
+test('the p floor only bites when there are few clusters', () => {
+  assert.equal(clusterPFloor(6), 1 / 64);
+  assert.equal(clusterPFloor(0), 1);
+  assert.ok(clusterPFloor(30) < 1e-9);
+  // Many clusters, strong effect: the usual 1/(B+1) floor still applies.
+  const bets = Array.from({ length: 400 }, (_, i) => ({ e: i, pnl: 1 }));
+  const s = clusterBootstrapSums(bets, (b) => b.e, (b) => [1, b.pnl], { roi: (x) => x[1] / x[0] }, { B: 999 }).stats.roi;
+  assert.equal(s.p, 1 / 1000);
+});
+
+test('a survivor backed by only 6 independent events does not pass', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'review-few-'));
   try {
     const rng = makeRng('review-few-e2e');
@@ -47,7 +54,7 @@ test('a survivor backed by only 6 independent events must not pass', async () =>
           id: `${cid}|${i}|${offsetH}`, eventKey, conditionId: cid, outcomeIndex: i, outcome, startTs, decisionTs: startTs - offsetH * 3600, offsetH,
           sport: 'nba', marketType, sideType, line: null, price, priceAgeSec: 0, price_m6h: null, price_m24h: null, mom6h: null, mom24h: null,
           complementPrice: null, overround: null, nTrades24h: null, netBuyNotional24h: null, largeNetNotional24h: null, distinctWallets24h: null, topWalletShare24h: null,
-          won, closePrice: price, clv: 0,
+          won, closePrice: price, clv: 0, settleTs: startTs + 3 * 3600,
         }));
       }
     };
@@ -73,11 +80,19 @@ test('a survivor backed by only 6 independent events must not pass', async () =>
     fs.writeFileSync(data, lines.join('\n') + '\n');
     const { report } = await runBacktest({ data, sourceLabel: 'SYNTHETIC review repro', out: dir, name: 'r' });
     const tested = report.hypotheses.filter((h) => h.status === 'tested');
-    for (const h of tested) console.log(`${h.id.padEnd(18)} n ${String(h.oos.n).padStart(5)} events ${String(h.oos.nEvents).padStart(5)} roi ${(100 * h.oos.roi.estimate).toFixed(1)}% p ${h.oos.roi.p.toFixed(4)} bh ${h.bh.pAdj.toFixed(4)} ${h.verdict.label}`);
     for (const h of tested.filter((x) => x.verdict.survives)) {
-      const bound = 2 ** -h.oos.nEvents;
-      assert.ok(h.oos.roi.p >= bound, `${h.id} SURVIVES on ${h.oos.nEvents} events with p ${h.oos.roi.p.toFixed(4)}; no valid cluster-level test can go below 2^-${h.oos.nEvents} = ${bound.toFixed(4)}`);
+      assert.ok(h.oos.nEvents >= DEFAULTS.minEvents, `${h.id} SURVIVES on ${h.oos.nEvents} events`);
+      assert.ok(h.oos.roi.p >= 2 ** -h.oos.nEvents, `${h.id}: p ${h.oos.roi.p} below 2^-${h.oos.nEvents}`);
     }
+    const up = tested.find((h) => h.id === 'under-props');
+    assert.ok(up.oos.n >= DEFAULTS.minN, 'non-vacuous: enough bets to pass the old bet-count rule');
+    assert.equal(up.oos.nEvents, 6);
+    assert.equal(up.verdict.survives, false);
+    assert.equal(up.verdict.label, 'too few events');
+    assert.ok(up.verdict.fails.some((f) => /OOS events 6 < 30/.test(f)));
+    assert.ok(up.oos.roi.p >= 1 / 64, `p ${up.oos.roi.p} must respect the 2^-6 floor`);
+    assert.equal(up.oos.mde80, null, 'a sample that cannot survive has no detectable edge size');
+    assert.match(report.config.survivalRule, /OOS events >= 30/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
