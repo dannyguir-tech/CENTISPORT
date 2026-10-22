@@ -7,8 +7,9 @@ This repo does **not** rebuild the Sports Money prediction model. It opens Polym
 ## MVP Flow
 
 1. Open each URL from `EVENT_URLS`
-2. Inject `vendor/pm-sports-dashboard.user.js`
-3. Wait for `window.pmSportsBotExport`
+2. Inject `vendor/pm-sports-dashboard.user.js` (v2.36.0+) after the page loads
+3. Start a scan with `window.pmSportsRun()` and wait for a fresh `window.pmSportsBotExport`
+   (fails fast with the reason from `window.pmSportsLastScanStatus` — e.g. `thin_event`)
 4. Save full export JSON to `raw_exports`
 5. Extract actionable signals into `signals`
 6. Send Telegram for BET signals
@@ -32,6 +33,9 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 EVENT_URLS=https://polymarket.com/sports/nba/example-event
 ```
+
+Use `/sports/<league>/<slug>` URLs — the league segment selects the sport profile. If the
+Playwright browser download is blocked, set `CHROMIUM_PATH` to an installed Chromium instead.
 
 Put your current Sports Money userscript here:
 

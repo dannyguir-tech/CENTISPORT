@@ -29,6 +29,7 @@ export const config = {
   duplicateAlertMinutes: asNumber(process.env.DUPLICATE_ALERT_MINUTES, 10),
   userScriptPath: process.env.USER_SCRIPT_PATH || 'vendor/pm-sports-dashboard.user.js',
   headless: asBool(process.env.HEADLESS, true),
+  chromiumPath: process.env.CHROMIUM_PATH || '',
   pageTimeoutMs: asNumber(process.env.PAGE_TIMEOUT_MS, 120000),
   exportTimeoutMs: asNumber(process.env.EXPORT_TIMEOUT_MS, 120000),
   scanOnce: asBool(process.env.SCAN_ONCE, false),
