@@ -32,7 +32,7 @@ Requirements: Node 22. No npm packages are needed; the kit uses only Node built-
 ## Quick start (offline, synthetic)
 
 ```sh
-npm run research:test         # 58 unit/integration tests, ~10 s
+npm run research:test         # 59 unit/integration tests, ~10 s
 npm run research:selftest     # synthetic end-to-end self-test, ~5-6 min, exit 0 = PASS
 ```
 
@@ -113,7 +113,7 @@ These figures are estimates from the request pattern and the mock data. They hav
 | Requests per market | about 2 to 3 without trades (one prices-history call per token, plus an `interval=max` retry when a window is empty). If clob rejects the 80 h window at 15-minute fidelity, the collector learns the accepted span and splits windows, which can mean about 8 per market. `--trades` adds 1 to 30 pages of 500 trades each. |
 | Collection time | At the default `--rps 4`, 3,000 markets take roughly 20 to 40 minutes without trades and 1 to 3 hours with them. 20,000 markets take several hours, so run it in the background; it resumes. Raise `--rps` only if the API tolerates it (429s are retried and pause every worker). |
 | Disk | Prices are about 8 KB per token (about 16 KB per market). Trades are about 150 B per trade, capped at `--max-trades-per-market 3000` (at most about 450 KB per market; most markets are far smaller). 20,000 markets is roughly 0.3 GB of prices plus up to a few GB of trades. `dataset.jsonl` is about 0.7 KB per row and 8 rows per binary market. |
-| Build | Streams markets one at a time; a few seconds per 10k markets. |
+| Build | Streams markets one at a time. About 2 s for 1,700 markets with trades, so roughly 10 to 15 s per 10k markets. |
 | Backtest | Holds the dataset in memory. About 24 s for 320k rows at `--boot 2000`. |
 | Self-test | About 5 to 6 minutes at the defaults (3 seeds x 2 worlds x about 27k markets). |
 

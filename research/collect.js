@@ -606,12 +606,15 @@ async function loadOrFetchTrades(ctx, record, a, b) {
   const seen = new Set();
   const kept = [];
   let truncated = false;
+  let offset = 0;
+  let probing = false;
+  let shortLen = 0;
   for (let page = 0; ; page++) {
     if (page >= maxTradePages) {
       truncated = true;
       break;
     }
-    const url = `${ctx.bases.data}/trades?market=${encodeURIComponent(record.conditionId)}&limit=${TRADES_PAGE}&offset=${page * TRADES_PAGE}`;
+    const url = `${ctx.bases.data}/trades?market=${encodeURIComponent(record.conditionId)}&limit=${TRADES_PAGE}&offset=${offset}`;
     let body;
     try {
       body = await ctx.http.getJson(url, { allow404: true });
@@ -625,6 +628,17 @@ async function loadOrFetchTrades(ctx, record, a, b) {
     }
     if (body == null) break;
     const rows = asArray(body, url);
+    if (probing) {
+      probing = false;
+      if (!rows.length) {
+        // The short page really was the last one, so the server's cap is at least that long.
+        ctx.tradesCapAtLeast = Math.max(ctx.tradesCapAtLeast, shortLen);
+        break;
+      }
+      // A short page was followed by more rows: the server caps `limit` below what we asked for.
+      ctx.tradesPageCap = Math.min(ctx.tradesPageCap ?? Infinity, shortLen);
+      ctx.warn(`data-api /trades returns at most ${ctx.tradesPageCap} rows per page; paging by that`);
+    }
     let desc = true;
     let prevT = Infinity;
     let minT = Infinity;
@@ -642,12 +656,21 @@ async function loadOrFetchTrades(ctx, record, a, b) {
       if (tr.t >= a && tr.t <= b) kept.push(tr);
     }
     if (kept.length >= maxTradesPerMarket) {
-      truncated = kept.length > maxTradesPerMarket || rows.length === TRADES_PAGE;
+      truncated = kept.length > maxTradesPerMarket || rows.length >= (ctx.tradesPageCap ?? TRADES_PAGE);
       kept.length = Math.min(kept.length, maxTradesPerMarket);
       break;
     }
-    if (rows.length < TRADES_PAGE) break;
+    offset += rows.length;
     if (desc && minT < a) break; // newest-first and already past the window start
+    if (!rows.length) break;
+    if (rows.length >= TRADES_PAGE) ctx.tradesPageCap ??= TRADES_PAGE;
+    else if (ctx.tradesPageCap == null) {
+      // Short page with the cap unknown: the last page, or a server-side cap. Shorter than a page
+      // already proven complete means last page; otherwise one probe of the next offset decides.
+      if (rows.length < ctx.tradesCapAtLeast) break;
+      shortLen = rows.length;
+      probing = true;
+    } else if (rows.length < ctx.tradesPageCap) break;
   }
   kept.sort((x, y) => x.t - y.t);
   await writeFileAtomic(file, kept.map((t) => `${JSON.stringify(t)}\n`).join(''));
@@ -778,6 +801,8 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
     opts, bases, http, dirs, stats, log, warn,
     cache: !opts.noCache,
     priceSpanLimit: Infinity,
+    tradesPageCap: null, // learned server-side cap on /trades `limit`
+    tradesCapAtLeast: 0,
     skip: (reason) => {
       stats.skipped[reason] = (stats.skipped[reason] || 0) + 1;
     },

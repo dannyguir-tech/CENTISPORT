@@ -338,18 +338,34 @@ async function stageLadders() {
     const jobs = [];
     for (const e of events) {
       const born = Math.min(e.startTs || Infinity, ...e.markets.map((m) => m.createdTs || Infinity));
-      const fineFrom = Math.max(born, e.endTs - 48 * 3600);
-      for (const g of chunk(e.markets, 20)) {
-        jobs.push({ g, from: fineFrom, to: e.endTs + 60, fid: 1, key: 'pathFine' });
-        if (e.endTs - born > 48 * 3600) jobs.push({ g, from: born, to: e.endTs + 60, fid: 10, key: 'pathCoarse' });
+      // barrier ("hit") markets can resolve early: their trading ends at closedTs, not endTs
+      for (const m of e.markets) m.effEndTs = Math.min(e.endTs, m.closedTs && m.closedTs > born ? m.closedTs : e.endTs);
+      const ms = [...e.markets].sort((a, b) => a.effEndTs - b.effEndTs);
+      const groups = [];
+      for (const m of ms) {
+        const g = groups[groups.length - 1];
+        if (g && g.length < 20 && m.effEndTs - g[0].effEndTs <= 6 * 3600) g.push(m); else groups.push([m]);
+      }
+      for (const g of groups) {
+        const lo = g[0].effEndTs, hi = g[g.length - 1].effEndTs;
+        jobs.push({ g, from: Math.max(born, lo - 48 * 3600), to: hi + 60, fid: 1, key: 'pathFine' });
+        // CLOB rejects start..end intervals longer than ~15 days (any fidelity): split into 14-day segments
+        if (hi - born > 48 * 3600) for (let a = born; a < hi + 60; a += 14 * 86400) jobs.push({ g, from: a, to: Math.min(a + 14 * 86400, hi + 60), fid: 10, key: 'pathCoarse' });
       }
     }
     let done = 0;
     await pool(jobs, 6, async (j) => {
       const h = await batchHistory(j.g.map((m) => m.yesToken), j.from, j.to, j.fid);
-      for (const m of j.g) { m[j.key] = (h[m.yesToken] || []).map((x) => [x.t, x.p]); m[j.key + 'Fidelity'] = j.fid; }
+      for (const m of j.g) { (m[j.key] ||= []).push(...(h[m.yesToken] || []).map((x) => [x.t, x.p])); m[j.key + 'Fidelity'] = j.fid; }
       if (++done % 100 === 0) log(`  ladder paths ${done}/${jobs.length}`);
     });
+    const failedJobs = jobs.length - done;
+    if (failedJobs) problem(`ladders ${cfg.kind}: ${failedJobs} price-history jobs failed`);
+    for (const e of events) for (const m of e.markets) for (const k of ['pathFine', 'pathCoarse']) {
+      if (!m[k]) continue;
+      const seen = new Set();
+      m[k] = m[k].sort((a, b) => a[0] - b[0]).filter(([t]) => (seen.has(t) ? false : (seen.add(t), true)));
+    }
     const file = path.join(DATA, `ladders_${cfg.kind}.jsonl`);
     writeJSONL(file, events);
     const nm = events.reduce((s, e) => s + e.markets.length, 0);
@@ -439,7 +455,9 @@ async function stageLive() {
   for (const e of events) byKind[e.kind] = (byKind[e.kind] || 0) + 1;
   manifest.datasets.live_snapshot = { file: path.join(dir, 'latest.json'), stampedFile: path.join(dir, `snapshot_${stamp}.json`), fetchedAt: snap.fetchedAt,
     events: events.length, tokens: uniq.length, missingBooks: missing, eventsByKind: byKind, secs: Math.round((Date.now() - t1) / 1000) };
-  if (missing) problem(`live: ${missing} tokens without a book in the /books response`);
+  const missingOpen = events.reduce((s, e) => s + e.markets.filter((m) => !m.closed).reduce((a, m) => a + m.tokens.filter((t) => !t.book).length, 0), 0);
+  manifest.datasets.live_snapshot.missingBooksOnOpenMarkets = missingOpen;
+  if (missingOpen) problem(`live: ${missingOpen} tokens of still-open markets without a book in the /books response`);
   log(`[live] ${events.length} events, ${uniq.length} tokens, missing books ${missing}`);
   saveManifest();
 }

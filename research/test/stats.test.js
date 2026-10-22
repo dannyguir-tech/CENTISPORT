@@ -333,6 +333,8 @@ test('end-to-end on null synthetic data: nothing survives and the report says so
   assert.ok(md.split('\n')[0].includes(label), 'markdown header must carry the source label');
   assert.match(md, /No hypothesis survived/);
   assert.match(md, /SYNTHETIC \/ MOCK DATA/);
+  assert.match(report.verdict.text, /minimum detectable ROI \(80% power\) of the candidates ranged from/, 'a no-edge verdict must state its power');
+  assert.match(md, /\| MDE80 \|/);
   const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
   assert.equal(json.source.label, label);
   assert.equal(json.source.looksSynthetic, true);

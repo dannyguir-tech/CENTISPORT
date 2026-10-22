@@ -508,7 +508,7 @@ function buildVerdict(rep, survivors, o) {
     // "No evidence" is only as strong as the sample: state the smallest edge that could have shown up.
     const mdes = tested.filter((r) => r.role === 'candidate' && fin(r.oos.mde80)).map((r) => r.oos.mde80).sort((a, b) => a - b);
     const power = mdes.length
-      ? ` With these sample sizes the minimum detectable ROI (80% power) of the candidates ranged from ${pct(mdes[0])} to ${pct(mdes[mdes.length - 1])} (median ${pct(mdes[Math.floor(mdes.length / 2)])}); smaller edges would not have shown up, so this is not evidence that they are absent.`
+      ? ` With these sample sizes the minimum detectable ROI (80% power) of the candidates ranged from ${pctAbs(mdes[0])} to ${pctAbs(mdes[mdes.length - 1])} (median ${pctAbs(mdes[Math.floor(mdes.length / 2)])}); smaller edges would not have shown up, so this is not evidence that they are absent.`
       : '';
     text = `**No hypothesis survived.** ${tested.length} hypotheses were tested out-of-sample after costs (${costs}); none passed all of: n >= ${o.minN}, Benjamini-Hochberg significance at q = ${o.fdr}, a 95% cluster-bootstrap CI for ROI entirely above 0, and positive ROI at a ${o.stressSpread} spread. On this data there is no evidence of a repeatable edge. That is a legitimate result, not a tooling failure.${power}`;
   } else {
@@ -539,6 +539,7 @@ function num(x, d = 3) {
   if (x == null || !fin(x)) return 'n/a';
   return (Math.abs(x) < 0.5 * 10 ** -d ? 0 : x).toFixed(d);
 }
+const pctAbs = (x) => pct(x).replace('+', '');
 const ci = (s) => (s && s.lo != null ? `${pct(s.lo)} to ${pct(s.hi)}` : 'n/a');
 const esc = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const paramStr = (c) => (c ? `${c.offsetH}h ${JSON.stringify(c.params)}` : 'none (no setting reached min n)');
@@ -579,7 +580,7 @@ function toMarkdown(rep) {
   for (const r of tested) {
     const tag = r.role === 'candidate' ? '' : ` (${r.role})`;
     const verdict = r.verdict.survives ? '**SURVIVES**' : r.verdict.label;
-    L.push(`| ${esc(r.id)}${tag} | ${r.oos.n} (${r.oos.nEvents}) | ${pct(r.oos.roi.estimate)} | ${ci(r.oos.roi)} | ${pct(r.oos.mde80).replace('+', '')} | ${fmtP(r.oos.roi.p)} | ${fmtP(r.bh.pAdj)} | ${num(r.oos.clv.estimate, 4)} | ${pct(r.oos.hurdleRoi)} | ${r.sensitivity.map((s) => pct(s.roi)).join(' / ')} | ${verdict} |`);
+    L.push(`| ${esc(r.id)}${tag} | ${r.oos.n} (${r.oos.nEvents}) | ${pct(r.oos.roi.estimate)} | ${ci(r.oos.roi)} | ${pctAbs(r.oos.mde80)} | ${fmtP(r.oos.roi.p)} | ${fmtP(r.bh.pAdj)} | ${num(r.oos.clv.estimate, 4)} | ${pct(r.oos.hurdleRoi)} | ${r.sensitivity.map((s) => pct(s.roi)).join(' / ')} | ${verdict} |`);
   }
 
   const survivors = tested.filter((r) => r.verdict.survives);

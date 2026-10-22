@@ -167,7 +167,9 @@ export function buildMarketRows(market, startTs, pricesByToken, trades, opts, co
     const points = pricesByToken[tokenIds[i]];
     const compPoints = tokenIds.length === 2 ? pricesByToken[tokenIds[1 - i]] : null;
     const { sideType, line } = classifySide(market.question, outcomes[i]);
-    const close = priceAsOf(points, startTs, maxAge);
+    // Label only (spec): last point at or before start, whatever its age.
+    const closeIdx = points ? lastIndexAtOrBefore(points, startTs) : -1;
+    const closePrice = closeIdx >= 0 ? points[closeIdx].p : null;
 
     for (const offsetH of o.offsets) {
       if (!points) { bump(counters.rowDrops, 'no_price_file'); continue; }
@@ -181,7 +183,6 @@ export function buildMarketRows(market, startTs, pricesByToken, trades, opts, co
       const m6 = priceAsOf(points, decisionTs - 6 * HOUR, maxAge);
       const m24 = priceAsOf(points, decisionTs - 24 * HOUR, maxAge);
       const comp = priceAsOf(compPoints, decisionTs, maxAge);
-      const closePrice = close ? close.p : null;
 
       rows.push({
         id: `${conditionId}|${i}|${offsetH}`,

@@ -405,6 +405,31 @@ describe('collect.js other strategies and failures', () => {
     }
   });
 
+  test('trades survive a data-api that caps page size below 500', async () => {
+    const capped = await startMockServer({ faults: false, tradesCap: 100 });
+    try {
+      const fx = capped.fixture;
+      const many = fx.byCid.get(fx.tricky.manyTrades);
+      const slugFile = path.join(tmpRoot, 'slugs-trades-cap.txt');
+      await writeFile(slugFile, `${many.event.slug}\n${fx.entries.find((e) => e.meta.eventIndex === 0).event.slug}\n`);
+      const dataDir = path.join(tmpRoot, 'trades-capped');
+      const r = await runCollect(['--data-dir', dataDir, '--strategy', 'event-slugs', '--event-slugs', slugFile, '--trades', ...FAST], capped);
+      assert.equal(r.code, 0, r.stderr);
+      assert.match(r.stderr, /returns at most 100 rows per page/);
+      const rows = readJsonl(path.join(dataDir, 'markets.jsonl'));
+      assert.ok(rows.some((m) => m.conditionId === many.meta.cid));
+      for (const m of rows) {
+        const e = fx.byCid.get(m.conditionId);
+        const want = fx.tradesCache.get(m.conditionId).filter((t) => t.timestamp >= e.meta.gs - PRE && t.timestamp <= e.meta.gs + POST);
+        assert.equal(readJsonl(path.join(dataDir, 'trades', `${m.conditionId}.jsonl`)).length, want.length, `all windowed trades for ${m.conditionId}`);
+        assert.equal(m.tradesInfo.truncated, false);
+      }
+      for (const q of r.requests.filter((x) => x.path === '/data/trades')) assert.equal(Number(q.query.offset) % 100, 0, 'offset advances by rows returned');
+    } finally {
+      await capped.close();
+    }
+  });
+
   test('a discovery strategy that finds nothing fails loudly', async () => {
     const dataDir = path.join(tmpRoot, 'empty');
     const r = await runCollect(['--data-dir', dataDir, '--tag', 'no-such-tag', ...FAST]);

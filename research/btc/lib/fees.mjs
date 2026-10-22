@@ -22,7 +22,11 @@
 //    size * 0.07 * p * (1 - p) to ~1e-5 USDC (e.g. SELL 82.28 @ 0.59475: observed 1.38818,
 //    model 1.388188; BUY 6 @ 0.68333: observed 0.09088, model 0.09088). Fee is charged in USDC
 //    on top of a buy and deducted from sell proceeds. See data/fees_verified.json (stage feeverify)
-//    for the stratified sample across prices.
+//    for the stratified sample across prices (111/119 fills within 1e-4 USDC; the 8 misses are all
+//    LARGER than the model by amounts consistent with tx-level price rounding, never smaller).
+//  * Legacy "crypto_fees" (rate 0.25, exp 2) hourly markets, Mar 2026: 5/5 sampled taker SELL fills
+//    showed ZERO fee in usdcSize. Treat that regime as fee-uncertain; 'docs_always' (current v2 curve
+//    applied to every market) is the conservative choice for historical backtests.
 //
 // HEADLINE model = 'docs' = 0.07 * p * (1-p) per share (verified). Other models are kept only as
 // sensitivity checks: 'docs_extra_p' (older docs form, under-states), 'minp' (stress, 2x at p=0.5),

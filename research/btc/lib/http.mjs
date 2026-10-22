@@ -18,7 +18,8 @@ const minGapMs = 1000 / RPS;
 let lastStart = 0;
 let active = 0;
 const waiters = [];
-export const stats = { requests: 0, cacheHits: 0, retries: 0, failures: 0, bytes: 0, byHost: {} };
+export const stats = { requests: 0, cacheHits: 0, retries: 0, failures: 0, bytes: 0, byHost: {}, failureSamples: [] };
+function noteFail(msg) { stats.failures++; if (stats.failureSamples.length < 30) stats.failureSamples.push(String(msg).slice(0, 400)); }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -96,8 +97,9 @@ export async function getJSON(url, opts = {}) {
     }
     if (res.status !== 200) {
       if (opts.allowStatus && opts.allowStatus.includes(res.status)) return { __status: res.status, __text: text.slice(0, 500) };
-      stats.failures++;
-      throw new Error(`HTTP ${res.status} ${url} ${text.slice(0, 300)}`);
+      const msg = `HTTP ${res.status} ${method} ${url} ${body ? body.slice(0, 150) : ''} -> ${text.slice(0, 200)}`;
+      noteFail(msg);
+      throw new Error(msg);
     }
     let json;
     try { json = JSON.parse(text); } catch (e) { lastErr = e; stats.retries++; await sleep(1000); continue; }
@@ -107,7 +109,7 @@ export async function getJSON(url, opts = {}) {
     }
     return json;
   }
-  stats.failures++;
+  noteFail(`gave up ${method} ${url}: ${lastErr && lastErr.message}`);
   throw lastErr || new Error('fetch failed ' + url);
 }
 

@@ -194,7 +194,7 @@ test('totals market via eventStartDate, stale complement, no trades -> null trad
     price: 0.52, priceAgeSec: 0, mom6h: 0, complementPrice: null, overround: null, ...nulls, won: 0, closePrice: 0.52, clv: 0 });
   assertRow(baseRows.get('c2|0|24'), { id: 'c2|0|24', complementPrice: 0.47, overround: -0.01 });
   assertRow(baseRows.get('c2|1|24'), { id: 'c2|1|24', outcome: 'Under', sideType: 'under', line: 220.5, price: 0.47, price_m6h: 0.47, mom6h: 0,
-    price_m24h: null, complementPrice: 0.52, overround: -0.01, ...nulls, won: 1, closePrice: null, clv: null });
+    price_m24h: null, complementPrice: 0.52, overround: -0.01, ...nulls, won: 1, closePrice: 0.47, clv: 0 }); // close = last point <= start, even if stale
   for (const h of [1, 3, 12]) assert.equal(baseRows.has(`c2|1|${h}`), false, `stale c2|1|${h} must be dropped`);
 });
 

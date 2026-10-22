@@ -352,7 +352,7 @@ const eventStub = (ev) => {
   return rest;
 };
 
-function route(fixture, u, send, limitCap) {
+function route(fixture, u, send, limitCap, tradesCap) {
   const q = u.searchParams;
   const p = u.pathname;
   if (p === '/gamma/events') return send(200, paginate(filterEvents(fixture, q), q, limitCap));
@@ -379,7 +379,7 @@ function route(fixture, u, send, limitCap) {
   if (p === '/clob/prices-history') return pricesHistory(fixture, q, send);
   if (p === '/data/trades') {
     const entry = fixture.byCid.get(q.get('market'));
-    const limit = Math.min(500, Math.max(1, Number(q.get('limit')) || 100));
+    const limit = Math.min(tradesCap, Math.max(1, Number(q.get('limit')) || 100));
     const offset = Math.max(0, Number(q.get('offset')) || 0);
     if (offset > 10000) return send(400, { error: 'offset too large' });
     if (!entry || !entry.meta.path) return send(200, []);
@@ -436,8 +436,9 @@ function defaultFaults(fixture) {
   return faults.map((f) => ({ ...f, fired: false, firedAt: null }));
 }
 
-// limitCap mimics a server that silently returns fewer rows than the requested gamma `limit`.
-export async function startMockServer({ port = 0, host = '127.0.0.1', fixture = buildFixture(), faults = true, limitCap = 500 } = {}) {
+// limitCap / tradesCap mimic a server that silently returns fewer rows than the requested `limit`
+// (gamma listings / data-api trades).
+export async function startMockServer({ port = 0, host = '127.0.0.1', fixture = buildFixture(), faults = true, limitCap = 500, tradesCap = 500 } = {}) {
   const requests = [];
   const faultList = faults ? defaultFaults(fixture) : [];
   const server = http.createServer((req, res) => {
@@ -456,7 +457,7 @@ export async function startMockServer({ port = 0, host = '127.0.0.1', fixture = 
       return send(fault.status, fault.body, fault.headers);
     }
     try {
-      route(fixture, u, send, limitCap);
+      route(fixture, u, send, limitCap, tradesCap);
     } catch (err) {
       send(500, { error: String(err && err.message) });
     }
