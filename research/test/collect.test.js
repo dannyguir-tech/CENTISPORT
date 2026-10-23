@@ -9,9 +9,9 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { eventsPage, startMockServer } from './mock-server.js';
+import { buildFixture, eventsPage, startMockServer } from './mock-server.js';
 import { cachePathFor, createHttpClient, createLimiter, createRateLimiter, fetchJson, HttpError, parseRetryAfter } from '../lib/http.js';
-import { endDateWindows, gameKeyOf, inferSport, sampleOrder, isFinalMarket, looksLikeGameTime, normalizeMarket, parseArgs, parseTs, readSlugList, resolveWinner } from '../collect.js';
+import { endDateWindows, gameKeyOf, inferSport, sampleOrder, isFinalMarket, looksLikeGameTime, normalizeMarket, parseArgs, parseTs, readSlugList, resolveWinner, slimListing, slimMarketsListing } from '../collect.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const COLLECT = path.join(HERE, '..', 'collect.js');
@@ -151,6 +151,28 @@ describe('lib/http.js', () => {
     assert.equal(client.stats.cacheHits, 0);
     assert.equal(await client.getJson(`${base}/missing`, { cache: true, allow404: true, cacheIf: (b) => b != null }), null);
     assert.ok(!existsSync(cachePathFor(cacheDir, `${base}/missing`)), '404 not cached');
+  });
+
+  // Listing pages are trimmed with `shape` before caching (2026 gamma events are ~50 KB each).
+  test('client cache: shape trims fresh and cached bodies alike, before cacheIf', async () => {
+    const cacheDir = path.join(tmpRoot, 'httpcache-shape');
+    const url = `${base}/cached`;
+    const legacy = createHttpClient({ cacheDir, rps: 100 });
+    const full = await legacy.getJson(url, { cache: true }); // an entry written before trimming existed
+    assert.ok('value' in full);
+    const seen = [];
+    const shape = (b) => ({ kept: b.kept ?? b.value });
+    const client = createHttpClient({ cacheDir, rps: 100 });
+    const fromDisk = await client.getJson(url, { cache: true, shape, cacheIf: (b) => (seen.push(b), true) });
+    assert.deepEqual(fromDisk, { kept: full.value }, 'old full entry is shaped on read');
+    assert.equal(client.stats.requests, 0);
+    const fresh = await client.getJson(`${url}?x=1`, { cache: true, shape, cacheIf: (b) => (seen.push(b), true) });
+    assert.deepEqual(Object.keys(fresh), ['kept']);
+    assert.ok(seen.every((b) => Object.keys(b).join() === 'kept'), 'cacheIf sees the shaped body');
+    const onDisk = JSON.parse(readFileSync(cachePathFor(cacheDir, `${url}?x=1`), 'utf8'));
+    assert.deepEqual(onDisk.body, fresh, 'the shaped body is what is cached');
+    const again = await client.getJson(`${url}?x=1`, { cache: true, shape });
+    assert.deepEqual(again, fresh, 'shape is idempotent on a shaped entry');
   });
 
   test('limiters bound concurrency and request rate', async () => {
@@ -567,6 +589,26 @@ describe('live gamma API adaptations', () => {
     assert.deepEqual(sampleOrder(flipped, 'w1').map((p) => p.market.conditionId), out.map((p) => p.market.conditionId));
   });
 
+  test("sampleOrder puts a game's main event before its sub-events, so the per-game cap keeps the main lines", () => {
+    const ev = (slug, sport) => ({ slug, sport: { sport } });
+    const mk = (e, i) => ({ event: e, market: { conditionId: `${e.slug}#${i}` } });
+    const td = ev('nfl-dal-gb-2026-10-19-first-td-scorer', 'nfl');
+    const main = ev('nfl-dal-gb-2026-10-19', 'nfl');
+    const props = ev('nfl-dal-gb-2026-10-19-player-props', 'nfl');
+    const soc = ev('gtm-mun-cdg-2026-10-18-more-markets', 'soccer');
+    const socMain = ev('gtm-mun-cdg-2026-10-18', 'soccer');
+    const pairs = [mk(td, 0), mk(td, 1), mk(props, 0), mk(main, 0), mk(main, 1), mk(soc, 0), mk(socMain, 0), mk(socMain, 1)];
+    const out = sampleOrder(pairs, 'w').map((p) => p.market.conditionId);
+    const nfl = out.filter((c) => c.startsWith('nfl'));
+    assert.deepEqual(nfl, ['nfl-dal-gb-2026-10-19#0', 'nfl-dal-gb-2026-10-19#1', 'nfl-dal-gb-2026-10-19-first-td-scorer#0', 'nfl-dal-gb-2026-10-19-first-td-scorer#1', 'nfl-dal-gb-2026-10-19-player-props#0']);
+    assert.deepEqual(out.filter((c) => c.startsWith('gtm')), ['gtm-mun-cdg-2026-10-18#0', 'gtm-mun-cdg-2026-10-18#1', 'gtm-mun-cdg-2026-10-18-more-markets#0']);
+    // A game seen only through sub-events, or keyed by gameId, keeps gamma's order.
+    const solo = [mk(td, 0), mk(props, 0), mk(td, 1)];
+    assert.deepEqual(sampleOrder(solo, 'w'), solo);
+    const byId = [{ event: { slug: 'nfl-bills-vs-jets-props', gameId: 7 }, market: { conditionId: 'a' } }, { event: { slug: 'nfl-bills-vs-jets', gameId: 7 }, market: { conditionId: 'b' } }];
+    assert.deepEqual(sampleOrder(byId, 'w'), byId);
+  });
+
   test('end-date windows tile [since, until + 8d] on a fixed grid, newest first, without overlap', () => {
     const w = endDateWindows(parseArgs(['--since', '2026-10-01', '--until', '2026-10-03', '--window-hours', '6']));
     assert.ok(w.length > 0);
@@ -579,6 +621,88 @@ describe('live gamma API adaptations', () => {
     assert.equal(endDateWindows(parseArgs(['--since', '2026-10-01'])), null);
     assert.throws(() => parseArgs(['--window-hours', '6']), /needs --since/);
     assert.throws(() => parseArgs(['--since', '2026-10-01', '--max-markets-per-window', '5']), /needs --window-hours/);
+  });
+
+  test('outright / race events get a sport bucket instead of null', () => {
+    assert.equal(inferSport({ slug: 'nascar-xfinity-timberland-pro-200-winner-2026-10-17' }, {}, ['sports', 'nascar', 'racing', 'nascar-xfinity']), 'racing');
+    assert.equal(inferSport({ slug: 'cycling-tour-of-guangxi-winner-2026-10-12' }, {}, ['sports', 'cycling', 'professional-cycling']), 'cycling');
+    assert.equal(inferSport({ slug: 'titled-tuesday-2026-09-29-top8' }, {}, ['sports', 'chess', 'titled-tuesday', 'recurring']), 'chess');
+    assert.equal(inferSport({ slug: 'f1-monaco-gp-winner-2026-05-24' }, {}, ['sports', 'racing', 'f1']), 'f1', 'league slug beats the racing tag');
+  });
+
+  // Listing pages are trimmed before caching. The trim must keep every field the collector reads:
+  // the normalized record (sport, gameKey, times, outcome, fees ...) and the final-page test must be
+  // identical before and after it.
+  test('slimListing keeps every field normalizeMarket, sampleOrder and the cache test read', () => {
+    const fx = buildFixture({ nEvents: 12 });
+    const bloat = (o) => ({ ...o, description: 'x'.repeat(4000), image: 'https://x/y.png', clobRewards: [{ id: 1, rate: 2 }], umaBond: '500' });
+    const events = fx.events.map((ev, i) => ({
+      ...bloat(ev),
+      sport: { sport: ev.slug.split('-')[0], id: 7, image: 'z', resolution: 'r' },
+      gameId: 1000 + i,
+      tags: ev.tags.map((t) => ({ ...t, forceShow: true, createdAt: '2025-01-01' })),
+      markets: ev.markets.map((m, k) => ({ ...bloat(m), feesEnabled: k % 2 === 0, feeType: k % 2 === 0 ? 'sports_fees_v2' : null, feeSchedule: { rate: 0.03 } })),
+    }));
+    const slim = slimListing(JSON.parse(JSON.stringify(events)));
+    assert.ok(JSON.stringify(slim).length < JSON.stringify(events).length / 3, 'much smaller');
+    assert.deepEqual(slimListing(slim), slim, 'idempotent');
+    assert.deepEqual(slimListing({ data: events }).data, slim, 'paged {data:[...]} bodies too');
+    let n = 0;
+    events.forEach((ev, i) => {
+      ev.markets.forEach((m, k) => {
+        const a = normalizeMarket(m, ev);
+        const b = normalizeMarket(slim[i].markets[k], slim[i]);
+        assert.deepEqual(b, a);
+        if (a.record) {
+          n++;
+          assert.equal(a.record.feeType, k % 2 === 0 ? 'sports_fees_v2' : null);
+          assert.equal(a.record.feesEnabled, k % 2 === 0);
+        }
+        assert.equal(isFinalMarket(slim[i].markets[k]), isFinalMarket(m));
+      });
+    });
+    assert.ok(n > 20);
+    const pairs = (evs) => evs.flatMap((ev) => ev.markets.map((m) => ({ market: m, event: ev })));
+    assert.deepEqual(sampleOrder(pairs(slim), 'w').map((p) => p.market.conditionId), sampleOrder(pairs(events), 'w').map((p) => p.market.conditionId));
+    // /markets listings carry the parent event inside market.events.
+    const mk = events[0].markets.map((m) => ({ ...m, events: [{ ...events[0], markets: undefined }] }));
+    const slimMk = slimMarketsListing(mk);
+    assert.equal(slimMk[0].events[0].slug, events[0].slug);
+    assert.ok(!('description' in slimMk[0]) && !('description' in slimMk[0].events[0]));
+    assert.deepEqual(normalizeMarket(slimMk[0], slimMk[0].events[0]), normalizeMarket(mk[0], mk[0].events[0]));
+  });
+
+  // Bug seen live (2026-10-22): with --tag nba,nfl,... the window buffer was shared, so it filled
+  // with the first tags' markets and later tags were never read in a capped window.
+  test('time-stratified sampling with several --tag filters reads every filter in each window', async () => {
+    const srv = await startMockServer({ faults: false });
+    try {
+      const fx = srv.fixture;
+      const dataDir = path.join(tmpRoot, 'windowed-multitag');
+      const tags = ['nba', 'nfl', 'mlb', 'nhl', 'epl', 'tennis'];
+      const args = ['--data-dir', dataDir, ...FAST, '--tag', tags.join(','), '--window-hours', '2400', '--max-markets-per-window', '2', '--max-markets-per-game', '1', '--max-markets', '1000'];
+      const r = await runCollect(args, srv);
+      assert.equal(r.code, 0, r.stderr);
+      const listed = new Set(r.requests.filter((q) => q.path === '/gamma/events').map((q) => q.query.tag_slug));
+      for (const t of tags) assert.ok(listed.has(t), `tag_slug=${t} was read`);
+      const rows = readJsonl(path.join(dataDir, 'markets.jsonl'));
+      const windows = r.summary.discovery.windows;
+      assert.ok(rows.length > 0 && rows.length <= 2 * windows);
+      // Every window samples across sports: no window holds two markets of one sport while
+      // another listed sport with an eligible market in that window got none.
+      const perWindowSport = new Map();
+      for (const m of rows) {
+        const e = fx.byCid.get(m.conditionId);
+        const k = Math.floor(parseTs(e.event.endDate) / (2400 * HOUR));
+        if (!perWindowSport.has(k)) perWindowSport.set(k, new Map());
+        const ws = perWindowSport.get(k);
+        ws.set(m.sport, (ws.get(m.sport) || 0) + 1);
+      }
+      for (const ws of perWindowSport.values()) assert.ok(ws.size === [...ws.values()].reduce((a, b) => a + b, 0), 'one market per sport per window');
+      assert.ok(new Set(rows.map((m) => m.sport)).size >= 2, 'more than the first tag');
+    } finally {
+      await srv.close();
+    }
   });
 
   test('a listing that rejects deep offsets (gamma 422) continues with an end-date cursor', async () => {

@@ -130,6 +130,10 @@ export const BACKTEST = Object.freeze({
   foldBy: 'decision',
   embargoFrom: 'settle',
   cutoffScope: 'offsets',
+  // Many of these bets are heavily skewed (No on longshots, 0.90+ favourites): fixed before any real
+  // run, p also has the losing-events floor (backtest.js losingEventsFloor), because the synthetic
+  // null world showed that a few dozen events that all happened to win make the bootstrap degenerate.
+  lossFloor: true,
   // Not features: fee schedules are as of collection, not decision time. Stripped from rows before
   // select() and used only for the actual-fee sensitivity.
   metaFields: ['feeRate', 'feeExponent', 'feeType'],

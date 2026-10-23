@@ -120,6 +120,25 @@ for (const r of IS) variants.push({ group: 'I', family: r.rule, scenario: r.s, f
 const IP = fs.existsSync(path.join(REPORT, 'implied', 'print_check.json')) ? JSON.parse(fs.readFileSync(path.join(REPORT, 'implied', 'print_check.json'), 'utf8')) : [];
 for (const r of IP) for (const k of ['pl', 'pn']) if (r[k] && r[k].n) variants.push({ group: 'I', family: r.rule, scenario: `print_${k}`, fee: 'docs_always', theta: 'WF', mode: 'walk-forward', n: r[k].n, days: r[k].days, winRate: r[k].winRate, avgCost: r[k].avgCost, roi: r[k].roi, ci: r[k].ci, p: r[k].p, slipVsAssumed: r[k].slipVsAssumed, midRoiSameSubset: r[k].midRoiSameSubset });
 
+// ------------------------------------------------------------------ K: maker-legged simulation on live books + real tape
+const MK = fs.existsSync(path.join(REPORT, 'maker', 'maker_sim.json')) ? JSON.parse(fs.readFileSync(path.join(REPORT, 'maker', 'maker_sim.json'), 'utf8')) : null;
+if (MK) for (const g of MK.grid) variants.push({ group: 'K', family: `maker_${g.family}`, scenario: `${g.placement}|H${g.H}|session${g.session}`, fee: 'maker0+takerHedge', theta: g.theta, mode: 'fixed',
+  n: g.filledOrders, ordersPlaced: g.orders, days: 1, winRate: g.winRate, avgCost: g.avgCostPerSet, roi: g.roi, ci: g.ci, p: g.p ?? NaN, pnlUsd: g.pnlUsd, capacityUsdPerDay: g.usdPerDay, roiWithRebate: g.withRebate.roi });
+if (MK && MK.walkForward) { const w = MK.walkForward; variants.push({ group: 'K', family: 'maker_ALL', scenario: `WF ${w.chosen} -> sessions ${w.oosSessions.join(',')}`, fee: 'maker0+takerHedge', theta: 'WF', mode: 'walk-forward',
+  n: w.oos.filledOrders, ordersPlaced: w.oos.orders, days: 1, winRate: w.oos.winRate, avgCost: w.oos.avgCostPerSet, roi: w.oos.roi, ci: w.oos.ci, p: w.oos.p ?? NaN, pnlUsd: w.oos.pnlUsd, capacityUsdPerDay: w.oos.usdPerDay, roiWithRebate: w.oosWithRebate.roi }); }
+
+// ------------------------------------------------------------------ C: print-first census of nested Chainlink pairs (print_scan.mjs)
+const PS = fs.existsSync(path.join(REPORT, 'printscan', 'summary.json')) ? JSON.parse(fs.readFileSync(path.join(REPORT, 'printscan', 'summary.json'), 'utf8')) : null;
+if (PS) for (const v of PS.variants) {
+  variants.push({ group: 'C', family: v.family, scenario: `lastPrint_W${v.W}`, fee: 'docs_always', theta: v.theta, mode: v.mode, n: v.n, days: v.days, winRate: v.winRate, avgCost: v.avgCost, roi: v.roi, ci: v.ci, p: v.days >= 2 ? v.p : NaN, capacityUsdPerDay: v.usdPerDay, oosFrom: v.oosFrom, oosTo: v.oosTo });
+  if (v.folN) variants.push({ group: 'C', family: v.family, scenario: `followThrough_W${v.W}`, fee: 'docs_always', theta: v.theta, mode: v.mode, n: v.folN, days: v.days, winRate: v.folWin, roi: v.folRoi, ci: v.folCi, p: v.mode === 'walk-forward' && v.folP != null ? v.folP : NaN, capacityUsdPerDay: v.usdPerDayFollow, oosFrom: v.oosFrom, oosTo: v.oosTo });
+}
+
+// ------------------------------------------------------------------ L: live taker screen on real books (no p-values: a pass/fail existence screen)
+const LIVE = fs.existsSync(path.join(REPORT, 'live', 'live_summary.json')) ? JSON.parse(fs.readFileSync(path.join(REPORT, 'live', 'live_summary.json'), 'utf8')) : null;
+if (LIVE && LIVE.scopes) for (const [scope, sc] of Object.entries(LIVE.scopes)) if (scope !== 'all') for (const [f, o] of Object.entries(sc.families)) variants.push({ group: 'L', family: f, scenario: `taker_books_${scope}`, fee: 'docs', theta: 0, mode: 'live',
+  n: o.violatingSnapshotInstances, ordersPlaced: o.priced, days: 1, roi: null, p: NaN, maxMargin: o.maxMargin, capacityUsdPerDay: o.usdPerDayUpperBound });
+
 // ------------------------------------------------------------------ BH across every variant with a p-value
 const sig = bh(variants.map((v) => (Number.isFinite(v.p) && v.n >= 5 ? v.p : NaN)), 0.1);
 variants.forEach((v, i) => { v.bh = sig[i]; });
@@ -128,10 +147,10 @@ const live = fs.existsSync(path.join(REPORT, 'live', 'live_summary.json')) ? JSO
 const episodeSummary = JSON.parse(fs.readFileSync(path.join(HIST, 'episode_summary.json'), 'utf8'));
 const famStats = JSON.parse(fs.readFileSync(path.join(HIST, 'family_stats.json'), 'utf8'));
 writeJSON('results.json', { variantsTested: variants.length, variantsWithP: variants.filter((v) => Number.isFinite(v.p) && v.n >= 5).length, bhSignificant: variants.filter((v) => v.bh).length,
-  bhSignificantByGroup: { M: variants.filter((v) => v.bh && v.group === 'M').length, P: variants.filter((v) => v.bh && v.group === 'P').length, I: variants.filter((v) => v.bh && v.group === 'I').length },
-  verifySummary, episodeSummary, famStats, live, headline: variants.filter((v) => (v.group === 'P' && v.scenario === 'pl60' && v.fee === 'docs_always' && v.mode === 'walk-forward') || (v.group === 'M' && v.scenario === 'hc1' && v.fee === 'docs_always' && v.mode === 'walk-forward') || (v.group === 'I' && v.mode === 'walk-forward')) });
+  bhSignificantByGroup: Object.fromEntries(['M', 'P', 'I', 'C', 'K', 'L'].map((g) => [g, variants.filter((v) => v.bh && v.group === g).length])), variantsByGroup: Object.fromEntries(['M', 'P', 'I', 'C', 'K', 'L'].map((g) => [g, variants.filter((v) => v.group === g).length])), maker: MK ? { sessions: MK.sessions, walkForward: MK.walkForward } : null,
+  verifySummary, episodeSummary, famStats, live, headline: variants.filter((v) => (v.group === 'P' && v.scenario === 'pl60' && v.fee === 'docs_always' && v.mode === 'walk-forward') || (v.group === 'M' && v.scenario === 'hc1' && v.fee === 'docs_always' && v.mode === 'walk-forward') || (v.group === 'I' && v.mode === 'walk-forward') || (v.group === 'K' && v.mode === 'walk-forward') || (v.group === 'C' && v.mode === 'walk-forward')) });
 // console digest
-console.log('variants', variants.length, 'with p', variants.filter((v) => Number.isFinite(v.p) && v.n >= 5).length, 'BH sig', variants.filter((v) => v.bh).length, JSON.stringify({ M: variants.filter((v) => v.bh && v.group === 'M').length, P: variants.filter((v) => v.bh && v.group === 'P').length, I: variants.filter((v) => v.bh && v.group === 'I').length }));
+console.log('variants', variants.length, 'with p', variants.filter((v) => Number.isFinite(v.p) && v.n >= 5).length, 'BH sig', variants.filter((v) => v.bh).length, JSON.stringify(Object.fromEntries(['M', 'P', 'I', 'C', 'K', 'L'].map((g) => [g, [variants.filter((v) => v.group === g).length, variants.filter((v) => v.bh && v.group === g).length]]))));
 console.log('\n== print verification by family (sampled episodes that looked executable on mid+half-spread)');
 for (const [f, v] of Object.entries(verifySummary)) console.log(f.padEnd(26), 'pop', String(v.populationExecOnMidScreen).padEnd(5), 'sampled', String(v.sampled).padEnd(4), 'noPrintLeg', String(v.legsWithNoPrints).padEnd(4), 'pl60avail', String(v.pl60Available).padEnd(4), 'pl60arb', String(v.pl60Arb).padEnd(3), 'plArb', String(v.plArb).padEnd(3), 'pmArb', String(v.pmArb).padEnd(3), 'medMargin', v.medianPl60Margin, 'p90', v.p90Pl60Margin);
 console.log('\n== headline rows');

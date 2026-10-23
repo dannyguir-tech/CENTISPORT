@@ -1,0 +1,1613 @@
+{
+ "within": [
+  {
+   "tf": "5m",
+   "f": 0.2,
+   "decision": "last path point with real time <= start+60s",
+   "velLookbackSec": 60,
+   "n": 11382,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0025,
+     "ci95": [
+      -0.0303,
+      0.0423
+     ]
+    },
+    "logit_p": {
+     "beta": 1.1572,
+     "ci95": [
+      0.9417,
+      1.3915
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0841,
+     "ci95": [
+      -0.3145,
+      0.1436
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "5m",
+   "f": 0.4,
+   "decision": "last path point with real time <= start+120s",
+   "velLookbackSec": 60,
+   "n": 12787,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0075,
+     "ci95": [
+      -0.0246,
+      0.0465
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0868,
+     "ci95": [
+      1.0048,
+      1.1631
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0657,
+     "ci95": [
+      -0.1432,
+      0.0197
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "5m",
+   "f": 0.6,
+   "decision": "last path point with real time <= start+180s",
+   "velLookbackSec": 60,
+   "n": 12785,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0283,
+     "ci95": [
+      -0.0262,
+      0.0749
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0442,
+     "ci95": [
+      0.987,
+      1.0915
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0266,
+     "ci95": [
+      -0.0748,
+      0.015
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "5m",
+   "f": 0.8,
+   "decision": "last path point with real time <= start+240s",
+   "velLookbackSec": 60,
+   "n": 12787,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0527,
+     "ci95": [
+      -0.0077,
+      0.113
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0598,
+     "ci95": [
+      1.0009,
+      1.1143
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0234,
+     "ci95": [
+      -0.0881,
+      0.0292
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "15m",
+   "f": 0.2,
+   "decision": "last path point with real time <= start+180s",
+   "velLookbackSec": 120,
+   "n": 11454,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": -0.0052,
+     "ci95": [
+      -0.0418,
+      0.0282
+     ]
+    },
+    "logit_p": {
+     "beta": 1.1308,
+     "ci95": [
+      1.0323,
+      1.2503
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0899,
+     "ci95": [
+      -0.2058,
+      0.0064
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "15m",
+   "f": 0.4,
+   "decision": "last path point with real time <= start+360s",
+   "velLookbackSec": 120,
+   "n": 11454,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": -0.0185,
+     "ci95": [
+      -0.0609,
+      0.022
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0973,
+     "ci95": [
+      1.0424,
+      1.154
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0455,
+     "ci95": [
+      -0.1149,
+      0.0188
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "15m",
+   "f": 0.6,
+   "decision": "last path point with real time <= start+540s",
+   "velLookbackSec": 120,
+   "n": 11445,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": -0.0049,
+     "ci95": [
+      -0.0544,
+      0.0425
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0766,
+     "ci95": [
+      1.0297,
+      1.1254
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0348,
+     "ci95": [
+      -0.0916,
+      0.0248
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "15m",
+   "f": 0.8,
+   "decision": "last path point with real time <= start+720s",
+   "velLookbackSec": 120,
+   "n": 11459,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": -0.0432,
+     "ci95": [
+      -0.1085,
+      0.0167
+     ]
+    },
+    "logit_p": {
+     "beta": 1.005,
+     "ci95": [
+      0.9648,
+      1.0506
+     ]
+    },
+    "dlogit_recent": {
+     "beta": 0.0208,
+     "ci95": [
+      -0.0436,
+      0.0801
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1h",
+   "f": 0.2,
+   "decision": "last path point with real time <= start+720s",
+   "velLookbackSec": 300,
+   "n": 8715,
+   "days": 366,
+   "coef": {
+    "const": {
+     "beta": -0.0025,
+     "ci95": [
+      -0.0395,
+      0.0398
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0997,
+     "ci95": [
+      1.0279,
+      1.182
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0831,
+     "ci95": [
+      -0.1906,
+      0.0272
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1h",
+   "f": 0.4,
+   "decision": "last path point with real time <= start+1440s",
+   "velLookbackSec": 300,
+   "n": 8714,
+   "days": 366,
+   "coef": {
+    "const": {
+     "beta": -0.0076,
+     "ci95": [
+      -0.0468,
+      0.0414
+     ]
+    },
+    "logit_p": {
+     "beta": 1.122,
+     "ci95": [
+      1.0723,
+      1.1894
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.1457,
+     "ci95": [
+      -0.2509,
+      -0.0741
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1h",
+   "f": 0.6,
+   "decision": "last path point with real time <= start+2160s",
+   "velLookbackSec": 300,
+   "n": 8730,
+   "days": 366,
+   "coef": {
+    "const": {
+     "beta": 0.0063,
+     "ci95": [
+      -0.0409,
+      0.0644
+     ]
+    },
+    "logit_p": {
+     "beta": 1.1036,
+     "ci95": [
+      1.0525,
+      1.144
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0169,
+     "ci95": [
+      -0.1019,
+      0.0661
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1h",
+   "f": 0.8,
+   "decision": "last path point with real time <= start+2880s",
+   "velLookbackSec": 300,
+   "n": 8722,
+   "days": 366,
+   "coef": {
+    "const": {
+     "beta": -0.001,
+     "ci95": [
+      -0.0547,
+      0.0781
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0572,
+     "ci95": [
+      1.0117,
+      1.1042
+     ]
+    },
+    "dlogit_recent": {
+     "beta": 0.0293,
+     "ci95": [
+      -0.0593,
+      0.1138
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "4h",
+   "f": 0.2,
+   "decision": "last path point with real time <= start+2880s",
+   "velLookbackSec": 1200,
+   "n": 2186,
+   "days": 368,
+   "coef": {
+    "const": {
+     "beta": -0.0442,
+     "ci95": [
+      -0.1382,
+      0.0304
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0791,
+     "ci95": [
+      0.924,
+      1.2296
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.1637,
+     "ci95": [
+      -0.4034,
+      0.026
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "4h",
+   "f": 0.4,
+   "decision": "last path point with real time <= start+5760s",
+   "velLookbackSec": 1200,
+   "n": 2195,
+   "days": 368,
+   "coef": {
+    "const": {
+     "beta": -0.0317,
+     "ci95": [
+      -0.1304,
+      0.0594
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0583,
+     "ci95": [
+      0.9443,
+      1.1539
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.1603,
+     "ci95": [
+      -0.3351,
+      0.0584
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "4h",
+   "f": 0.6,
+   "decision": "last path point with real time <= start+8640s",
+   "velLookbackSec": 1200,
+   "n": 2194,
+   "days": 368,
+   "coef": {
+    "const": {
+     "beta": -0.0062,
+     "ci95": [
+      -0.1046,
+      0.0872
+     ]
+    },
+    "logit_p": {
+     "beta": 1.109,
+     "ci95": [
+      1.0102,
+      1.2044
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.0775,
+     "ci95": [
+      -0.2531,
+      0.1095
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "4h",
+   "f": 0.8,
+   "decision": "last path point with real time <= start+11520s",
+   "velLookbackSec": 1200,
+   "n": 2194,
+   "days": 368,
+   "coef": {
+    "const": {
+     "beta": 0.0067,
+     "ci95": [
+      -0.1259,
+      0.1325
+     ]
+    },
+    "logit_p": {
+     "beta": 1.1229,
+     "ci95": [
+      1.0326,
+      1.231
+     ]
+    },
+    "dlogit_recent": {
+     "beta": -0.027,
+     "ci95": [
+      -0.2109,
+      0.1271
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1d",
+   "f": 0.2,
+   "decision": "last path point with real time <= start+17280s",
+   "velLookbackSec": 7200,
+   "n": 524,
+   "days": 524,
+   "coef": {
+    "const": {
+     "beta": 0.0484,
+     "ci95": [
+      -0.1256,
+      0.2441
+     ]
+    },
+    "logit_p": {
+     "beta": 0.8612,
+     "ci95": [
+      0.5161,
+      1.246
+     ]
+    },
+    "dlogit_recent": {
+     "beta": 0.0075,
+     "ci95": [
+      -0.5223,
+      0.4844
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1d",
+   "f": 0.4,
+   "decision": "last path point with real time <= start+34560s",
+   "velLookbackSec": 7200,
+   "n": 524,
+   "days": 524,
+   "coef": {
+    "const": {
+     "beta": 0.0323,
+     "ci95": [
+      -0.1545,
+      0.227
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0212,
+     "ci95": [
+      0.765,
+      1.2865
+     ]
+    },
+    "dlogit_recent": {
+     "beta": 0.0997,
+     "ci95": [
+      -0.3385,
+      0.5713
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1d",
+   "f": 0.6,
+   "decision": "last path point with real time <= start+51840s",
+   "velLookbackSec": 7200,
+   "n": 525,
+   "days": 525,
+   "coef": {
+    "const": {
+     "beta": 0.0312,
+     "ci95": [
+      -0.1907,
+      0.2342
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0665,
+     "ci95": [
+      0.8704,
+      1.2801
+     ]
+    },
+    "dlogit_recent": {
+     "beta": 0.1057,
+     "ci95": [
+      -0.3261,
+      0.6558
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  },
+  {
+   "tf": "1d",
+   "f": 0.8,
+   "decision": "last path point with real time <= start+69120s",
+   "velLookbackSec": 7200,
+   "n": 525,
+   "days": 525,
+   "coef": {
+    "const": {
+     "beta": -0.0406,
+     "ci95": [
+      -0.2816,
+      0.1992
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0975,
+     "ci95": [
+      0.9103,
+      1.3005
+     ]
+    },
+    "dlogit_recent": {
+     "beta": 0.078,
+     "ci95": [
+      -0.2623,
+      0.4176
+     ]
+    }
+   },
+   "note": "logit_p coef > 1 => market under-reacts to its own move since the open (momentum); < 1 => over-reacts (reversal). dlogit_recent > 0 => recent move continues beyond the current price."
+  }
+ ],
+ "across": [
+  {
+   "tf": "5m",
+   "model": "win_b ~ logit(p_open_b) + prevResult_a(+-1)",
+   "n": 12856,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0139,
+     "ci95": [
+      -0.0237,
+      0.0525
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.0899,
+     "ci95": [
+      1.0426,
+      1.1377
+     ]
+    },
+    "prev": {
+     "beta": -0.0155,
+     "ci95": [
+      -0.055,
+      0.0249
+     ]
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "model": "win_b ~ logit(p_open_b) + zMag_a",
+   "n": 12848,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0139,
+     "ci95": [
+      -0.0243,
+      0.0529
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.0911,
+     "ci95": [
+      1.0428,
+      1.1399
+     ]
+    },
+    "zMag_prev": {
+     "beta": -0.0397,
+     "ci95": [
+      -0.0868,
+      -0.0038
+     ]
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "model": "win_b ~ logit(p_open_b) + lastMinute dlogit of window a",
+   "n": 8604,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0009,
+     "ci95": [
+      -0.0519,
+      0.0492
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.1033,
+     "ci95": [
+      1.057,
+      1.1622
+     ]
+    },
+    "lastMin_prev": {
+     "beta": -0.012,
+     "ci95": [
+      -0.0356,
+      0.0083
+     ]
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "model": "win_b ~ logit(p_open_b) + prevResult_a(+-1)",
+   "n": 11452,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": -0.0015,
+     "ci95": [
+      -0.039,
+      0.0294
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.0736,
+     "ci95": [
+      0.9968,
+      1.1668
+     ]
+    },
+    "prev": {
+     "beta": 0.0127,
+     "ci95": [
+      -0.0241,
+      0.0527
+     ]
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "model": "win_b ~ logit(p_open_b) + zMag_a",
+   "n": 10956,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": -0.0016,
+     "ci95": [
+      -0.0406,
+      0.0303
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.0873,
+     "ci95": [
+      1.0085,
+      1.1837
+     ]
+    },
+    "zMag_prev": {
+     "beta": 0.0141,
+     "ci95": [
+      -0.0303,
+      0.0535
+     ]
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "model": "win_b ~ logit(p_open_b) + lastMinute dlogit of window a",
+   "n": 8006,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": 0.0026,
+     "ci95": [
+      -0.042,
+      0.0508
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.1377,
+     "ci95": [
+      1.0363,
+      1.2363
+     ]
+    },
+    "lastMin_prev": {
+     "beta": -0.0002,
+     "ci95": [
+      -0.0216,
+      0.0228
+     ]
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "model": "win_b ~ logit(p_open_b) + z5 (Chainlink 5-min return into b start)",
+   "n": 4270,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0016,
+     "ci95": [
+      -0.0702,
+      0.0599
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.1422,
+     "ci95": [
+      1.0236,
+      1.2949
+     ]
+    },
+    "z5": {
+     "beta": 0.0146,
+     "ci95": [
+      -0.0426,
+      0.0732
+     ]
+    }
+   }
+  },
+  {
+   "tf": "1h",
+   "model": "win_b ~ logit(p_open_b) + prevResult_a(+-1)",
+   "n": 8697,
+   "days": 366,
+   "coef": {
+    "const": {
+     "beta": -0.001,
+     "ci95": [
+      -0.0351,
+      0.0433
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.2045,
+     "ci95": [
+      1.0082,
+      1.4303
+     ]
+    },
+    "prev": {
+     "beta": -0.0002,
+     "ci95": [
+      -0.0447,
+      0.0479
+     ]
+    }
+   }
+  },
+  {
+   "tf": "1h",
+   "model": "win_b ~ logit(p_open_b) + zMag_a",
+   "n": 4964,
+   "days": 216,
+   "coef": {
+    "const": {
+     "beta": 0.0176,
+     "ci95": [
+      -0.0373,
+      0.0752
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.1558,
+     "ci95": [
+      0.9661,
+      1.3737
+     ]
+    },
+    "zMag_prev": {
+     "beta": 0.0182,
+     "ci95": [
+      -0.0287,
+      0.0604
+     ]
+    }
+   }
+  },
+  {
+   "tf": "1h",
+   "model": "win_b ~ logit(p_open_b) + z5 (Chainlink 5-min return into b start)",
+   "n": 1071,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0021,
+     "ci95": [
+      -0.1386,
+      0.1526
+     ]
+    },
+    "logit_p_open": {
+     "beta": 0.8742,
+     "ci95": [
+      0.4017,
+      1.4351
+     ]
+    },
+    "z5": {
+     "beta": 0.1032,
+     "ci95": [
+      -0.0219,
+      0.2159
+     ]
+    }
+   }
+  },
+  {
+   "tf": "4h",
+   "model": "win_b ~ logit(p_open_b) + prevResult_a(+-1)",
+   "n": 2171,
+   "days": 368,
+   "coef": {
+    "const": {
+     "beta": -0.0004,
+     "ci95": [
+      -0.0848,
+      0.0902
+     ]
+    },
+    "logit_p_open": {
+     "beta": 0.4503,
+     "ci95": [
+      -0.0648,
+      1.0361
+     ]
+    },
+    "prev": {
+     "beta": -0.1351,
+     "ci95": [
+      -0.2322,
+      -0.0681
+     ]
+    }
+   }
+  },
+  {
+   "tf": "4h",
+   "model": "win_b ~ logit(p_open_b) + zMag_a",
+   "n": 1247,
+   "days": 216,
+   "coef": {
+    "const": {
+     "beta": 0.0063,
+     "ci95": [
+      -0.1025,
+      0.1184
+     ]
+    },
+    "logit_p_open": {
+     "beta": 1.1652,
+     "ci95": [
+      0.2096,
+      2.0256
+     ]
+    },
+    "zMag_prev": {
+     "beta": -0.083,
+     "ci95": [
+      -0.2189,
+      -0.0028
+     ]
+    }
+   }
+  },
+  {
+   "tf": "4h",
+   "model": "win_b ~ logit(p_open_b) + z5 (Chainlink 5-min return into b start)",
+   "n": 269,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0496,
+     "ci95": [
+      -0.2,
+      0.3191
+     ]
+    },
+    "logit_p_open": {
+     "beta": 2.4907,
+     "ci95": [
+      0.2482,
+      5.3572
+     ]
+    },
+    "z5": {
+     "beta": -0.1343,
+     "ci95": [
+      -0.5896,
+      0.1644
+     ]
+    }
+   }
+  },
+  {
+   "tf": "1d",
+   "model": "win_b ~ logit(p_open_b) + prevResult_a(+-1)",
+   "n": 515,
+   "days": 515,
+   "coef": {
+    "const": {
+     "beta": 0.0563,
+     "ci95": [
+      -0.1586,
+      0.2232
+     ]
+    },
+    "logit_p_open": {
+     "beta": 0.0215,
+     "ci95": [
+      -2.2747,
+      2.1656
+     ]
+    },
+    "prev": {
+     "beta": 0.041,
+     "ci95": [
+      -0.151,
+      0.2198
+     ]
+    }
+   }
+  },
+  {
+   "tf": "1d",
+   "model": "win_b ~ logit(p_open_b) + zMag_a",
+   "n": 201,
+   "days": 201,
+   "coef": {
+    "const": {
+     "beta": 0.1591,
+     "ci95": [
+      -0.1418,
+      0.399
+     ]
+    },
+    "logit_p_open": {
+     "beta": -1.2617,
+     "ci95": [
+      -5.6718,
+      1.4684
+     ]
+    },
+    "zMag_prev": {
+     "beta": -0.0794,
+     "ci95": [
+      -0.3977,
+      0.2025
+     ]
+    }
+   }
+  }
+ ],
+ "cross": [
+  {
+   "pair": "15m<-5m",
+   "model": "win ~ logit(p_long) + count(sub Up - sub Down)",
+   "n": 8578,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0464,
+     "ci95": [
+      -0.1241,
+      0.0281
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0692,
+     "ci95": [
+      1.0032,
+      1.1326
+     ]
+    },
+    "subCount": {
+     "beta": -0.0305,
+     "ci95": [
+      -0.0938,
+      0.0335
+     ]
+    }
+   }
+  },
+  {
+   "pair": "15m<-5m",
+   "model": "win ~ logit(p_long) + zc (Chainlink move since start / sigma*sqrt(remaining))",
+   "n": 8578,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0463,
+     "ci95": [
+      -0.126,
+      0.0272
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0562,
+     "ci95": [
+      0.9695,
+      1.1333
+     ]
+    },
+    "zc": {
+     "beta": -0.0078,
+     "ci95": [
+      -0.1712,
+      0.1829
+     ]
+    }
+   }
+  },
+  {
+   "pair": "15m<-5m",
+   "model": "win ~ logit(p_long) + zc + zLast5m",
+   "n": 8578,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0463,
+     "ci95": [
+      -0.126,
+      0.0269
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0558,
+     "ci95": [
+      0.9693,
+      1.1314
+     ]
+    },
+    "zc": {
+     "beta": -0.0189,
+     "ci95": [
+      -0.2044,
+      0.2387
+     ]
+    },
+    "zLast5m": {
+     "beta": 0.0144,
+     "ci95": [
+      -0.0776,
+      0.0696
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1h<-5m",
+   "model": "win ~ logit(p_long) + count(sub Up - sub Down)",
+   "n": 11789,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0308,
+     "ci95": [
+      -0.1731,
+      0.1003
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.1046,
+     "ci95": [
+      1.009,
+      1.2468
+     ]
+    },
+    "subCount": {
+     "beta": -0.0252,
+     "ci95": [
+      -0.0959,
+      0.0404
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1h<-5m",
+   "model": "win ~ logit(p_long) + zc (Chainlink move since start / sigma*sqrt(remaining))",
+   "n": 11789,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0289,
+     "ci95": [
+      -0.1698,
+      0.1022
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0223,
+     "ci95": [
+      0.8905,
+      1.1649
+     ]
+    },
+    "zc": {
+     "beta": 0.1058,
+     "ci95": [
+      -0.0844,
+      0.3007
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1h<-5m",
+   "model": "win ~ logit(p_long) + zc + zLast5m",
+   "n": 11789,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0288,
+     "ci95": [
+      -0.1695,
+      0.1022
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0226,
+     "ci95": [
+      0.8905,
+      1.1661
+     ]
+    },
+    "zc": {
+     "beta": 0.117,
+     "ci95": [
+      -0.073,
+      0.3169
+     ]
+    },
+    "zLast5m": {
+     "beta": -0.0224,
+     "ci95": [
+      -0.0589,
+      0.0023
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1h<-15m",
+   "model": "win ~ logit(p_long) + count(sub Up - sub Down)",
+   "n": 8589,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": 0.0075,
+     "ci95": [
+      -0.0742,
+      0.0895
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0216,
+     "ci95": [
+      0.9279,
+      1.1009
+     ]
+    },
+    "subCount": {
+     "beta": 0.0706,
+     "ci95": [
+      -0.0129,
+      0.1409
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1h<-15m",
+   "model": "win ~ logit(p_long) + zc (Chainlink move since start / sigma*sqrt(remaining))",
+   "n": 8351,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": 0.0136,
+     "ci95": [
+      -0.0725,
+      0.0992
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0287,
+     "ci95": [
+      0.9079,
+      1.1604
+     ]
+    },
+    "zc": {
+     "beta": 0.0745,
+     "ci95": [
+      -0.113,
+      0.2934
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1h<-15m",
+   "model": "win ~ logit(p_long) + zc + zLast5m",
+   "n": 3205,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": -0.0301,
+     "ci95": [
+      -0.1802,
+      0.1059
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.0615,
+     "ci95": [
+      0.8693,
+      1.2482
+     ]
+    },
+    "zc": {
+     "beta": 0.0345,
+     "ci95": [
+      -0.2351,
+      0.3116
+     ]
+    },
+    "zLast5m": {
+     "beta": 0.071,
+     "ci95": [
+      -0.0051,
+      0.1645
+     ]
+    }
+   }
+  },
+  {
+   "pair": "4h<-1h",
+   "model": "win ~ logit(p_long) + count(sub Up - sub Down)",
+   "n": 6423,
+   "days": 361,
+   "coef": {
+    "const": {
+     "beta": -0.0294,
+     "ci95": [
+      -0.1266,
+      0.0627
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.041,
+     "ci95": [
+      0.9339,
+      1.1574
+     ]
+    },
+    "subCount": {
+     "beta": 0.0659,
+     "ci95": [
+      -0.0167,
+      0.17
+     ]
+    }
+   }
+  },
+  {
+   "pair": "4h<-1h",
+   "model": "win ~ logit(p_long) + zc (Chainlink move since start / sigma*sqrt(remaining))",
+   "n": 2111,
+   "days": 121,
+   "coef": {
+    "const": {
+     "beta": 0.074,
+     "ci95": [
+      -0.0962,
+      0.2532
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.1228,
+     "ci95": [
+      0.8658,
+      1.3626
+     ]
+    },
+    "zc": {
+     "beta": -0.0997,
+     "ci95": [
+      -0.4456,
+      0.2677
+     ]
+    }
+   }
+  },
+  {
+   "pair": "4h<-1h",
+   "model": "win ~ logit(p_long) + zc + zLast5m",
+   "n": 809,
+   "days": 46,
+   "coef": {
+    "const": {
+     "beta": 0.0164,
+     "ci95": [
+      -0.2253,
+      0.2624
+     ]
+    },
+    "logit_p_long": {
+     "beta": 0.9393,
+     "ci95": [
+      0.4907,
+      1.3002
+     ]
+    },
+    "zc": {
+     "beta": 0.2165,
+     "ci95": [
+      -0.1899,
+      0.8901
+     ]
+    },
+    "zLast5m": {
+     "beta": 0.1764,
+     "ci95": [
+      0.0182,
+      0.4254
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1d<-4h",
+   "model": "win ~ logit(p_long) + count(sub Up - sub Down)",
+   "n": 1780,
+   "days": 359,
+   "coef": {
+    "const": {
+     "beta": 0.0588,
+     "ci95": [
+      -0.1702,
+      0.298
+     ]
+    },
+    "logit_p_long": {
+     "beta": 0.9002,
+     "ci95": [
+      0.6995,
+      1.1398
+     ]
+    },
+    "subCount": {
+     "beta": 0.136,
+     "ci95": [
+      -0.066,
+      0.3184
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1d<-4h",
+   "model": "win ~ logit(p_long) + zc (Chainlink move since start / sigma*sqrt(remaining))",
+   "n": 1062,
+   "days": 214,
+   "coef": {
+    "const": {
+     "beta": 0.1787,
+     "ci95": [
+      -0.1567,
+      0.5203
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.3099,
+     "ci95": [
+      0.713,
+      2.0514
+     ]
+    },
+    "zc": {
+     "beta": -0.3085,
+     "ci95": [
+      -1.1716,
+      0.5045
+     ]
+    }
+   }
+  },
+  {
+   "pair": "1d<-4h",
+   "model": "win ~ logit(p_long) + zc + zLast5m",
+   "n": 221,
+   "days": 45,
+   "coef": {
+    "const": {
+     "beta": 0.2488,
+     "ci95": [
+      -0.4848,
+      1.0051
+     ]
+    },
+    "logit_p_long": {
+     "beta": 1.2273,
+     "ci95": [
+      0.2961,
+      2.6074
+     ]
+    },
+    "zc": {
+     "beta": -0.1467,
+     "ci95": [
+      -1.5485,
+      1.1031
+     ]
+    },
+    "zLast5m": {
+     "beta": 0.2391,
+     "ci95": [
+      -0.1787,
+      0.7399
+     ]
+    }
+   }
+  }
+ ],
+ "tape": [
+  {
+   "tf": "5m",
+   "model": "win ~ logit(p_exec) + OFI(start..mid-window)",
+   "n": 343,
+   "days": 13,
+   "coef": {
+    "const": {
+     "beta": -0.2029,
+     "ci95": [
+      -0.5567,
+      0.0483
+     ]
+    },
+    "logit_p": {
+     "beta": 1.0212,
+     "ci95": [
+      0.8852,
+      1.3
+     ]
+    },
+    "ofi": {
+     "beta": 1.0619,
+     "ci95": [
+      -0.1667,
+      2.0375
+     ]
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "model": "win ~ logit(p_exec) + OFI(start..mid-window)",
+   "n": 334,
+   "days": 33,
+   "coef": {
+    "const": {
+     "beta": -0.3888,
+     "ci95": [
+      -0.6448,
+      -0.1291
+     ]
+    },
+    "logit_p": {
+     "beta": 1.3039,
+     "ci95": [
+      1.0506,
+      1.7275
+     ]
+    },
+    "ofi": {
+     "beta": -0.1066,
+     "ci95": [
+      -1.543,
+      1.0712
+     ]
+    }
+   }
+  }
+ ]
+}

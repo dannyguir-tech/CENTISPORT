@@ -20,3 +20,5 @@ research/data-*/
 research/btc/reports/**/*.jsonl.gz
 research/btc/verify/**/out/
 research/btc/verify/**/data/
+research/btc/reports/**/maker_orders.csv
+research/btc/verify/**/logs/

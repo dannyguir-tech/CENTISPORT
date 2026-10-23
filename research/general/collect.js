@@ -22,20 +22,25 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHttpClient, HttpError, writeFileAtomic } from '../lib/http.js';
-import { DEFAULT_BASES as KIT_BASES } from '../collect.js';
 import {
-  DAY, DEFAULT_SINCE, HOUR, bool, categoryOf, decisionPlan, feeInfoOf, isCryptoUpDown, isSportsEvent, isYesNo, listingTsOf, mergeWindows,
+  CATEGORIES, DAY, DEFAULT_SINCE, HOUR, bool, categoryOf, decisionPlan, feeInfoOf, isCryptoUpDown, isSportsEvent, isYesNo, listingTsOf, mergeWindows,
   parseJsonArray, parseTs, priceWindows, questionFlags, resolveWinner, sampleKey, tagSlugs, umaIsFinal, windowsCover,
 } from './lib.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const TOOL = 'research/general/collect.js';
-export const DEFAULT_BASES = Object.freeze({ gamma: KIT_BASES.gamma, clob: KIT_BASES.clob });
+// Same production bases as research/collect.js (copied, so this track does not load that module).
+export const DEFAULT_BASES = Object.freeze({ gamma: 'https://gamma-api.polymarket.com', clob: 'https://clob.polymarket.com' });
 const ID_RE = /^[\w-]{1,130}$/;
 // clob rejects startTs/endTs spans above 15 days ("interval is too long"; probed 2026-10-22: 360 h ok,
-// 384 h rejected) at any fidelity. A request with startTs only returns history up to the end.
+// 384 h rejected) at fidelity 60, 720 and 1440 alike. A request with startTs only returns the whole
+// history from startTs to the market's end (probed: 10 months at fidelity 60 = 7,357 points in one
+// response), so longer windows take one open-ended request, trimmed; bounded 15-day chunks are the
+// fallback if an open-ended request fails.
 const SPAN_LIMIT_SEC = 360 * HOUR;
-const OPEN_ENDED_MAX_SEC = 120 * DAY;
+// Never more than this many requests per second against the real hosts.
+export const MAX_LIVE_RPS = 20;
+const OPEN_ENDED_MAX_SEC = 1100 * DAY;
 
 const HELP = `Usage: node research/general/collect.js [options]
 
@@ -46,12 +51,17 @@ Collects closed, cleanly resolved NON-SPORTS Yes/No markets (crypto Up-or-Down s
   --max-markets N         stop once markets.jsonl holds N markets (default 1000000)
   --max-events N          process at most N new events in this run (default 0 = no cap)
   --sample-salt S         salt of the fixed pseudo-random event order (default general-v1)
+  --balance MODE          none (default): one uniform order over all events; category: interleave
+                          categories so every prefix holds about the same number of listed markets
+                          per category (uniform random within each). Fixed per data dir.
+  --event-workers N       events processed in parallel (default min(4, ceil(concurrency / 3)))
   --refresh-index         rebuild the event index (default: reuse a complete index)
+  --index-from DIR        copy a complete event index from another data dir (same listing parameters)
   --index-only            build/load the index, print universe counts, collect nothing
   --exclude-tag-ids LIST  sent as exclude_tag_id (default 1,102127 = sports, up-or-down)
   --event-batch N         events per /events?id= request (default 10)
   --concurrency N         parallel requests (default 8)
-  --rps N                 requests per second cap (default 8)
+  --rps N                 requests per second cap (default 8; at most ${MAX_LIVE_RPS} against the real API)
   --fidelity MIN          prices-history fidelity in minutes (default 60)
   --timeout-ms N / --retries N / --retry-base-ms N   HTTP tuning (30000 / 6 / 1000)
   --quiet                 only warnings and the final summary
@@ -65,14 +75,17 @@ const OPTIONS = {
   'max-markets': { type: 'int', default: 1000000, min: 1 },
   'max-events': { type: 'int', default: 0, min: 0 },
   'sample-salt': { type: 'string', default: 'general-v1' },
+  balance: { type: 'enum', values: ['none', 'category'], default: 'none' },
+  'event-workers': { type: 'int', default: 0, min: 0, max: 64 },
   'refresh-index': { type: 'bool', default: false },
+  'index-from': { type: 'string', default: null },
   'index-only': { type: 'bool', default: false },
   'exclude-tag-ids': { type: 'string', default: '1,102127' },
   'event-batch': { type: 'int', default: 10, min: 1, max: 50 },
   'index-page-size': { type: 'int', default: 500, min: 1, max: 500 },
   'max-index-pages': { type: 'int', default: 2000, min: 1 },
   concurrency: { type: 'int', default: 8, min: 1 },
-  rps: { type: 'number', default: 8, min: 0.01, max: 20 },
+  rps: { type: 'number', default: 8, min: 0.01, max: 1000 }, // capped at MAX_LIVE_RPS against the real API
   fidelity: { type: 'int', default: 60, min: 1 },
   'timeout-ms': { type: 'int', default: 30000, min: 1 },
   retries: { type: 'int', default: 6, min: 0 },
@@ -107,6 +120,10 @@ export function parseArgs(argv) {
       if (value == null) throw new UsageError(`--${name} needs a value`);
     }
     if (spec.type === 'string') out[camel(name)] = value;
+    else if (spec.type === 'enum') {
+      if (!spec.values.includes(value)) throw new UsageError(`--${name} must be one of ${spec.values.join(', ')}`);
+      out[camel(name)] = value;
+    }
     else if (spec.type === 'date') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`))) throw new UsageError(`--${name} must be YYYY-MM-DD`);
       out[camel(name)] = value;
@@ -155,6 +172,7 @@ export function indexRow(ev) {
     title: ev.title ?? null,
     slug: ev.slug ?? null,
     createdAt: ev.createdAt ?? null,
+    startDate: ev.startDate ?? null,
     endDate: ev.endDate ?? null,
     closedTime: ev.closedTime ?? null,
     negRisk: bool(ev.negRisk),
@@ -304,9 +322,17 @@ async function fetchWindow(ctx, tokenId, a, b, closedTs) {
       throw err;
     }
   }
-  if (closedTs != null && closedTs - a <= OPEN_ENDED_MAX_SEC) {
-    ctx.stats.prices.openEnded++;
-    return (await getHistory(ctx, tokenId, a, null)).filter((pt) => pt.t <= b);
+  if (!ctx.noOpenEnded && closedTs != null && closedTs - a <= OPEN_ENDED_MAX_SEC) {
+    try {
+      const pts = await getHistory(ctx, tokenId, a, null);
+      ctx.stats.prices.openEnded++;
+      return pts.filter((pt) => pt.t <= b);
+    } catch (err) {
+      if (!(err instanceof HttpError && err.status === 400)) throw err;
+      // The API refused an open-ended window: use bounded chunks from now on.
+      ctx.warn(`open-ended prices-history refused (${String(err.body || err.message).slice(0, 120)}); switching to ${ctx.spanLimit / HOUR} h chunks`);
+      ctx.noOpenEnded = true;
+    }
   }
   let out = [];
   for (let s = a; s < b; s += ctx.spanLimit) out = out.concat(await fetchWindow(ctx, tokenId, s, Math.min(b, s + ctx.spanLimit), closedTs));
@@ -355,6 +381,18 @@ async function buildIndex(ctx) {
   const excludeIds = ctx.opts.excludeTagIds.split(',').map((s) => s.trim()).filter((s) => /^\d+$/.test(s));
   const params = { closed: 'true', order: 'id', ascending: 'false', excludeTagIds: excludeIds };
   let meta = ctx.opts.refreshIndex ? null : await readJsonIfExists(metaFile);
+  if (ctx.opts.indexFrom && !(meta && meta.complete)) {
+    // Listing data only (no prices, no outcomes used): reusing it does not change provenance, which
+    // comes from this data dir's own collect-runs.jsonl.
+    const srcDir = path.join(path.resolve(ctx.opts.indexFrom), 'index');
+    const srcMeta = await readJsonIfExists(path.join(srcDir, 'meta.json'));
+    if (!srcMeta || !srcMeta.complete) throw new CollectError(`--index-from ${ctx.opts.indexFrom}: no complete index in ${srcDir}`);
+    if (JSON.stringify(srcMeta.params) !== JSON.stringify(params)) throw new CollectError(`--index-from ${ctx.opts.indexFrom}: index built with different listing parameters ${JSON.stringify(srcMeta.params)}`);
+    await writeFile(rowsFile, await readFile(path.join(srcDir, 'events.jsonl')));
+    meta = { ...srcMeta, copiedFrom: srcDir, copiedAt: new Date().toISOString() };
+    await writeFileAtomic(metaFile, JSON.stringify(meta));
+    ctx.log(`index copied from ${srcDir} (${meta.rows} events, built ${srcMeta.finishedAt || srcMeta.startedAt})`);
+  }
   if (meta && JSON.stringify(meta.params) !== JSON.stringify(params)) {
     ctx.warn('index was built with different listing parameters; rebuilding it');
     meta = null;
@@ -392,9 +430,53 @@ async function buildIndex(ctx) {
   return { meta, rows };
 }
 
+// Universe rule: events whose whole life (earliest of createdAt/startDate to the later of
+// endDate/closedTime) is under a day are left out. Their markets cannot have a decision row as long
+// as they live inside the event's span (anchor - 1 d precedes listing, listing + 1 d is not before
+// the anchor); in the live index these are the hourly crypto strike ladders and similar (11,631 of
+// 62,877 closed events on 2026-10-22). Listing fields and closedTime only (closedTime as in the row
+// rule: was the market open), never prices or outcomes.
+export function eventTooShort(r) {
+  const born = [parseTs(r.createdAt), parseTs(r.startDate)].filter((t) => t != null);
+  const ends = [parseTs(r.endDate), parseTs(r.closedTime)].filter((t) => t != null);
+  if (!born.length || !ends.length) return false;
+  return Math.max(...ends) - Math.min(...born) < DAY;
+}
+
+// Category-balanced order: categories are interleaved so that every prefix holds about the same
+// number of LISTED markets (index nMarkets, all markets of the event) per category, until a
+// category runs out; within a category, events keep their sha1 order (uniform random). Each step
+// takes the next event of the category with the fewest listed markets so far (ties: CATEGORIES
+// order). Listing fields only (tags, market count), never prices or outcomes, so any prefix is a
+// stratified random sample and one big category (science-weather is 38% of events) cannot dominate.
+export function balanceByCategory(sorted) {
+  const queues = new Map();
+  for (const r of sorted) {
+    const c = categoryOf(r.tags);
+    if (!queues.has(c)) queues.set(c, []);
+    queues.get(c).push(r);
+  }
+  const cats = [...CATEGORIES.filter((c) => queues.has(c)), ...[...queues.keys()].filter((c) => !CATEGORIES.includes(c)).sort()];
+  const pos = new Map(cats.map((c) => [c, 0]));
+  const load = new Map(cats.map((c) => [c, 0]));
+  const out = [];
+  while (out.length < sorted.length) {
+    let best = null;
+    for (const c of cats) {
+      if (pos.get(c) >= queues.get(c).length) continue;
+      if (best == null || load.get(c) < load.get(best)) best = c;
+    }
+    const r = queues.get(best)[pos.get(best)];
+    pos.set(best, pos.get(best) + 1);
+    load.set(best, load.get(best) + Math.max(1, Number(r.nMarkets) || 1));
+    out.push(r);
+  }
+  return out;
+}
+
 // Index rows -> universe candidates in sample order, plus counts of what was excluded.
-export function orderUniverse(rows, { sinceTs, salt }) {
-  const counts = { indexed: rows.length, sports: 0, crypto_up_or_down: 0, closed_before_since: 0, duplicate: 0, kept: 0 };
+export function orderUniverse(rows, { sinceTs, salt, balance = 'none' }) {
+  const counts = { indexed: rows.length, sports: 0, crypto_up_or_down: 0, closed_before_since: 0, lifetime_under_1d: 0, duplicate: 0, kept: 0 };
   const seen = new Set();
   const keep = [];
   for (const r of rows) {
@@ -405,16 +487,21 @@ export function orderUniverse(rows, { sinceTs, salt }) {
     // Every market closed at or before the event's closedTime, and was created before it.
     const closed = parseTs(r.closedTime);
     if (sinceTs != null && closed != null && closed < sinceTs) { counts.closed_before_since++; continue; }
+    if (eventTooShort(r)) { counts.lifetime_under_1d++; continue; }
     keep.push({ ...r, key: sampleKey(salt, r.id) });
   }
   keep.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   counts.kept = keep.length;
-  return { order: keep, counts };
+  return { order: balance === 'category' ? balanceByCategory(keep) : keep, counts };
 }
 
 // ---------- per event ----------
 
-async function processEvent(ctx, ev) {
+// One full gamma event -> { eventId, kept: [records], skipped: { reason: n }, failed }. Prices come from
+// ctx.loadPrices(tokenId, windows, closedTs) when set (the synthetic generator), else from clob; the
+// group files are written to ctx.dirs.groups either way.
+export async function processEvent(ctx, ev) {
+  const loadPrices = ctx.loadPrices || ((tokenId, windows, closedTs) => loadOrFetchPrices(ctx, tokenId, windows, closedTs));
   const res = { eventId: String(ev.id), kept: [], skipped: {} };
   const skip = (k) => { res.skipped[k] = (res.skipped[k] || 0) + 1; };
   const why = eventExclusion(ev);
@@ -457,7 +544,7 @@ async function processEvent(ctx, ev) {
   const series = new Map();
   await Promise.all([...fetchJobs].map(async ([tokenId, job]) => {
     try {
-      series.set(tokenId, await loadOrFetchPrices(ctx, tokenId, job.windows, job.closedTs));
+      series.set(tokenId, await loadPrices(tokenId, job.windows, job.closedTs));
     } catch (err) {
       ctx.warn(`prices failed for token ${tokenId.slice(0, 12)}... (event ${res.eventId}): ${err.message}`);
       series.set(tokenId, null);
@@ -494,6 +581,7 @@ export async function run(argv, { env = process.env, stdout = process.stdout, st
   const log = opts.quiet ? () => {} : say;
   const warn = (msg) => say(`warning: ${msg}`);
   const { bases, nonDefault } = resolveBases(env);
+  if (!nonDefault && opts.rps > MAX_LIVE_RPS) throw new UsageError(`--rps must be <= ${MAX_LIVE_RPS} against the Polymarket API (higher rates only for a local mock via GAMMA_BASE/CLOB_BASE)`);
   if (nonDefault) warn(`non-default API bases (${Object.values(bases).join(', ')}); this data dir will be marked synthetic`);
   const dataDir = path.resolve(opts.dataDir);
   const dirs = { prices: path.join(dataDir, 'prices'), groups: path.join(dataDir, 'groups'), index: path.join(dataDir, 'index') };
@@ -539,8 +627,17 @@ async function collectInto({ opts, stdout, say, log, warn, bases, dataDir, dirs,
 
   for (const r of await readJsonl(marketsFile)) if (r && typeof r.conditionId === 'string') ctx.existing.add(r.conditionId);
   const done = new Set((await readJsonl(doneFile)).filter((d) => d && d.eventId != null && !d.failed).map((d) => String(d.eventId)));
+  // The sample order is fixed per data dir: a resumed run with another salt or balance would turn the
+  // processed prefix into a mix of two orders.
+  const sampleFile = path.join(dataDir, 'sample.json');
+  const sample = { salt: opts.sampleSalt, balance: opts.balance };
+  const prevSample = await readJsonIfExists(sampleFile);
+  if (prevSample && (prevSample.salt !== sample.salt || (prevSample.balance || 'none') !== sample.balance)) {
+    throw new CollectError(`${dataDir} was collected with --sample-salt ${prevSample.salt} --balance ${prevSample.balance || 'none'}; use the same options (or another --data-dir)`);
+  }
+  if (!prevSample) await writeFileAtomic(sampleFile, JSON.stringify({ ...sample, at: new Date().toISOString() }));
   const { meta, rows } = await buildIndex(ctx);
-  const { order, counts } = orderUniverse(rows, { sinceTs, salt: opts.sampleSalt });
+  const { order, counts } = orderUniverse(rows, { sinceTs, salt: opts.sampleSalt, balance: opts.balance });
   const todo = order.filter((r) => !done.has(r.id));
   log(`index: ${rows.length} closed events (${meta.complete ? 'complete' : 'INCOMPLETE'}); universe ${order.length} events after exclusions ${JSON.stringify(counts)}; ${done.size} done, ${todo.length} to go; ${ctx.existing.size} markets in markets.jsonl`);
 
@@ -561,7 +658,7 @@ async function collectInto({ opts, stdout, say, log, warn, bases, dataDir, dirs,
   const stopReason = () => (total() >= opts.maxMarkets ? 'max_markets' : opts.maxEvents && processed >= opts.maxEvents ? 'max_events' : null);
   if (!opts.indexOnly) {
     let next = 0;
-    const workers = Math.max(1, Math.min(4, Math.ceil(opts.concurrency / 3)));
+    const workers = opts.eventWorkers || Math.max(1, Math.min(4, Math.ceil(opts.concurrency / 3)));
     const worker = async () => {
       while (next < todo.length && !stopReason()) {
         const room = opts.maxEvents ? Math.max(0, opts.maxEvents - processed) : Infinity;
@@ -615,6 +712,7 @@ async function collectInto({ opts, stdout, say, log, warn, bases, dataDir, dirs,
     dataDir,
     bases,
     index: { complete: !!meta.complete, events: rows.length, universeEvents: order.length, exclusions: counts },
+    sample: { salt: opts.sampleSalt, balance: opts.balance },
     kept,
     totalInFile: total(),
     eventsProcessed: processed,

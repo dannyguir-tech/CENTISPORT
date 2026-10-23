@@ -1,0 +1,937 @@
+{
+ "generatedAt": "2026-10-22T23:57:56.888Z",
+ "requests": 6500,
+ "failures": 0,
+ "errors": 0,
+ "families": {
+  "nest_cl_4h_15m": {
+   "pairs": 693,
+   "days": 121,
+   "from": "2026-06-24",
+   "to": "2026-10-22",
+   "medAskEvents": 481,
+   "byW": {
+    "10": {
+     "pairsWithViolation": 38,
+     "share": 0.0548,
+     "violSecP50": 15,
+     "violSecP90": 114,
+     "maxMarginP50": 0.0295
+    },
+    "30": {
+     "pairsWithViolation": 45,
+     "share": 0.0649,
+     "violSecP50": 24,
+     "violSecP90": 130,
+     "maxMarginP50": 0.0286
+    },
+    "60": {
+     "pairsWithViolation": 48,
+     "share": 0.0693,
+     "violSecP50": 28,
+     "violSecP90": 130,
+     "maxMarginP50": 0.0292
+    }
+   }
+  },
+  "nest_cl_4h_5m": {
+   "pairs": 270,
+   "days": 46,
+   "from": "2026-09-07",
+   "to": "2026-10-22",
+   "medAskEvents": 689,
+   "byW": {
+    "10": {
+     "pairsWithViolation": 10,
+     "share": 0.037,
+     "violSecP50": 23,
+     "violSecP90": 238,
+     "maxMarginP50": 0.0528
+    },
+    "30": {
+     "pairsWithViolation": 13,
+     "share": 0.0481,
+     "violSecP50": 16,
+     "violSecP90": 201,
+     "maxMarginP50": 0.0528
+    },
+    "60": {
+     "pairsWithViolation": 16,
+     "share": 0.0593,
+     "violSecP50": 20,
+     "violSecP90": 201,
+     "maxMarginP50": 0.0441
+    }
+   }
+  },
+  "nest_cl_15m_5m": {
+   "pairs": 600,
+   "days": 46,
+   "from": "2026-09-07",
+   "to": "2026-10-22",
+   "medAskEvents": 854,
+   "byW": {
+    "10": {
+     "pairsWithViolation": 80,
+     "share": 0.1333,
+     "violSecP50": 5,
+     "violSecP90": 30,
+     "maxMarginP50": 0.0395
+    },
+    "30": {
+     "pairsWithViolation": 87,
+     "share": 0.145,
+     "violSecP50": 6,
+     "violSecP90": 31,
+     "maxMarginP50": 0.0369
+    },
+    "60": {
+     "pairsWithViolation": 97,
+     "share": 0.1617,
+     "violSecP50": 6,
+     "violSecP90": 32,
+     "maxMarginP50": 0.0348
+    }
+   }
+  }
+ },
+ "variants": [
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 10,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 38,
+   "days": 34,
+   "winRate": 1,
+   "avgCost": 0.9629,
+   "roi": 0.1205,
+   "ci": [
+    0.0232,
+    0.2432
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10.3448,
+   "medSecToEnd": 540,
+   "folN": 27,
+   "folRoi": 0.0133,
+   "folCi": [
+    -0.058,
+    0.1041
+   ],
+   "folWin": 0.3333,
+   "usdPerDay": 0.4847,
+   "usdPerDayFollow": -0.0377
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 10,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 27,
+   "days": 26,
+   "winRate": 1,
+   "avgCost": 0.9449,
+   "roi": 0.1367,
+   "ci": [
+    0.0281,
+    0.3178
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 612,
+   "folN": 20,
+   "folRoi": -0.0007,
+   "folCi": [
+    -0.0672,
+    0.0861
+   ],
+   "folWin": 0.45,
+   "usdPerDay": 0.3891,
+   "usdPerDayFollow": -0.1069
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 10,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 22,
+   "days": 22,
+   "winRate": 1,
+   "avgCost": 0.9212,
+   "roi": 0.1842,
+   "ci": [
+    0.0505,
+    0.4052
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 568,
+   "folN": 17,
+   "folRoi": -0.0111,
+   "folCi": [
+    -0.0835,
+    0.0938
+   ],
+   "folWin": 0.3529,
+   "usdPerDay": 0.4045,
+   "usdPerDayFollow": -0.1289
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 30,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 45,
+   "days": 38,
+   "winRate": 1,
+   "avgCost": 0.9671,
+   "roi": 0.1029,
+   "ci": [
+    0.0197,
+    0.2095
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 530,
+   "folN": 27,
+   "folRoi": 0.0068,
+   "folCi": [
+    -0.0644,
+    0.1012
+   ],
+   "folWin": 0.2963,
+   "usdPerDay": 0.5002,
+   "usdPerDayFollow": -0.0498
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 30,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 30,
+   "days": 28,
+   "winRate": 1,
+   "avgCost": 0.9474,
+   "roi": 0.1259,
+   "ci": [
+    0.0289,
+    0.287
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 646,
+   "folN": 19,
+   "folRoi": -0.0051,
+   "folCi": [
+    -0.0724,
+    0.085
+   ],
+   "folWin": 0.4211,
+   "usdPerDay": 0.391,
+   "usdPerDayFollow": -0.1043
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 30,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 24,
+   "days": 23,
+   "winRate": 1,
+   "avgCost": 0.9241,
+   "roi": 0.1723,
+   "ci": [
+    0.0494,
+    0.3872
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 530,
+   "folN": 18,
+   "folRoi": -0.0146,
+   "folCi": [
+    -0.082,
+    0.0816
+   ],
+   "folWin": 0.3333,
+   "usdPerDay": 0.4043,
+   "usdPerDayFollow": -0.1332
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 60,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 48,
+   "days": 40,
+   "winRate": 1,
+   "avgCost": 0.967,
+   "roi": 0.0987,
+   "ci": [
+    0.0224,
+    0.1945
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 565,
+   "folN": 27,
+   "folRoi": -0.0252,
+   "folCi": [
+    -0.0724,
+    0.0445
+   ],
+   "folWin": 0.2593,
+   "usdPerDay": 0.4667,
+   "usdPerDayFollow": -0.1195
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 60,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 36,
+   "days": 33,
+   "winRate": 1,
+   "avgCost": 0.9519,
+   "roi": 0.1381,
+   "ci": [
+    0.0324,
+    0.2891
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 646,
+   "folN": 23,
+   "folRoi": -0.0136,
+   "folCi": [
+    -0.0695,
+    0.0637
+   ],
+   "folWin": 0.3478,
+   "usdPerDay": 0.4432,
+   "usdPerDayFollow": -0.1226
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 60,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 28,
+   "days": 27,
+   "winRate": 1,
+   "avgCost": 0.9318,
+   "roi": 0.1882,
+   "ci": [
+    0.0529,
+    0.3633
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 556,
+   "folN": 21,
+   "folRoi": -0.0206,
+   "folCi": [
+    -0.0808,
+    0.0642
+   ],
+   "folWin": 0.2857,
+   "usdPerDay": 0.4526,
+   "usdPerDayFollow": -0.1465
+  },
+  {
+   "family": "nest_cl_4h_15m",
+   "W": 30,
+   "theta": 0.02,
+   "mode": "walk-forward",
+   "trainBest": {
+    "W": 30,
+    "th": 0.02,
+    "roi": 0.0421,
+    "n": 4
+   },
+   "oosFrom": "2026-08-11",
+   "oosTo": "2026-10-22",
+   "oosPairs": 434,
+   "n": 20,
+   "days": 19,
+   "winRate": 1,
+   "avgCost": 0.917,
+   "roi": 0.1995,
+   "ci": [
+    0.0514,
+    0.4573
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "folN": 16,
+   "folRoi": -0.0117,
+   "folCi": [
+    -0.0852,
+    0.0963
+   ],
+   "folP": 0.6331834082958521,
+   "folWin": 0.375,
+   "usdPerDay": 0.6526,
+   "usdPerDayFollow": -0.2013
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 10,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 10,
+   "days": 9,
+   "winRate": 1,
+   "avgCost": 0.9737,
+   "roi": 0.027,
+   "ci": [
+    0.007,
+    0.0545
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 5.3,
+   "medSecToEnd": 244,
+   "folN": 8,
+   "folRoi": -0.0158,
+   "folCi": [
+    -0.0653,
+    0.0281
+   ],
+   "folWin": 0.5,
+   "usdPerDay": 0.0403,
+   "usdPerDayFollow": -0.0098
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 10,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 7,
+   "days": 6,
+   "winRate": 1,
+   "avgCost": 0.9545,
+   "roi": 0.0477,
+   "ci": [
+    0.0246,
+    0.0805
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10.1818,
+   "medSecToEnd": 244,
+   "folN": 6,
+   "folRoi": 0.0256,
+   "folCi": [
+    -0.0187,
+    0.0763
+   ],
+   "folWin": 0.5,
+   "usdPerDay": 0.0677,
+   "usdPerDayFollow": -0.0004
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 10,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 6,
+   "days": 6,
+   "winRate": 1,
+   "avgCost": 0.9343,
+   "roi": 0.0703,
+   "ci": [
+    0.0454,
+    0.0961
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10.1818,
+   "medSecToEnd": 244,
+   "folN": 5,
+   "folRoi": 0.0246,
+   "folCi": [
+    -0.0131,
+    0.0653
+   ],
+   "folWin": 0.6,
+   "usdPerDay": 0.0791,
+   "usdPerDayFollow": 0.0163
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 30,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 13,
+   "days": 12,
+   "winRate": 1,
+   "avgCost": 0.9732,
+   "roi": 0.0275,
+   "ci": [
+    0.0126,
+    0.0474
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 5.3,
+   "medSecToEnd": 237,
+   "folN": 7,
+   "folRoi": -0.0138,
+   "folCi": [
+    -0.0689,
+    0.0331
+   ],
+   "folWin": 0.5714,
+   "usdPerDay": 0.0517,
+   "usdPerDayFollow": -0.0088
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 30,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 10,
+   "days": 9,
+   "winRate": 1,
+   "avgCost": 0.9647,
+   "roi": 0.0366,
+   "ci": [
+    0.0201,
+    0.06
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 244,
+   "folN": 5,
+   "folRoi": 0.0258,
+   "folCi": [
+    -0.0274,
+    0.0872
+   ],
+   "folWin": 0.4,
+   "usdPerDay": 0.0598,
+   "usdPerDayFollow": -0.0092
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 30,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 9,
+   "days": 9,
+   "winRate": 1,
+   "avgCost": 0.9477,
+   "roi": 0.0552,
+   "ci": [
+    0.0354,
+    0.079
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 237,
+   "folN": 4,
+   "folRoi": 0.0246,
+   "folCi": [
+    -0.0221,
+    0.076
+   ],
+   "folWin": 0.5,
+   "usdPerDay": 0.0841,
+   "usdPerDayFollow": 0.0074
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 60,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 16,
+   "days": 15,
+   "winRate": 1,
+   "avgCost": 0.9778,
+   "roi": 0.0227,
+   "ci": [
+    0.0101,
+    0.0399
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 5.8824,
+   "medSecToEnd": 237,
+   "folN": 10,
+   "folRoi": -0.0115,
+   "folCi": [
+    -0.0531,
+    0.0217
+   ],
+   "folWin": 0.4,
+   "usdPerDay": 0.055,
+   "usdPerDayFollow": -0.0101
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 60,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 10,
+   "days": 9,
+   "winRate": 1,
+   "avgCost": 0.9647,
+   "roi": 0.0366,
+   "ci": [
+    0.0201,
+    0.06
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 244,
+   "folN": 5,
+   "folRoi": 0.0258,
+   "folCi": [
+    -0.0274,
+    0.0872
+   ],
+   "folWin": 0.4,
+   "usdPerDay": 0.0598,
+   "usdPerDayFollow": -0.0092
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 60,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 9,
+   "days": 9,
+   "winRate": 1,
+   "avgCost": 0.9477,
+   "roi": 0.0552,
+   "ci": [
+    0.0354,
+    0.079
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "medSecToEnd": 237,
+   "folN": 4,
+   "folRoi": 0.0246,
+   "folCi": [
+    -0.0221,
+    0.076
+   ],
+   "folWin": 0.5,
+   "usdPerDay": 0.0841,
+   "usdPerDayFollow": 0.0074
+  },
+  {
+   "family": "nest_cl_4h_5m",
+   "W": 30,
+   "theta": 0.02,
+   "mode": "walk-forward",
+   "trainBest": {
+    "W": 30,
+    "th": 0.02,
+    "roi": 0.0825,
+    "n": 3
+   },
+   "oosFrom": "2026-09-25",
+   "oosTo": "2026-10-22",
+   "oosPairs": 164,
+   "n": 6,
+   "days": 6,
+   "winRate": 1,
+   "avgCost": 0.9596,
+   "roi": 0.0421,
+   "ci": [
+    0.0266,
+    0.0684
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 10,
+   "folN": 2,
+   "folRoi": -0.0221,
+   "folCi": [
+    -0.0323,
+    -0.0118
+   ],
+   "folP": 1,
+   "folWin": 0,
+   "usdPerDay": 0.0782,
+   "usdPerDayFollow": -0.0163
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 10,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 80,
+   "days": 39,
+   "winRate": 1,
+   "avgCost": 0.9678,
+   "roi": 0.0592,
+   "ci": [
+    0.0256,
+    0.1203
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 7.1163,
+   "medSecToEnd": 253,
+   "folN": 78,
+   "folRoi": -0.0444,
+   "folCi": [
+    -0.0771,
+    0.0082
+   ],
+   "folWin": 0.141,
+   "usdPerDay": 12.789,
+   "usdPerDayFollow": -1.2232
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 10,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 70,
+   "days": 36,
+   "winRate": 1,
+   "avgCost": 0.957,
+   "roi": 0.0747,
+   "ci": [
+    0.038,
+    0.1391
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 7.99,
+   "medSecToEnd": 235,
+   "folN": 69,
+   "folRoi": -0.0422,
+   "folCi": [
+    -0.0779,
+    0.0121
+   ],
+   "folWin": 0.1159,
+   "usdPerDay": 13.3618,
+   "usdPerDayFollow": 0.6453
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 10,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 58,
+   "days": 33,
+   "winRate": 1,
+   "avgCost": 0.9415,
+   "roi": 0.0988,
+   "ci": [
+    0.0504,
+    0.1833
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 8.5,
+   "medSecToEnd": 229,
+   "folN": 58,
+   "folRoi": -0.0258,
+   "folCi": [
+    -0.0665,
+    0.0373
+   ],
+   "folWin": 0.1552,
+   "usdPerDay": 13.7286,
+   "usdPerDayFollow": 2.3616
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 30,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 87,
+   "days": 40,
+   "winRate": 1,
+   "avgCost": 0.9698,
+   "roi": 0.0548,
+   "ci": [
+    0.0243,
+    0.1126
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 6.8421,
+   "medSecToEnd": 235,
+   "folN": 78,
+   "folRoi": -0.0444,
+   "folCi": [
+    -0.0771,
+    0.0082
+   ],
+   "folWin": 0.141,
+   "usdPerDay": 12.8414,
+   "usdPerDayFollow": -1.2232
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 30,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 73,
+   "days": 36,
+   "winRate": 1,
+   "avgCost": 0.9581,
+   "roi": 0.0724,
+   "ci": [
+    0.0375,
+    0.1325
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 6.8421,
+   "medSecToEnd": 222,
+   "folN": 69,
+   "folRoi": -0.0422,
+   "folCi": [
+    -0.0779,
+    0.0121
+   ],
+   "folWin": 0.1159,
+   "usdPerDay": 13.4277,
+   "usdPerDayFollow": 0.6453
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 30,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 58,
+   "days": 33,
+   "winRate": 1,
+   "avgCost": 0.9415,
+   "roi": 0.0988,
+   "ci": [
+    0.0504,
+    0.1833
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 8.5,
+   "medSecToEnd": 229,
+   "folN": 58,
+   "folRoi": -0.0258,
+   "folCi": [
+    -0.0665,
+    0.0373
+   ],
+   "folWin": 0.1552,
+   "usdPerDay": 13.7286,
+   "usdPerDayFollow": 2.3616
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 60,
+   "theta": 0,
+   "mode": "fixed",
+   "n": 97,
+   "days": 41,
+   "winRate": 1,
+   "avgCost": 0.9724,
+   "roi": 0.0496,
+   "ci": [
+    0.0226,
+    0.1017
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 6.8421,
+   "medSecToEnd": 219,
+   "folN": 79,
+   "folRoi": -0.0439,
+   "folCi": [
+    -0.0767,
+    0.0086
+   ],
+   "folWin": 0.1392,
+   "usdPerDay": 13.1625,
+   "usdPerDayFollow": -1.2234
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 60,
+   "theta": 0.01,
+   "mode": "fixed",
+   "n": 74,
+   "days": 37,
+   "winRate": 1,
+   "avgCost": 0.9582,
+   "roi": 0.0719,
+   "ci": [
+    0.0377,
+    0.1315
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 7.99,
+   "medSecToEnd": 222,
+   "folN": 69,
+   "folRoi": -0.0422,
+   "folCi": [
+    -0.0779,
+    0.0121
+   ],
+   "folWin": 0.1159,
+   "usdPerDay": 13.6802,
+   "usdPerDayFollow": 0.6453
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 60,
+   "theta": 0.02,
+   "mode": "fixed",
+   "n": 59,
+   "days": 34,
+   "winRate": 1,
+   "avgCost": 0.9419,
+   "roi": 0.0977,
+   "ci": [
+    0.0501,
+    0.1815
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 8.5,
+   "medSecToEnd": 219,
+   "folN": 58,
+   "folRoi": -0.0258,
+   "folCi": [
+    -0.0665,
+    0.0373
+   ],
+   "folWin": 0.1552,
+   "usdPerDay": 13.9811,
+   "usdPerDayFollow": 2.3616
+  },
+  {
+   "family": "nest_cl_15m_5m",
+   "W": 30,
+   "theta": 0.02,
+   "mode": "walk-forward",
+   "trainBest": {
+    "W": 30,
+    "th": 0.02,
+    "roi": 0.2054,
+    "n": 17
+   },
+   "oosFrom": "2026-09-25",
+   "oosTo": "2026-10-22",
+   "oosPairs": 378,
+   "n": 41,
+   "days": 24,
+   "winRate": 1,
+   "avgCost": 0.9474,
+   "roi": 0.0555,
+   "ci": [
+    0.0439,
+    0.0706
+   ],
+   "p": 0.0004997501249375312,
+   "medSize": 6,
+   "folN": 41,
+   "folRoi": -0.0459,
+   "folCi": [
+    -0.0641,
+    -0.0211
+   ],
+   "folP": 0.999000499750125,
+   "folWin": 0.1463,
+   "usdPerDay": 5.6193,
+   "usdPerDayFollow": -5.1062
+  }
+ ]
+}

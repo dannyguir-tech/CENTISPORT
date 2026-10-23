@@ -1,4 +1,4 @@
-BTC Polymarket cross-market structure / arbitrage study  (generated 2026-10-22T11:43:59.089Z)
+BTC Polymarket cross-market structure / arbitrage study  (generated 2026-10-23T00:11:37.515Z)
 
 ORACLE MAP (verified on settled data)
   above_daily ladder, range_daily buckets, daily Up/Down: same Binance BTC/USDT 1m close at 12:00 ET (0 mismatches over 1,223 above + 1,199 bucket outcomes)
@@ -12,35 +12,37 @@ METHOD
      Risk-free baskets are profitable BY CONSTRUCTION whenever the mids say so, so M "wins" are not evidence.
   P  print verification: a seeded sample of M episodes re-priced from real taker fills (data-api /trades) on every leg;
      pl60 = last ask-side print of every leg within 60 s before the decision time (no look-ahead).
-  L  live scan: real CLOB books (/books) for every open BTC market, 117 snapshots 2026-10-22T10:12:42.000Z .. 2026-10-22T11:43:44.000Z (1.5172 h), buy every leg at the ask with depth.
+  L  live scan: real CLOB books (/books) for every open BTC market, session0@2026-10-22T10:12Z: 2 snapshots 2026-10-22T10:12:42.000Z .. 2026-10-22T10:22:50.000Z (0.1689 h); session1@2026-10-22T11:05Z: 166 snapshots 2026-10-22T11:05:15.000Z .. 2026-10-22T12:00:45.000Z (0.925 h); session2@2026-10-22T23:18Z: 200 snapshots 2026-10-22T23:18:23.000Z .. 2026-10-23T00:08:10.000Z (0.8297 h), buy every leg at the ask with depth.
+  K  maker-legged simulation: rest a bid on one leg (join or improve by a tick), fills only from the REAL taker tape after the decision, hedge the other legs at the next recorded book; tuned on session0, OOS on later sessions.
 
 FAMILY TABLE  (M: episodes = runs of minutes with mid violation; exec = still positive after half-spread+fee on mids)
 family                     M episodes M exec  medDur s P sampled noPrintLeg pl60 chk pl60 arb pl60 medMargin L inst L maxTakerMargin L makerLegged+
-above_daily_mono           13456      2089    600      80        80         0        0        -              385    -0.0019          4             
-above_hourly_mono          14119      6556    240      80        80         0        0        -              570    -0.0098          30            
-hit_daily_mono             18589      1649    120      80        79         0        0        -              49     -0.0023          1             
-hit_weekly_mono            7618       2366    960      80        77         0        0        -              36     -0.0035          0             
-hit_monthly_mono           2645       431     1800     80        61         1        0        -0.3786        292    -0.0016          3             
-range_allyes               11601      27      120      27        25         0        0        -              7      -0.0778          0             
-range_allno                12428      590     420      30        30         0        0        -              7      -0.1235          4             
-above_vs_range             242264     1064    180      80        77         1        1        0.001          140    -0.0001          21            
+above_daily_mono           13456      2089    600      80        80         0        0        -              440    -0.0016          11            
+above_hourly_mono          14119      6556    240      80        80         0        0        -              950    -0.0098          45            
+hit_daily_mono             18589      1649    120      80        79         0        0        -              49     -0.0023          3             
+hit_weekly_mono            7618       2366    960      80        77         0        0        -              49     -0.0015          1             
+hit_monthly_mono           2645       431     1800     80        61         1        0        -0.3786        302    -0.0016          3             
+range_allyes               11601      27      120      27        25         0        0        -              8      -0.0596          1             
+range_allno                12428      590     420      30        30         0        0        -              8      -0.102           6             
+above_vs_range             242264     1064    180      80        77         1        1        0.001          160    0.0005           37            
 hit_vs_above_daily         509        24      180      24        20         0        0        -              15     -0.0047          0             
-hit_vs_above_weekly        1818       295     1200     80        79         0        0        -              36     -0.0083          1             
-hit_vs_above_monthly       567        405     1200     80        79         0        0        -              49     -0.0524          0             
-hit_nest_wd                2825       660     180      80        65         4        3        0.0116         6      -0.0162          0             
-hit_nest_md                540        211     120      80        70         1        1        0.0053         6      -0.1159          0             
-hit_nest_mw                537        255     1200     80        74         1        0        -0.0115        10     -0.0195          0             
-daily_ud_vs_above          501        20      60       20        13         5        0        -0.0048        2      0.0029           1             
-hourly_ud_vs_above_hourly  890        482     120      80        67         0        0        -              4      -0.0283          2             
-nest_cl_15m_5m             240        62      60       62        1          60       5        -0.0334        2      -0.0311          0             
-nest_cl_4h_15m             79         13      60       13        2          11       4        -0.0118        -      -                -             
-nest_cl_4h_5m              18         7       60       7         0          7        4        0.018          -      -                -             
-nest_basis_1h_15m          853        527     180      80        3          71       59       0.1093         -      -                -             
-nest_basis_1h_5m           183        146     180      80        1          77       70       0.1386         -      -                -             
+hit_vs_above_weekly        1818       295     1200     80        79         0        0        -              42     -0.0044          3             
+hit_vs_above_monthly       567        405     1200     80        79         0        0        -              63     -0.0428          0             
+hit_nest_wd                2825       660     180      80        65         4        3        0.0116         8      -0.0162          0             
+hit_nest_md                540        211     120      80        70         1        1        0.0053         7      -0.1159          0             
+hit_nest_mw                537        255     1200     80        74         1        0        -0.0115        11     -0.0172          0             
+daily_ud_vs_above          501        20      60       20        13         5        0        -0.0048        4      0.0029           1             
+hourly_ud_vs_above_hourly  890        482     120      80        67         0        0        -              8      -0.0001          3             
+nest_cl_15m_5m             240        62      60       62        1          60       5        -0.0334        7      -0.0227          0             
+nest_cl_4h_15m             79         13      60       13        2          11       4        -0.0118        2      -0.4956          0             
+nest_cl_4h_5m              18         7       60       7         0          7        4        0.018          2      -0.4856          0             
+nest_basis_1h_15m          853        527     180      80        3          71       59       0.1093         2      0.0458           1             
+nest_basis_1h_5m           183        146     180      80        1          77       70       0.1386         2      0.4912           1             
 nest_basis_1d_4h           321        47      120      47        18         17       11       0.0072         -      -                -             
 nest_basis_1h_15m_b100     51         3       60       3         1          2        1        0.0058         -      -                -             
 nest_basis_1h_5m_b100      15         7       60       7         0          7        5        0.0474         -      -                -             
 nest_basis_1d_4h_b100      123        6       120      6         1          2        2        0.0085         -      -                -             
+complement_sum             -          -       -        -         -          -        -        -              403    -0.0012          12            
 
 PRINT-VERIFIED EXAMPLES (pl60, fee docs_always)
   above_vs_range: bitcoin-above-on-september-25-2026|hi|90000 @ 2026-09-21T09:31:00.000Z prices [0.917,0.072] margin 0.001/share-set, print size 10 sh, payoff 1
@@ -132,31 +134,180 @@ HEADLINE WALK-FORWARD ROWS
   I implied_4h_15m_outer       print_pn  n 53    days 39   win 0.3585 cost 0.3338  roi 0.074   ci [-0.1915,0.3335] p 0.2914 BH false
   I implied_4h_5m_outer        print_pl  n 8     days 5    win 0.625  cost 0.5593  roi 0.1175  ci [-0.7606,1.2949] p 0.3918 BH false
   I implied_4h_5m_outer        print_pn  n 11    days 9    win 0.6364 cost 0.4484  roi 0.4192  ci [-0.3333,1.6175] p 0.1649 BH false
+  K maker_ALL                  WF improve|0.005|60 -> sessions 1 n 0     days 1    win -      cost -       roi -       ci [null,null] p - BH false cap$/day 0
+  C nest_cl_4h_15m             lastPrint_W30 n 20    days 19   win 1      cost 0.917   roi 0.1995  ci [0.0514,0.4573] p 0.0005 BH true cap$/day 0.6526
+  C nest_cl_4h_15m             followThrough_W30 n 16    days 19   win 0.375  cost -       roi -0.0117 ci [-0.0852,0.0963] p 0.6332 BH false cap$/day -0.2013
+  C nest_cl_4h_5m              lastPrint_W30 n 6     days 6    win 1      cost 0.9596  roi 0.0421  ci [0.0266,0.0684] p 0.0005 BH true cap$/day 0.0782
+  C nest_cl_4h_5m              followThrough_W30 n 2     days 6    win 0      cost -       roi -0.0221 ci [-0.0323,-0.0118] p 1.0000 BH false cap$/day -0.0163
+  C nest_cl_15m_5m             lastPrint_W30 n 41    days 24   win 1      cost 0.9474  roi 0.0555  ci [0.0439,0.0706] p 0.0005 BH true cap$/day 5.6193
+  C nest_cl_15m_5m             followThrough_W30 n 41    days 24   win 0.1463 cost -       roi -0.0459 ci [-0.0641,-0.0211] p 0.9990 BH false cap$/day -5.1062
 
 IMPLIED-STATE (statistical) ON REAL PRINTS (WF OOS hc1 trades re-priced from taker fills)
   implied_15m_5m_outer   mid-ROI 0.159 [0.0894,0.2306] | pl n=1342 ROI -0.0004 [-0.056,0.0535] slip 0.0528 | pn n=1278 ROI 0.0223 [-0.0376,0.0786] slip 0.0471
   implied_4h_15m_outer   mid-ROI 0.041 [-0.2678,0.3553] | pl n=67 ROI -0.0665 [-0.3256,0.1662] slip 0.0606 | pn n=53 ROI 0.074 [-0.1915,0.3335] slip 0.0441
   implied_4h_5m_outer    mid-ROI 0.3182 [-0.496,1.2421] | pl n=8 ROI 0.1175 [-0.7606,1.2949] slip 0.1108 | pn n=11 ROI 0.4192 [-0.3333,1.6175] slip 0.1056
 
-VARIANTS: 1593 tested, 1087 with p-values (n>=5, >=2 days); BH q=0.10 significant 877 (M 673, P 192, I 12).
+VARIANTS: 1926 tested {"M":871,"P":644,"I":78,"C":60,"K":213,"L":60}, 1119 with p-values (n>=5); BH q=0.10 significant 907 {"M":673,"P":192,"I":12,"C":30,"K":0,"L":0}.
   M and P significance for risk-free baskets is mechanical (every selected trade pays >= cost by construction); it shows that
   violations EXISTED in the respective price series, not that they were capturable at scale. I significance is mid-only and disappears on prints.
 
-LIVE SCAN
-  above_daily_mono            instances 385   priced 38142  taker-violating snapshot-instances 0    maxMargin -0.0019  p99 -0.006   maxProfit$ 0       $/day<= 0       maker-legged>0: 259 snaps / 4 inst (max 0.0138)
-  above_hourly_mono           instances 570   priced 2267   taker-violating snapshot-instances 0    maxMargin -0.0098  p99 -0.0311  maxProfit$ 0       $/day<= 0       maker-legged>0: 79 snaps / 30 inst (max 0.9489)
-  hit_daily_mono              instances 49    priced 5404   taker-violating snapshot-instances 0    maxMargin -0.0023  p99 -0.0033  maxProfit$ 0       $/day<= 0       maker-legged>0: 116 snaps / 1 inst (max 0.0007)
-  hit_weekly_mono             instances 36    priced 4212   taker-violating snapshot-instances 0    maxMargin -0.0035  p99 -0.0035  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0021)
-  hit_monthly_mono            instances 292   priced 8846   taker-violating snapshot-instances 0    maxMargin -0.0016  p99 -0.0034  maxProfit$ 0       $/day<= 0       maker-legged>0: 6 snaps / 3 inst (max 0.0022)
-  range_allyes                instances 7     priced 819    taker-violating snapshot-instances 0    maxMargin -0.0778  p99 -0.0848  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0014)
-  range_allno                 instances 7     priced 585    taker-violating snapshot-instances 0    maxMargin -0.1235  p99 -0.1273  maxProfit$ 0       $/day<= 0       maker-legged>0: 8 snaps / 4 inst (max 0.8157)
-  above_vs_range              instances 140   priced 15795  taker-violating snapshot-instances 0    maxMargin -0.0001  p99 -0.0023  maxProfit$ 0       $/day<= 0       maker-legged>0: 997 snaps / 21 inst (max 0.097)
-  hit_vs_above_daily          instances 15    priced 1170   taker-violating snapshot-instances 0    maxMargin -0.0047  p99 -0.0066  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0021)
-  hit_vs_above_weekly         instances 36    priced 3393   taker-violating snapshot-instances 0    maxMargin -0.0083  p99 -0.0083  maxProfit$ 0       $/day<= 0       maker-legged>0: 2 snaps / 1 inst (max 0.006)
-  hit_vs_above_monthly        instances 49    priced 5148   taker-violating snapshot-instances 0    maxMargin -0.0524  p99 -0.0524  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.033)
-  hit_nest_wd                 instances 6     priced 655    taker-violating snapshot-instances 0    maxMargin -0.0162  p99 -0.0162  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0121)
-  hit_nest_md                 instances 6     priced 655    taker-violating snapshot-instances 0    maxMargin -0.1159  p99 -0.1159  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0991)
-  hit_nest_mw                 instances 10    priced 1170   taker-violating snapshot-instances 0    maxMargin -0.0195  p99 -0.0195  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0131)
-  daily_ud_vs_above           instances 2     priced 234    taker-violating snapshot-instances 13   maxMargin 0.0029   p99 0.0019   maxProfit$ 0.765   $/day<= 12.1011 maker-legged>0: 79 snaps / 1 inst (max 0.0076)
-  hourly_ud_vs_above_hourly   instances 4     priced 234    taker-violating snapshot-instances 0    maxMargin -0.0283  p99 -0.0463  maxProfit$ 0       $/day<= 0       maker-legged>0: 29 snaps / 2 inst (max 0.5732)
-  nest_cl_15m_5m              instances 2     priced 24     taker-violating snapshot-instances 0    maxMargin -0.0311  p99 -0.0311  maxProfit$ 0       $/day<= 0       maker-legged>0: 0 snaps / 0 inst (max -0.0191)
+LIVE SCAN all  (368 snapshots, 2026-10-22T10:12:42.000Z .. 2026-10-23T00:08:10.000Z, 13.9244 h; taker = buy every leg at the asks + fee 0.07p(1-p))
+  complement_sum              instances 403   priced 71917  taker-violating snapshot-instances 0    maxMargin -0.0012  p99 -0.0012  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 12
+  above_daily_mono            instances 440   priced 126270 taker-violating snapshot-instances 0    maxMargin -0.0016  p99 -0.0033  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 11
+  above_hourly_mono           instances 950   priced 5990   taker-violating snapshot-instances 0    maxMargin -0.0098  p99 -0.0098  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 45
+  hit_daily_mono              instances 49    priced 8712   taker-violating snapshot-instances 0    maxMargin -0.0023  p99 -0.0033  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  hit_weekly_mono             instances 49    priced 15848  taker-violating snapshot-instances 0    maxMargin -0.0015  p99 -0.0015  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  hit_monthly_mono            instances 302   priced 28718  taker-violating snapshot-instances 0    maxMargin -0.0016  p99 -0.0034  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  range_allyes                instances 8     priced 2576   taker-violating snapshot-instances 0    maxMargin -0.0596  p99 -0.0794  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  range_allno                 instances 8     priced 1840   taker-violating snapshot-instances 0    maxMargin -0.102   p99 -0.1179  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 6
+  above_vs_range              instances 160   priced 50266  taker-violating snapshot-instances 1    maxMargin 0.0005   p99 -0.0023  maxProfit$ 0.0026  medEpisodeSec 0     $/day<= 0.0045  naive-maker>0 inst 37
+  hit_vs_above_daily          instances 15    priced 1680   taker-violating snapshot-instances 0    maxMargin -0.0047  p99 -0.0066  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_vs_above_weekly         instances 42    priced 10858  taker-violating snapshot-instances 0    maxMargin -0.0044  p99 -0.0051  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  hit_vs_above_monthly        instances 63    priced 18178  taker-violating snapshot-instances 0    maxMargin -0.0428  p99 -0.0439  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_wd                 instances 8     priced 1710   taker-violating snapshot-instances 0    maxMargin -0.0162  p99 -0.0162  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_md                 instances 7     priced 1432   taker-violating snapshot-instances 0    maxMargin -0.1159  p99 -0.1159  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_mw                 instances 11    priced 3880   taker-violating snapshot-instances 0    maxMargin -0.0172  p99 -0.0172  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  daily_ud_vs_above           instances 4     priced 736    taker-violating snapshot-instances 14   maxMargin 0.0029   p99 0.0009   maxProfit$ 0.765   medEpisodeSec 1802  $/day<= 1.3185  naive-maker>0 inst 1
+  hourly_ud_vs_above_hourly   instances 8     priced 577    taker-violating snapshot-instances 0    maxMargin -0.0001  p99 -0.0194  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  nest_cl_15m_5m              instances 7     priced 93     taker-violating snapshot-instances 0    maxMargin -0.0227  p99 -0.0227  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_cl_4h_15m              instances 2     priced 54     taker-violating snapshot-instances 0    maxMargin -0.4956  p99 -0.4956  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_basis_1h_15m           instances 2     priced 85     taker-violating snapshot-instances 28   maxMargin 0.0458   p99 0.0458   maxProfit$ 33.2333 medEpisodeSec 555   $/day<= 57.2805 naive-maker>0 inst 1
+  nest_cl_4h_5m               instances 2     priced 13     taker-violating snapshot-instances 0    maxMargin -0.4856  p99 -0.4856  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_basis_1h_5m            instances 2     priced 18     taker-violating snapshot-instances 17   maxMargin 0.4912   p99 0.4912   maxProfit$ 1471.068 medEpisodeSec 240   $/day<= 2535.5146 naive-maker>0 inst 1
+
+LIVE SCAN session0@2026-10-22T10:12Z  (2 snapshots, 2026-10-22T10:12:42.000Z .. 2026-10-22T10:22:50.000Z, 0.1689 h; taker = buy every leg at the asks + fee 0.07p(1-p))
+  complement_sum              instances 258   priced 462    taker-violating snapshot-instances 0    maxMargin -0.0012  p99 -0.0012  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  above_daily_mono            instances 385   priced 652    taker-violating snapshot-instances 0    maxMargin -0.0019  p99 -0.0066  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  above_hourly_mono           instances 190   priced 90     taker-violating snapshot-instances 0    maxMargin -0.0311  p99 -0.0311  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 6
+  hit_daily_mono              instances 49    priced 98     taker-violating snapshot-instances 0    maxMargin -0.0023  p99 -0.0023  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  hit_weekly_mono             instances 36    priced 72     taker-violating snapshot-instances 0    maxMargin -0.0035  p99 -0.0035  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_monthly_mono            instances 292   priced 566    taker-violating snapshot-instances 0    maxMargin -0.0016  p99 -0.0023  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  range_allyes                instances 7     priced 14     taker-violating snapshot-instances 0    maxMargin -0.087   p99 -0.087   maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  range_allno                 instances 7     priced 10     taker-violating snapshot-instances 0    maxMargin -0.1352  p99 -0.1352  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  above_vs_range              instances 140   priced 270    taker-violating snapshot-instances 0    maxMargin -0.0001  p99 -0.0004  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 9
+  hit_vs_above_daily          instances 15    priced 20     taker-violating snapshot-instances 0    maxMargin -0.0047  p99 -0.0047  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_vs_above_weekly         instances 36    priced 58     taker-violating snapshot-instances 0    maxMargin -0.0094  p99 -0.0094  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  hit_vs_above_monthly        instances 49    priced 88     taker-violating snapshot-instances 0    maxMargin -0.0605  p99 -0.0605  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_wd                 instances 6     priced 12     taker-violating snapshot-instances 0    maxMargin -0.0183  p99 -0.0183  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_md                 instances 6     priced 12     taker-violating snapshot-instances 0    maxMargin -0.1265  p99 -0.1265  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_mw                 instances 10    priced 20     taker-violating snapshot-instances 0    maxMargin -0.0206  p99 -0.0206  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  daily_ud_vs_above           instances 2     priced 4      taker-violating snapshot-instances 0    maxMargin -0.0174  p99 -0.0174  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hourly_ud_vs_above_hourly   instances 2     priced 4      taker-violating snapshot-instances 0    maxMargin -0.1504  p99 -0.1504  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+
+LIVE SCAN session1@2026-10-22T11:05Z  (166 snapshots, 2026-10-22T11:05:15.000Z .. 2026-10-22T12:00:45.000Z, 0.925 h; taker = buy every leg at the asks + fee 0.07p(1-p))
+  complement_sum              instances 263   priced 32418  taker-violating snapshot-instances 0    maxMargin -0.0012  p99 -0.0012  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 9
+  above_daily_mono            instances 385   priced 54116  taker-violating snapshot-instances 0    maxMargin -0.0019  p99 -0.006   maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 6
+  above_hourly_mono           instances 380   priced 2434   taker-violating snapshot-instances 0    maxMargin -0.0098  p99 -0.0311  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 25
+  hit_daily_mono              instances 49    priced 7448   taker-violating snapshot-instances 0    maxMargin -0.0033  p99 -0.0033  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 2
+  hit_weekly_mono             instances 36    priced 5976   taker-violating snapshot-instances 0    maxMargin -0.0035  p99 -0.0035  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_monthly_mono            instances 81    priced 11952  taker-violating snapshot-instances 0    maxMargin -0.0034  p99 -0.0034  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  range_allyes                instances 7     priced 1162   taker-violating snapshot-instances 0    maxMargin -0.0596  p99 -0.0681  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  range_allno                 instances 7     priced 830    taker-violating snapshot-instances 0    maxMargin -0.102   p99 -0.116   maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 5
+  above_vs_range              instances 140   priced 22410  taker-violating snapshot-instances 0    maxMargin -0.0001  p99 -0.0023  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 25
+  hit_vs_above_daily          instances 15    priced 1660   taker-violating snapshot-instances 0    maxMargin -0.0066  p99 -0.0066  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_vs_above_weekly         instances 36    priced 4814   taker-violating snapshot-instances 0    maxMargin -0.0083  p99 -0.0083  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_vs_above_monthly        instances 49    priced 7304   taker-violating snapshot-instances 0    maxMargin -0.0524  p99 -0.0524  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_wd                 instances 6     priced 898    taker-violating snapshot-instances 0    maxMargin -0.0162  p99 -0.0162  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_md                 instances 6     priced 898    taker-violating snapshot-instances 0    maxMargin -0.1159  p99 -0.1159  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_mw                 instances 10    priced 1660   taker-violating snapshot-instances 0    maxMargin -0.0195  p99 -0.0195  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  daily_ud_vs_above           instances 2     priced 332    taker-violating snapshot-instances 14   maxMargin 0.0029   p99 0.0018   maxProfit$ 0.765   medEpisodeSec 1802  $/day<= 19.8486 naive-maker>0 inst 1
+  hourly_ud_vs_above_hourly   instances 2     priced 271    taker-violating snapshot-instances 0    maxMargin -0.0283  p99 -0.0311  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 2
+  nest_cl_15m_5m              instances 4     priced 48     taker-violating snapshot-instances 0    maxMargin -0.0311  p99 -0.0311  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_cl_4h_15m              instances 1     priced 1      taker-violating snapshot-instances 0    maxMargin -0.4956  p99 -0.4956  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_basis_1h_15m           instances 1     priced 31     taker-violating snapshot-instances 0    maxMargin -0.0418  p99 -0.0418  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_cl_4h_5m               instances 1     priced 0      taker-violating snapshot-instances 0    maxMargin -        p99 -        maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_basis_1h_5m            instances 1     priced 1      taker-violating snapshot-instances 0    maxMargin -0.5565  p99 -0.5565  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+
+LIVE SCAN session2@2026-10-22T23:18Z  (200 snapshots, 2026-10-22T23:18:23.000Z .. 2026-10-23T00:08:10.000Z, 0.8297 h; taker = buy every leg at the asks + fee 0.07p(1-p))
+  complement_sum              instances 263   priced 39037  taker-violating snapshot-instances 0    maxMargin -0.0012  p99 -0.0012  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  above_daily_mono            instances 385   priced 71502  taker-violating snapshot-instances 0    maxMargin -0.0016  p99 -0.0027  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 8
+  above_hourly_mono           instances 380   priced 3466   taker-violating snapshot-instances 0    maxMargin -0.0098  p99 -0.0098  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 14
+  hit_daily_mono              instances 43    priced 1166   taker-violating snapshot-instances 0    maxMargin -0.0063  p99 -0.0085  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  hit_weekly_mono             instances 49    priced 9800   taker-violating snapshot-instances 0    maxMargin -0.0015  p99 -0.0015  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  hit_monthly_mono            instances 91    priced 16200  taker-violating snapshot-instances 0    maxMargin -0.0023  p99 -0.0023  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  range_allyes                instances 7     priced 1400   taker-violating snapshot-instances 0    maxMargin -0.0953  p99 -0.1063  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  range_allno                 instances 7     priced 1000   taker-violating snapshot-instances 0    maxMargin -0.1287  p99 -0.1322  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 5
+  above_vs_range              instances 140   priced 27586  taker-violating snapshot-instances 1    maxMargin 0.0005   p99 -0.0048  maxProfit$ 0.0026  medEpisodeSec 0     $/day<= 0.0752  naive-maker>0 inst 17
+  hit_vs_above_weekly         instances 33    priced 5986   taker-violating snapshot-instances 0    maxMargin -0.0044  p99 -0.0044  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 3
+  hit_vs_above_monthly        instances 56    priced 10786  taker-violating snapshot-instances 0    maxMargin -0.0428  p99 -0.0439  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_wd                 instances 8     priced 800    taker-violating snapshot-instances 0    maxMargin -0.1221  p99 -0.1221  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_md                 instances 7     priced 522    taker-violating snapshot-instances 0    maxMargin -0.3854  p99 -0.3854  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hit_nest_mw                 instances 11    priced 2200   taker-violating snapshot-instances 0    maxMargin -0.0172  p99 -0.0172  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  daily_ud_vs_above           instances 2     priced 400    taker-violating snapshot-instances 0    maxMargin -0.1291  p99 -0.1296  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  hourly_ud_vs_above_hourly   instances 4     priced 302    taker-violating snapshot-instances 0    maxMargin -0.0001  p99 -0.0194  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 1
+  nest_cl_15m_5m              instances 3     priced 45     taker-violating snapshot-instances 0    maxMargin -0.0227  p99 -0.0227  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_cl_4h_15m              instances 1     priced 53     taker-violating snapshot-instances 0    maxMargin -0.4995  p99 -0.4995  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_basis_1h_15m           instances 1     priced 54     taker-violating snapshot-instances 28   maxMargin 0.0458   p99 0.0458   maxProfit$ 33.2333 medEpisodeSec 555   $/day<= 961.2846 naive-maker>0 inst 1
+  nest_cl_4h_5m               instances 1     priced 13     taker-violating snapshot-instances 0    maxMargin -0.4856  p99 -0.4856  maxProfit$ 0       medEpisodeSec -     $/day<= 0       naive-maker>0 inst 0
+  nest_basis_1h_5m            instances 1     priced 17     taker-violating snapshot-instances 17   maxMargin 0.4912   p99 0.4912   maxProfit$ 1471.068 medEpisodeSec 240   $/day<= 42551.1467 naive-maker>0 inst 1
+  NOTE: nest_basis_* live "violations" assume Binance (1h/1d) = Chainlink (5m/15m/4h); the ~$40-100 oracle gap gives the basket a losing state, so they are NOT arbitrage (historical print-verified ROI of these baskets is negative).
+
+MAKER-LEGGED SIMULATION (real tape fills, hedge at next recorded book; P&L uses the guaranteed payoff)
+  improve|0|60      session 0 orders 2431   filled 4    shares 245.1    unhedged 0      pnl$ 0.4103   roi 0.0017  ci [null,null] $/day 10.6456 (+rebate pnl$ 0.4989)
+  improve|0|60      session 1 orders 2137   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0|300     session 0 orders 629    filled 2    shares 200      unhedged 0      pnl$ 0.2722   roi 0.0014  ci [null,null] $/day 7.0625  (+rebate pnl$ 0.3458)
+  improve|0|300     session 1 orders 604    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0.005|60  session 0 orders 1884   filled 1    shares 100      unhedged 0      pnl$ 0.5561   roi 0.0056  ci [null,null] $/day 14.4285 (+rebate pnl$ 0.5942)
+  improve|0.005|60  session 1 orders 1537   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0.005|300 session 0 orders 488    filled 1    shares 43       unhedged 0      pnl$ 0.2391   roi 0.0056  ci [null,null] $/day 6.2037  (+rebate pnl$ 0.2555)
+  improve|0.005|300 session 1 orders 476    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0.01|60   session 0 orders 1771   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0.01|60   session 1 orders 1307   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0.01|300  session 0 orders 453    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  improve|0.01|300  session 1 orders 414    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0|60         session 0 orders 2630   filled 4    shares 244.99   unhedged 0      pnl$ -1.7316  roi -0.007  ci [-0.3143,0.0023] $/day -44.928 (+rebate pnl$ -1.6425)
+  join|0|60         session 1 orders 2258   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0|300        session 0 orders 694    filled 3    shares 205      unhedged 0      pnl$ -1.8194  roi -0.0088 ci [-0.3143,0.0024] $/day -47.2061 (+rebate pnl$ -1.7426)
+  join|0|300        session 1 orders 665    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.005|60     session 0 orders 1923   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.005|60     session 1 orders 1617   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.005|300    session 0 orders 501    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.005|300    session 1 orders 514    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.01|60      session 0 orders 1780   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.01|60      session 1 orders 1357   filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.01|300     session 0 orders 456    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+  join|0.01|300     session 1 orders 426    filled 0    shares 0        unhedged 0      pnl$ 0        roi -       ci [null,null] $/day 0       (+rebate pnl$ 0)
+    by family: improve|0|60      s0 daily_ud_vs_above          orders 31     filled 4    pnl$ 0.4103   roi 0.0017
+    by family: improve|0|300     s0 daily_ud_vs_above          orders 10     filled 2    pnl$ 0.2722   roi 0.0014
+    by family: improve|0.005|60  s0 daily_ud_vs_above          orders 7      filled 1    pnl$ 0.5561   roi 0.0056
+    by family: improve|0.005|300 s0 daily_ud_vs_above          orders 2      filled 1    pnl$ 0.2391   roi 0.0056
+    by family: join|0|60         s0 daily_ud_vs_above          orders 39     filled 3    pnl$ 0.56     roi 0.0023
+    by family: join|0|60         s0 complement_sum             orders 9      filled 1    pnl$ -2.2916  roi -0.3143
+    by family: join|0|300        s0 daily_ud_vs_above          orders 10     filled 2    pnl$ 0.4722   roi 0.0024
+    by family: join|0|300        s0 complement_sum             orders 9      filled 1    pnl$ -2.2916  roi -0.3143
+  WALK-FORWARD: chosen on session 0 = improve|0.005|60 (IS pnl $0.5561, 1 fills) -> OOS sessions 1: orders 1537 filled 0 pnl $0 roi null ci [null,null] $/day 0 (+rebate $0)
+
+PRINT-FIRST CENSUS OF NESTED CHAINLINK PAIRS (every taker print; last ask-side print per leg <= W s old; follow-through = first ask print after T within 15 s)
+  nest_cl_4h_15m   pairs 693 days 121 (2026-06-24..2026-10-22) medAskEvents 481 | W10: viol 38 (0.0548) dur p50 15s p90 114s maxMargin p50 0.0295 | W30: viol 45 (0.0649) dur p50 24s p90 130s maxMargin p50 0.0286 | W60: viol 48 (0.0693) dur p50 28s p90 130s maxMargin p50 0.0292
+  nest_cl_4h_5m    pairs 270 days 46 (2026-09-07..2026-10-22) medAskEvents 689 | W10: viol 10 (0.037) dur p50 23s p90 238s maxMargin p50 0.0528 | W30: viol 13 (0.0481) dur p50 16s p90 201s maxMargin p50 0.0528 | W60: viol 16 (0.0593) dur p50 20s p90 201s maxMargin p50 0.0441
+  nest_cl_15m_5m   pairs 600 days 46 (2026-09-07..2026-10-22) medAskEvents 854 | W10: viol 80 (0.1333) dur p50 5s p90 30s maxMargin p50 0.0395 | W30: viol 87 (0.145) dur p50 6s p90 31s maxMargin p50 0.0369 | W60: viol 97 (0.1617) dur p50 6s p90 32s maxMargin p50 0.0348
+  nest_cl_4h_15m   fixed        W 10  th 0     n 38   win 1      cost 0.9629  roi 0.1205  ci [0.0232,0.2432] | follow n 27   roi 0.0133  ci [-0.058,0.1041] | medSize 10.3448 $/day 0.4847  follow $/day -0.0377
+  nest_cl_4h_15m   fixed        W 10  th 0.01  n 27   win 1      cost 0.9449  roi 0.1367  ci [0.0281,0.3178] | follow n 20   roi -0.0007 ci [-0.0672,0.0861] | medSize 10     $/day 0.3891  follow $/day -0.1069
+  nest_cl_4h_15m   fixed        W 10  th 0.02  n 22   win 1      cost 0.9212  roi 0.1842  ci [0.0505,0.4052] | follow n 17   roi -0.0111 ci [-0.0835,0.0938] | medSize 10     $/day 0.4045  follow $/day -0.1289
+  nest_cl_4h_15m   fixed        W 30  th 0     n 45   win 1      cost 0.9671  roi 0.1029  ci [0.0197,0.2095] | follow n 27   roi 0.0068  ci [-0.0644,0.1012] | medSize 10     $/day 0.5002  follow $/day -0.0498
+  nest_cl_4h_15m   fixed        W 30  th 0.01  n 30   win 1      cost 0.9474  roi 0.1259  ci [0.0289,0.287] | follow n 19   roi -0.0051 ci [-0.0724,0.085] | medSize 10     $/day 0.391   follow $/day -0.1043
+  nest_cl_4h_15m   fixed        W 30  th 0.02  n 24   win 1      cost 0.9241  roi 0.1723  ci [0.0494,0.3872] | follow n 18   roi -0.0146 ci [-0.082,0.0816] | medSize 10     $/day 0.4043  follow $/day -0.1332
+  nest_cl_4h_15m   fixed        W 60  th 0     n 48   win 1      cost 0.967   roi 0.0987  ci [0.0224,0.1945] | follow n 27   roi -0.0252 ci [-0.0724,0.0445] | medSize 10     $/day 0.4667  follow $/day -0.1195
+  nest_cl_4h_15m   fixed        W 60  th 0.01  n 36   win 1      cost 0.9519  roi 0.1381  ci [0.0324,0.2891] | follow n 23   roi -0.0136 ci [-0.0695,0.0637] | medSize 10     $/day 0.4432  follow $/day -0.1226
+  nest_cl_4h_15m   fixed        W 60  th 0.02  n 28   win 1      cost 0.9318  roi 0.1882  ci [0.0529,0.3633] | follow n 21   roi -0.0206 ci [-0.0808,0.0642] | medSize 10     $/day 0.4526  follow $/day -0.1465
+  nest_cl_4h_15m   walk-forward W 30  th 0.02  n 20   win 1      cost 0.917   roi 0.1995  ci [0.0514,0.4573] | follow n 16   roi -0.0117 ci [-0.0852,0.0963] | medSize 10     $/day 0.6526  follow $/day -0.2013
+  nest_cl_4h_5m    fixed        W 10  th 0     n 10   win 1      cost 0.9737  roi 0.027   ci [0.007,0.0545] | follow n 8    roi -0.0158 ci [-0.0653,0.0281] | medSize 5.3    $/day 0.0403  follow $/day -0.0098
+  nest_cl_4h_5m    fixed        W 10  th 0.01  n 7    win 1      cost 0.9545  roi 0.0477  ci [0.0246,0.0805] | follow n 6    roi 0.0256  ci [-0.0187,0.0763] | medSize 10.1818 $/day 0.0677  follow $/day -0.0004
+  nest_cl_4h_5m    fixed        W 10  th 0.02  n 6    win 1      cost 0.9343  roi 0.0703  ci [0.0454,0.0961] | follow n 5    roi 0.0246  ci [-0.0131,0.0653] | medSize 10.1818 $/day 0.0791  follow $/day 0.0163
+  nest_cl_4h_5m    fixed        W 30  th 0     n 13   win 1      cost 0.9732  roi 0.0275  ci [0.0126,0.0474] | follow n 7    roi -0.0138 ci [-0.0689,0.0331] | medSize 5.3    $/day 0.0517  follow $/day -0.0088
+  nest_cl_4h_5m    fixed        W 30  th 0.01  n 10   win 1      cost 0.9647  roi 0.0366  ci [0.0201,0.06] | follow n 5    roi 0.0258  ci [-0.0274,0.0872] | medSize 10     $/day 0.0598  follow $/day -0.0092
+  nest_cl_4h_5m    fixed        W 30  th 0.02  n 9    win 1      cost 0.9477  roi 0.0552  ci [0.0354,0.079] | follow n 4    roi 0.0246  ci [-0.0221,0.076] | medSize 10     $/day 0.0841  follow $/day 0.0074
+  nest_cl_4h_5m    fixed        W 60  th 0     n 16   win 1      cost 0.9778  roi 0.0227  ci [0.0101,0.0399] | follow n 10   roi -0.0115 ci [-0.0531,0.0217] | medSize 5.8824 $/day 0.055   follow $/day -0.0101
+  nest_cl_4h_5m    fixed        W 60  th 0.01  n 10   win 1      cost 0.9647  roi 0.0366  ci [0.0201,0.06] | follow n 5    roi 0.0258  ci [-0.0274,0.0872] | medSize 10     $/day 0.0598  follow $/day -0.0092
+  nest_cl_4h_5m    fixed        W 60  th 0.02  n 9    win 1      cost 0.9477  roi 0.0552  ci [0.0354,0.079] | follow n 4    roi 0.0246  ci [-0.0221,0.076] | medSize 10     $/day 0.0841  follow $/day 0.0074
+  nest_cl_4h_5m    walk-forward W 30  th 0.02  n 6    win 1      cost 0.9596  roi 0.0421  ci [0.0266,0.0684] | follow n 2    roi -0.0221 ci [-0.0323,-0.0118] | medSize 10     $/day 0.0782  follow $/day -0.0163
+  nest_cl_15m_5m   fixed        W 10  th 0     n 80   win 1      cost 0.9678  roi 0.0592  ci [0.0256,0.1203] | follow n 78   roi -0.0444 ci [-0.0771,0.0082] | medSize 7.1163 $/day 12.789  follow $/day -1.2232
+  nest_cl_15m_5m   fixed        W 10  th 0.01  n 70   win 1      cost 0.957   roi 0.0747  ci [0.038,0.1391] | follow n 69   roi -0.0422 ci [-0.0779,0.0121] | medSize 7.99   $/day 13.3618 follow $/day 0.6453
+  nest_cl_15m_5m   fixed        W 10  th 0.02  n 58   win 1      cost 0.9415  roi 0.0988  ci [0.0504,0.1833] | follow n 58   roi -0.0258 ci [-0.0665,0.0373] | medSize 8.5    $/day 13.7286 follow $/day 2.3616
+  nest_cl_15m_5m   fixed        W 30  th 0     n 87   win 1      cost 0.9698  roi 0.0548  ci [0.0243,0.1126] | follow n 78   roi -0.0444 ci [-0.0771,0.0082] | medSize 6.8421 $/day 12.8414 follow $/day -1.2232
+  nest_cl_15m_5m   fixed        W 30  th 0.01  n 73   win 1      cost 0.9581  roi 0.0724  ci [0.0375,0.1325] | follow n 69   roi -0.0422 ci [-0.0779,0.0121] | medSize 6.8421 $/day 13.4277 follow $/day 0.6453
+  nest_cl_15m_5m   fixed        W 30  th 0.02  n 58   win 1      cost 0.9415  roi 0.0988  ci [0.0504,0.1833] | follow n 58   roi -0.0258 ci [-0.0665,0.0373] | medSize 8.5    $/day 13.7286 follow $/day 2.3616
+  nest_cl_15m_5m   fixed        W 60  th 0     n 97   win 1      cost 0.9724  roi 0.0496  ci [0.0226,0.1017] | follow n 79   roi -0.0439 ci [-0.0767,0.0086] | medSize 6.8421 $/day 13.1625 follow $/day -1.2234
+  nest_cl_15m_5m   fixed        W 60  th 0.01  n 74   win 1      cost 0.9582  roi 0.0719  ci [0.0377,0.1315] | follow n 69   roi -0.0422 ci [-0.0779,0.0121] | medSize 7.99   $/day 13.6802 follow $/day 0.6453
+  nest_cl_15m_5m   fixed        W 60  th 0.02  n 59   win 1      cost 0.9419  roi 0.0977  ci [0.0501,0.1815] | follow n 58   roi -0.0258 ci [-0.0665,0.0373] | medSize 8.5    $/day 13.9811 follow $/day 2.3616
+  nest_cl_15m_5m   walk-forward W 30  th 0.02  n 41   win 1      cost 0.9474  roi 0.0555  ci [0.0439,0.0706] | follow n 41   roi -0.0459 ci [-0.0641,-0.0211] | medSize 6      $/day 5.6193  follow $/day -5.1062

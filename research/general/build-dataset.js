@@ -21,7 +21,7 @@ import { once } from 'node:events';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isSyntheticMarket, readProvenance } from '../build-dataset.js';
 import {
-  DAY, EARLY_OFFSET_H, GROUP_SYNC_SEC, HOUR, LOOKBACK_SEC, MAX_PRICE, MIN_PRICE, decisionPlan, lastIndexAtOrBefore, offsetLabel, patternClass,
+  DAY, EARLY_OFFSET_H, GROUP_STAMP_TOL_SEC, GROUP_SYNC_SEC, HOUR, LOOKBACK_SEC, MAX_PRICE, MIN_PRICE, decisionPlan, lastIndexAtOrBefore, offsetLabel, patternClass,
   questionFlags,
 } from './lib.js';
 
@@ -58,10 +58,15 @@ function pointAsOf(points, ts, maxAgeSec) {
 /**
  * negRisk group features as of T (the row's own price point). Members count once they have
  * traded (listing <= T and a price point <= T). A member closed by T adds its resolved value (public
- * at T); an open member needs a quote within GROUP_SYNC_SEC before T (never after). Any gap -> sums
- * null. -> { groupSize, groupYesSum, groupTop, nullReason }
+ * at T); an open member needs its last quote at or before min(decisionTs, T + GROUP_STAMP_TOL_SEC)
+ * to be at most GROUP_SYNC_SEC older than T. clob stamps each token's hourly points a few seconds
+ * apart (all within the first minute of the hour, seen live), so a strict "at or before T" would
+ * pair a row with its members' previous hour; the 2-minute tolerance absorbs that stamp jitter and
+ * never reaches past the decision time. Any gap -> sums null.
+ * -> { groupSize, groupYesSum, groupTop, nullReason }
  */
-export function groupFeaturesAt(group, selfCid, selfYes, T) {
+export function groupFeaturesAt(group, selfCid, selfYes, T, decisionTs = T) {
+  const upTo = Math.min(decisionTs, T + GROUP_STAMP_TOL_SEC);
   if (!group || !Array.isArray(group.members) || !group.members.length) return { groupSize: null, groupYesSum: null, groupTop: null, nullReason: 'group_missing' };
   let size = 0, sum = 0, nullReason = null, topCid = null, topYes = -Infinity;
   const add = (cid, yes) => {
@@ -71,18 +76,18 @@ export function groupFeaturesAt(group, selfCid, selfYes, T) {
   let selfSeen = false;
   for (const mb of group.members) {
     if (mb.conditionId === selfCid) { selfSeen = true; size++; add(selfCid, selfYes); continue; }
-    if (mb.listingTs != null && mb.listingTs > T) continue; // not listed yet
+    if (mb.listingTs != null && mb.listingTs > upTo) continue; // not listed yet
     if (mb.closedTs != null && mb.closedTs <= T) {
       // Closed by T: its resolution is public at T.
       size++;
       if (mb.resolvedYes !== 0 && mb.resolvedYes !== 1) nullReason ||= 'group_member_unresolved';
-      else sum += mb.resolvedYes;
+      else add(mb.conditionId, mb.resolvedYes); // a member that already resolved Yes is the group's top
       continue;
     }
     const pts = mb.points;
     if (pts == null) { size++; nullReason ||= 'group_member_prices_missing'; continue; }
-    const i = lastIndexAtOrBefore(pts, T);
-    if (i < 0) continue; // no quote at or before T: not trading yet (e.g. a placeholder activated later)
+    const i = lastIndexAtOrBefore(pts, upTo);
+    if (i < 0) continue; // no quote yet: not trading yet (e.g. a placeholder activated later)
     size++;
     if (T - pts[i].t > GROUP_SYNC_SEC) { nullReason ||= 'group_quote_not_synchronous'; continue; }
     add(mb.conditionId, pts[i].p);
@@ -133,7 +138,7 @@ export function buildGeneralRows(m, yesPoints, group, counters = { rowDrops: {},
     const m7 = pointAsOf(yesPoints, pt.t - LOOKBACK_SEC.m7d, d.maxAgeSec);
     let g = { groupSize: null, groupYesSum: null, groupTop: null, nullReason: null };
     if (m.negRisk) {
-      g = groupFeaturesAt(group, m.conditionId, yes, pt.t);
+      g = groupFeaturesAt(group, m.conditionId, yes, pt.t, d.decisionTs);
       if (g.nullReason) bump(counters.featureNulls, g.nullReason);
     }
     for (const side of ['yes', 'no']) {
@@ -219,7 +224,7 @@ export async function buildGeneralDataset(opts = {}) {
       decisions: 'anchor - {1,3,7,14,30} d, and listing + 1 d (offsetH -24, only if before the anchor)',
       rowExists: 'listing <= decisionTs < closedTime; last Yes point <= decisionTs at most 12 h old (24 h for offsets >= 7 d); price in [0.01, 0.99]',
       endDateFarFromClose: 'never dropped or used as a feature (depends on closedTime); counted in anchorVsClose',
-      groupSync: `negRisk Yes-sum from member quotes within ${GROUP_SYNC_SEC / 60} min before the row's point, else null`,
+      groupSync: `negRisk Yes-sum from member quotes at most ${GROUP_SYNC_SEC / 60} min older than the row's point (or up to ${GROUP_STAMP_TOL_SEC} s newer for clob's per-token stamp jitter, never after the decision), else null`,
     },
     marketsRead: 0, marketsUsed: 0, rows: 0, rowsByOffset: {}, rowsByCategory: {}, marketsByCategory: {}, eventsUsed: 0,
     marketDrops: {}, rowDrops: {}, featureNulls: {},

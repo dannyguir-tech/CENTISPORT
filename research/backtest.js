@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { benjaminiHochberg, clusterBootstrapSums, mean, normalCdf, normalQuantile, wilson } from './lib/stats.js';
+import { benjaminiHochberg, clusterBootstrapSums, hashString, mean, normalCdf, normalQuantile, wilson } from './lib/stats.js';
 import * as DEFAULT_HYPOTHESES from './hypotheses.js';
 import { readProvenance } from './build-dataset.js';
 
@@ -50,6 +50,13 @@ export const DEFAULTS = Object.freeze({
   // 'fold': cutoff = the test fold's first decision (default). 'offsets': its first decision at the
   // hypothesis's own offsets (every test bet is at one of them, so labels are still known in time).
   cutoffScope: 'fold',
+  // Opt-in extra p-value floor for skewed bets (see losingEventsFloor). Off by default so existing
+  // runs are unchanged; a hypothesis module can switch it on (BACKTEST.lossFloor).
+  lossFloor: false,
+  // SENSITIVITY ONLY: the id of one of the module's BACKTEST.altCosts. When set, that cost function
+  // replaces the flat fee model everywhere (training choices, out-of-sample bets, spread
+  // sensitivities), and the report is marked as a sensitivity run that declares no survivors.
+  costModel: null,
 });
 
 export const LABEL_FIELDS = Object.freeze(['won', 'closePrice', 'clv', 'settleTs']);
@@ -63,6 +70,8 @@ const iso = (t) => (fin(t) ? new Date(t * 1000).toISOString().replace('.000Z', '
 // ---------- cost model ----------
 
 export const entryCost = (price, spread, fee) => Math.min(0.999, (price + spread) * (1 + fee));
+// Entry cost of a prepared row at a spread: the headline flat model, or o.costOf (--cost-model).
+const rowCost = (r, spread, o) => (o.costOf ? o.costOf(r, spread) : entryCost(r.f.price, spread, o.fee));
 export const betPnl = (won, cost) => (won ? 1 / cost - 1 : -1);
 
 // ---------- loading ----------
@@ -192,8 +201,8 @@ export function chooseParams(hyp, cands, train, o) {
     let n = 0, pnl = 0;
     for (const r of byOffset.get(offsetH) || []) {
       if (!hyp.select(r.f, params)) continue;
-      const cost = entryCost(r.f.price, o.spread, o.fee);
-      if (cost >= o.maxCost) continue;
+      const cost = rowCost(r, o.spread, o);
+      if (!(cost < o.maxCost)) continue;
       n++;
       pnl += betPnl(r.won, cost);
     }
@@ -246,14 +255,46 @@ export function walkForward(hyp, folds, o, hooks = {}) {
 function betsAt(picks, spread, o) {
   const bets = [];
   for (const r of picks) {
-    const cost = entryCost(r.f.price, spread, o.fee);
-    if (cost >= o.maxCost) continue;
-    bets.push({ eventKey: r.f.eventKey, price: r.f.price, cost, won: r.won, pnl: betPnl(r.won, cost), clv: r.clv });
+    const cost = rowCost(r, spread, o);
+    if (!(cost < o.maxCost)) continue;
+    bets.push({ id: r.f.id, eventKey: r.f.eventKey, price: r.f.price, cost, won: r.won, pnl: betPnl(r.won, cost), clv: r.clv });
   }
   return bets;
 }
 
 const meanPnl = (bets) => (bets.length ? mean(bets.map((b) => b.pnl)) : null);
+
+// A second floor on the one-sided p for ROI > 0, for skewed bets. At breakeven a bet bought at cost
+// c wins with probability c and loses with probability 1 - c. Each event (cluster) contributes ONE
+// representative bet, chosen without looking at outcomes or prices: the one whose row id has the
+// smallest hash (a fixed pseudo-random pick). Events are independent, so if no bet beats its cost, the number of
+// representatives that lost is stochastically at least a Poisson-binomial with those 1 - c, and
+// P(that <= observed) is a valid p-value; the reported p is the larger of it and the bootstrap's.
+// It matters for bets that rarely lose (No on longshots, 0.90+ favourites): a few dozen events that
+// all happened to win make the bootstrap degenerate (every replicate positive, p at its floor),
+// while this p stays near the real chance of such a lucky run (about the product of the costs).
+// -> { p, losingEvents (representatives that lost), events, expectedAtBreakeven }
+export function losingEventsFloor(bets) {
+  const ev = new Map();
+  bets.forEach((b, i) => {
+    const h = hashString(String(b.id ?? i));
+    const e = ev.get(b.eventKey);
+    if (!e || h < e.h) ev.set(b.eventKey, { h, pi: Math.min(1, Math.max(0, 1 - b.cost)), lost: !b.won });
+  });
+  const list = [...ev.values()];
+  const k = list.filter((e) => e.lost).length;
+  const dp = new Float64Array(k + 1);
+  dp[0] = 1;
+  let expected = 0;
+  for (const { pi } of list) {
+    expected += pi;
+    for (let j = k; j >= 1; j--) dp[j] = dp[j] * (1 - pi) + dp[j - 1] * pi;
+    dp[0] *= 1 - pi;
+  }
+  let p = 0;
+  for (let j = 0; j <= k; j++) p += dp[j];
+  return { p: Math.min(1, p), losingEvents: k, events: list.length, expectedAtBreakeven: expected };
+}
 const EMPTY_CI = Object.freeze({ estimate: null, lo: null, hi: null, se: null, p: 1 });
 
 function summarizeBets(bets, o, id) {
@@ -269,6 +310,12 @@ function summarizeBets(bets, o, id) {
   );
   const pick = ({ estimate, lo, hi, se, p }) => ({ estimate, lo, hi, se, p });
   const roi = pick(boot.stats.roi);
+  let lossFloor = null;
+  if (o.lossFloor) {
+    lossFloor = losingEventsFloor(bets);
+    roi.pBootstrap = roi.p;
+    roi.p = Math.max(roi.p, lossFloor.p);
+  }
   return {
     n: bets.length,
     nEvents: boot.nClusters,
@@ -281,6 +328,7 @@ function summarizeBets(bets, o, id) {
     clv: { ...pick(boot.stats.clv), n: bets.filter((b) => b.clv != null).length },
     // ROI these exact bets would earn if every price were perfectly calibrated: the cost hurdle.
     hurdleRoi: mean(bets.map((b) => b.price / b.cost - 1)),
+    lossFloor,
     // Set by runBacktest once the size of the BH family is known (see mde80).
     mde80: null,
     mde80SingleTest: null,
@@ -484,7 +532,7 @@ export async function loadHypothesisModule(file) {
   return { mod, file: file ? path.resolve(file) : path.join(HERE, 'hypotheses.js'), settings: mod.BACKTEST && typeof mod.BACKTEST === 'object' ? mod.BACKTEST : {} };
 }
 
-const MODULE_KEYS = ['foldBy', 'embargoFrom', 'cutoffScope'];
+const MODULE_KEYS = ['foldBy', 'embargoFrom', 'cutoffScope', 'lossFloor'];
 
 export async function runBacktest(opts = {}) {
   const hm = await loadHypothesisModule(opts.hypotheses || null);
@@ -493,6 +541,13 @@ export async function runBacktest(opts = {}) {
   Object.assign(o, Object.fromEntries(Object.entries(opts).filter(([, v]) => v !== undefined)));
   o.metaFields = hm.settings.metaFields || [];
   o.altCosts = (hm.settings.altCosts || []).filter((ac) => ac && typeof ac.cost === 'function');
+  o.costOf = null;
+  if (o.costModel != null) {
+    const ac = o.altCosts.find((x) => x.id === o.costModel);
+    if (!ac) throw new Error(`--cost-model ${o.costModel}: the hypothesis module has no such BACKTEST.altCosts entry (available: ${o.altCosts.map((x) => x.id).join(', ') || 'none'})`);
+    o.costOf = (r, spread) => ac.cost(r.meta, r.f.price, spread);
+    o.costModelLabel = ac.label;
+  }
   if (!['fold', 'offsets'].includes(o.cutoffScope)) throw new Error(`cutoffScope must be 'fold' or 'offsets', got "${o.cutoffScope}"`);
   if (!['start', 'settle'].includes(o.embargoFrom)) throw new Error(`embargoFrom must be 'start' or 'settle', got "${o.embargoFrom}"`);
   const words = { title: hm.settings.title || 'Sports edge backtest', group: hm.settings.groupLabel || 'sport', anchor: hm.settings.anchorLabel || 'game start', offsetLabel: typeof hm.settings.offsetLabel === 'function' ? hm.settings.offsetLabel : (h) => `${h}h` };
@@ -525,6 +580,13 @@ export async function runBacktest(opts = {}) {
   for (const r of results) if (r.status === 'skipped') r.verdict = { survives: false, label: 'skipped', fails: [r.skipReason] };
 
   const data = summarizeData(dataFile, rows, read, drops, folds, o);
+  if (o.costOf) {
+    // A sensitivity run never declares survival: relabel anything that passed every check.
+    for (const r of tested) {
+      if (!r.verdict.survives) continue;
+      r.verdict = { survives: false, passesSensitivity: true, label: 'passes all checks (sensitivity only)', fails: ['sensitivity run (--cost-model): survival is judged only at the headline costs'] };
+    }
+  }
   const survivors = tested.filter((r) => r.verdict.survives);
   const provenance = loadProvenance(dataFile);
   const labelLooksSynthetic = SYNTHETIC_RE.test(o.sourceLabel);
@@ -541,12 +603,16 @@ export async function runBacktest(opts = {}) {
     },
     verdict: null,
     config: {
-      hypotheses: hm.file, foldBy: o.foldBy, embargoFrom: o.embargoFrom, cutoffScope: o.cutoffScope, metaFields: o.metaFields,
+      hypotheses: hm.file, foldBy: o.foldBy, embargoFrom: o.embargoFrom, cutoffScope: o.cutoffScope, lossFloor: !!o.lossFloor, metaFields: o.metaFields,
       altCosts: o.altCosts.map((ac) => ({ id: ac.id, label: ac.label })), words: { title: words.title, group: words.group, anchor: words.anchor },
       data: dataFile, fee: o.fee, spread: o.spread, stressSpread: o.stressSpread, sensitivitySpreads: o.sensitivitySpreads,
       maxCost: o.maxCost, folds: o.folds, embargoH: o.embargoH, minN: o.minN, minEvents: o.minEvents, fdr: o.fdr, boot: o.boot, seed: o.seed,
       alpha: o.alpha, minSportMarkets: o.minSportMarkets, only: o.only || null, sportVariantsFor: sports,
-      costModel: 'cost = min(0.999, (price + spread) * (1 + fee)); skip if cost >= maxCost; flat $1 stake; pnl = won ? 1/cost - 1 : -1',
+      costModel: o.costOf
+        ? `SENSITIVITY: ${o.costModel} (${o.costModelLabel}); skip if cost >= maxCost; flat $1 stake; pnl = won ? 1/cost - 1 : -1`
+        : 'cost = min(0.999, (price + spread) * (1 + fee)); skip if cost >= maxCost; flat $1 stake; pnl = won ? 1/cost - 1 : -1',
+      costModelId: o.costModel ?? null,
+      pValue: `one-sided cluster-bootstrap p for ROI > 0, floored at max(1/(B+1), 2^-events)${o.lossFloor ? ' and at the losing-events floor (one outcome-blind representative bet per event; P(losing representatives <= observed) if every bet won exactly as often as its cost implies)' : ''}`,
       survivalRule: `OOS n >= ${o.minN} AND OOS events >= ${o.minEvents} AND BH-significant at q=${o.fdr} AND 95% cluster-bootstrap CI lower bound of ROI > 0 AND ROI > 0 at spread ${o.stressSpread}`,
       mde80: `BH-aware: (z_{1-q/m} + z_0.8) x bootstrap SE of ROI, with m = ${tested.length} hypotheses tested; null when the sample cannot meet min-n / min-events. A best case, not a guarantee.`,
     },
@@ -615,9 +681,12 @@ function buildWarnings(rep, o) {
 function buildVerdict(rep, survivors, o) {
   const tested = rep.hypotheses.filter((r) => r.status === 'tested');
   const sanityFailed = survivors.some((r) => r.role === 'sanity');
-  const costs = `fee ${o.fee}, spread haircut ${o.spread}`;
+  const costs = o.costOf ? `cost model ${o.costModel}, spread haircut ${o.spread}` : `fee ${o.fee}, spread haircut ${o.spread}`;
   let text;
-  if (!tested.length) {
+  if (o.costOf) {
+    const passing = tested.filter((r) => r.verdict.passesSensitivity).map((r) => r.id);
+    text = `**Sensitivity run, not a headline result.** Costs: ${o.costModelLabel} (\`--cost-model ${o.costModel}\`), spread haircut ${o.spread}, applied in training and out-of-sample alike. Survival is judged only at the pre-registered headline costs, so this run declares no survivors. ${tested.length} hypotheses tested; ${passing.length ? `${passing.length} would pass every check at these costs: ${passing.join(', ')}.` : 'none would pass every check at these costs either.'}`;
+  } else if (!tested.length) {
     text = '**Nothing could be tested.** Every hypothesis was skipped for missing data, so this run says nothing about an edge.';
   } else if (sanityFailed) {
     text = '**Results are not trustworthy.** The sanity baseline (buy every outcome) came out profitable after costs, which should be impossible on correctly built data. Find the leakage or label problem before reading anything else.';
@@ -688,11 +757,13 @@ function toMarkdown(rep, words = { title: 'Sports edge backtest', group: 'sport'
   L.push(`- Rows by ${G}: ${sports}. Trade features on ${pct(d.tradeCoverage, 0).replace('+', '')} of rows.`);
   if (c.hypotheses && !/research[\/\\]hypotheses\.js$/.test(c.hypotheses)) L.push(`- Hypothesis module: \`${c.hypotheses}\`. Decisions per offset: ${Object.entries(d.offsets).sort((a, b) => Number(a[0]) - Number(b[0])).map(([k, v]) => `${words.offsetLabel(Number(k))} ${v}`).join(', ')}.`);
   if (d.feeMarkets) L.push(`- Fees: ${d.feeMarkets.withTakerFees} of ${d.feeMarkets.withFeeInfo} markets carry a taker fee schedule (feeSchedule.rate > 0 with feesEnabled); the headline uses the flat fee below, the actual-fee re-costing is a sensitivity.`);
-  L.push(`- Costs: entry cost = min(0.999, (price + ${c.spread}) x (1 + ${c.fee})); rows with cost >= ${c.maxCost} skipped; flat $1 stake.`);
+  L.push(c.costModelId
+    ? `- Costs (SENSITIVITY, \`--cost-model ${c.costModelId}\`): ${c.costModel}; spread haircut ${c.spread}; used for training choices and out-of-sample bets alike.`
+    : `- Costs: entry cost = min(0.999, (price + ${c.spread}) x (1 + ${c.fee})); rows with cost >= ${c.maxCost} skipped; flat $1 stake.`);
   L.push(`- Walk-forward: ${c.folds} time-ordered folds, whole events per fold; fold 0 is train-only. For each later fold, parameters (grid x decision offset) are chosen on earlier folds only (best train ROI with n >= ${c.minN}), with a ${c.embargoH}h embargo before the fold's first decision. Only out-of-sample bets are reported.`);
   if (c.embargoFrom === 'settle') L.push(`- Fold order: events by their earliest ${c.foldBy === 'decision' ? 'decision' : 'start'}. Training rows must have SETTLED (closedTime) at least ${c.embargoH}h before the test fold's first decision${c.cutoffScope === 'offsets' ? " at the hypothesis's own offsets" : ''}; rows without a settle time never train.`);
   else L.push(`- Walk-forward training also skips rows whose market had not settled (closedTime) by the fold's first decision.`);
-  L.push(`- Statistics: 95% CIs by cluster bootstrap over eventKey (B = ${c.boot}, seed ${c.seed}); one-sided p for ROI > 0, floored at max(1/(B+1) = ${fmtP(rep.bh.minAttainableP)}, 2^-events) because no resampling test over few independent events can be more confident than that; Benjamini-Hochberg FDR q = ${c.fdr} across the ${rep.bh.m} hypotheses tested in this run.`);
+  L.push(`- Statistics: 95% CIs by cluster bootstrap over eventKey (B = ${c.boot}, seed ${c.seed}); one-sided p for ROI > 0, floored at max(1/(B+1) = ${fmtP(rep.bh.minAttainableP)}, 2^-events) because no resampling test over few independent events can be more confident than that${c.lossFloor ? ', and at the losing-events floor: with one representative bet per event (a fixed pseudo-random pick by row id, blind to outcomes and prices), the chance at breakeven (every bet wins exactly as often as its cost implies) of no more losing representatives than observed; it guards skewed bets such as 0.9+ favourites, where a few dozen events that all won make the bootstrap degenerate' : ''}; Benjamini-Hochberg FDR q = ${c.fdr} across the ${rep.bh.m} hypotheses tested in this run.`);
   L.push(`- SURVIVES requires: ${c.survivalRule}.`);
   L.push(`- Per-${G} variants: ${c.sportVariantsFor.length ? c.sportVariantsFor.join(', ') : 'none'} (${G === 'sport' ? 'sports' : `${G} values`} with >= ${c.minSportMarkets} markets).`);
 
@@ -784,9 +855,12 @@ const USAGE = `Usage: node research/backtest.js --source-label "<where the data 
   --name <base>            report file base name (default backtest-<UTC timestamp>)
   --hypotheses <file>      hypothesis module (default research/hypotheses.js), e.g. research/general/hypotheses.js;
                            its BACKTEST export sets fold order, embargo basis, cost sensitivities and wording
+  --loss-floor true|false  also floor p at the losing-events floor (default: the module's BACKTEST.lossFloor, else false)
+  --cost-model <id>        SENSITIVITY ONLY: replace the flat fee model by the module's BACKTEST.altCosts entry <id>
+                           (e.g. actual-fees) in training and out-of-sample; the report declares no survivors
   --list                   print the base hypothesis ids and exit`;
 
-const VALUE_OPTS = new Set(['data', 'source-label', 'fee', 'spread', 'stress-spread', 'folds', 'embargo-h', 'min-n', 'min-events', 'fdr', 'boot', 'seed', 'min-sport-markets', 'only', 'out', 'name', 'hypotheses']);
+const VALUE_OPTS = new Set(['data', 'source-label', 'fee', 'spread', 'stress-spread', 'folds', 'embargo-h', 'min-n', 'min-events', 'fdr', 'boot', 'seed', 'min-sport-markets', 'only', 'out', 'name', 'hypotheses', 'loss-floor', 'cost-model']);
 
 function parseArgs(argv) {
   const a = {};
@@ -817,6 +891,14 @@ export function optsFromArgs(argv) {
   if (a.help || a.list) return { help: !!a.help, list: !!a.list, hypotheses: a.hypotheses || null };
   const o = {};
   if (a.hypotheses) o.hypotheses = a.hypotheses;
+  if (a['loss-floor'] != null) {
+    if (!/^(true|false)$/.test(a['loss-floor'])) throw new Error('--loss-floor takes true or false');
+    o.lossFloor = a['loss-floor'] === 'true';
+  }
+  if (a['cost-model'] != null) {
+    if (!/^[\w-]+$/.test(a['cost-model'])) throw new Error('--cost-model takes an altCosts id such as actual-fees');
+    o.costModel = a['cost-model'];
+  }
   if (a.data) o.data = a.data;
   if (a.out) o.out = a.out;
   if (a.name) {

@@ -228,6 +228,8 @@ const SPORT_ALIASES = (() => {
     'table-tennis': ['table-tennis'], basketball: ['basketball'], baseball: ['baseball'], hockey: ['hockey'],
     handball: ['handball'], darts: ['darts'], pickleball: ['pickleball'], rugby: ['rugby'], volleyball: ['volleyball'],
     esports: ['esports'],
+    // Outrights / races (no head-to-head game) seen on live gamma in 2026.
+    racing: ['racing', 'nascar', 'indycar', 'motogp'], cycling: ['cycling'], chess: ['chess'],
   };
   const map = new Map();
   for (const [key, list] of Object.entries(groups)) for (const a of list) map.set(a, key);
@@ -421,6 +423,10 @@ export function normalizeMarket(m, ev, { sinceTs = null, untilTs = null } = {}) 
       times,
       volume: num(m.volumeNum ?? m.volume), // lifetime volume: leaks the future, never a feature
       negRisk: bool(m.negRisk ?? ev?.negRisk),
+      // Fee metadata as listed (2026: zero_fees, sports_fees_v2/v3, ...). Recorded for reporting only;
+      // the backtest charges a flat --fee.
+      feesEnabled: bool(m.feesEnabled),
+      feeType: m.feeType == null ? null : String(m.feeType),
       collectedAt: 0,
     },
   };
@@ -608,9 +614,13 @@ function hash32(str) {
 /**
  * Order for a capped window: round-robin over sports (in a fixed per-window shuffle), game-major:
  * the first game of every sport, then the second game of every sport, ...; a game's markets stay
- * together in gamma's order. Without it the cap fills with whatever ends last in the window, which
- * near "now" is all table tennis (setka endDate = start + 7 days). Uses only listing fields
- * (sport, slug, gameId, order), never prices, volume or outcomes.
+ * together, those of its main event (event slug === gameKey, e.g. "nfl-dal-gb-2026-10-19") first,
+ * then its sub-events ("...-first-td-scorer", "...-more-markets"), each in gamma's order. Without
+ * the round-robin the cap fills with whatever ends last in the window, which near "now" is all
+ * table tennis (setka endDate = start + 7 days); without main-event-first, --max-markets-per-game
+ * fills with whichever sub-event gamma lists first (first-TD props, exact scores) and drops the
+ * game's moneyline. Uses only listing fields (sport, slug, gameId, order), never prices, volume or
+ * outcomes.
  */
 export function sampleOrder(pairs, windowLabel = '') {
   const sports = new Map(); // sport -> Map(gameKey -> pairs[])
@@ -623,7 +633,11 @@ export function sampleOrder(pairs, windowLabel = '') {
     games.get(game).push(p);
   }
   const order = [...sports.keys()].sort((a, b) => hash32(`${windowLabel}|${a}`) - hash32(`${windowLabel}|${b}`) || (a < b ? -1 : 1));
-  const lists = order.map((s) => [...sports.get(s).values()]);
+  const mainFirst = (game) => {
+    const main = game.filter((p) => p.event?.slug != null && slugify(p.event.slug) === gameKeyOf(p.event, p.market));
+    return main.length && main.length < game.length ? [...main, ...game.filter((p) => !main.includes(p))] : game;
+  };
+  const lists = order.map((s) => [...sports.get(s).values()].map(mainFirst));
   const out = [];
   for (let g = 0; out.length < pairs.length; g++) for (const games of lists) if (games[g]) out.push(...games[g]);
   return out;
@@ -640,11 +654,14 @@ async function* discoverEvents(ctx, filters) {
     ctx.window = w ? w.label : null;
     ctx.windowFull = false;
     if (w) ctx.stats.discovery.windows++;
-    // A capped window is buffered (until it holds 4x the cap in markets, or ends) and reordered by
-    // sampleOrder; otherwise pages are passed on as they arrive.
+    // A capped window is buffered (each tag/series filter is read until it adds 4x the cap in
+    // markets, or ends) and reordered by sampleOrder; otherwise pages are passed on as they arrive.
+    // The budget is per filter: a shared one would fill up with the first filters of --tag (e.g.
+    // nba,nfl,...) and never read the later ones.
     const buffer = w && cap > 0 ? [] : null;
     for (const f of filters) {
-      if (ctx.windowFull || (buffer && buffer.length >= 4 * cap)) break;
+      if (ctx.windowFull) break;
+      const filterStart = buffer ? buffer.length : 0;
       const params = { ...listingParams(ctx), ...f.params, ...(w ? { end_date_min: w.min, end_date_max: w.max } : {}) };
       for await (const { items } of pagedList(ctx, ctx.bases.gamma, '/events', params, w ? `${f.label} ${w.label}` : f.label, finalEventsPage, slimListing)) {
         perFilter.set(f.label, perFilter.get(f.label) + items.length);
@@ -658,7 +675,7 @@ async function* discoverEvents(ctx, filters) {
         }
         if (buffer) {
           buffer.push(...pairs);
-          if (buffer.length >= 4 * cap) break;
+          if (buffer.length - filterStart >= 4 * cap) break;
           continue;
         }
         yield pairs;

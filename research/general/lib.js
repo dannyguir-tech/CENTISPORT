@@ -30,6 +30,9 @@ export const maxPriceAgeSec = (offsetH) => (offsetH >= 7 * 24 ? 24 : 12) * HOUR;
 export const LOOKBACK_SEC = Object.freeze({ m1d: DAY, m7d: 7 * DAY });
 // negRisk group features use only member quotes stamped within this window before the row's point.
 export const GROUP_SYNC_SEC = 30 * 60;
+// clob stamps different tokens' hourly points up to ~60 s apart; a member quote this much newer
+// than the row's point (and not after the decision) counts as synchronous.
+export const GROUP_STAMP_TOL_SEC = 120;
 export const DEFAULT_SINCE = '2024-01-01';
 
 // ---------- small parsers (copied from research/collect.js so this track does not depend on its internals) ----------
@@ -195,9 +198,10 @@ export function isCryptoUpDown({ tags, title, slug, series } = {}) {
 
 const MONTH = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
 // "by June 30", "before 2026", "by end of 2025", "by Q3", "by 12/31", "before the election" is NOT a date.
+// "by..." / "by ___" (date in the event's member list) also counts, with or without a space.
 const DEADLINE_RE = new RegExp(
-  `\\b(?:by|before)\\s+(?:the\\s+)?(?:(?:end|middle|start)\\s+of\\s+(?:the\\s+)?)?(?:${MONTH}\\b|(?:q[1-4]|h[12])\\b|(?:19|20)\\d{2}\\b|\\d{1,2}/\\d{1,2}\\b|`
-  + '(?:year|month|week)[- ]?end\\b|eoy\\b|(?:this|next)\\s+(?:year|month|week)\\b|(?:mon|tues|wednes|thurs|fri|satur|sun)day\\b|tomorrow\\b|\\.\\.\\.|___)', 'i');
+  `\\b(?:by|before)(?:\\s*(?:\\.\\.\\.|\u2026|___)|\\s+(?:the\\s+)?(?:(?:end|middle|start)\\s+of\\s+(?:the\\s+)?)?(?:${MONTH}\\b|(?:q[1-4]|h[12])\\b|(?:19|20)\\d{2}\\b|\\d{1,2}/\\d{1,2}\\b|`
+  + '(?:year|month|week)[- ]?end\\b|eoy\\b|(?:this|next)\\s+(?:year|month|week)\\b|(?:mon|tues|wednes|thurs|fri|satur|sun)day\\b|tomorrow\\b))', 'i');
 const WIN_RE = /\bwin(?:s|ner|ners|ning)?\b/i;
 const THRESHOLD_RE = /\b(?:above|below|over|under|reach(?:es|ed)?)\b[^?]*?(?:\d|___)/i;
 

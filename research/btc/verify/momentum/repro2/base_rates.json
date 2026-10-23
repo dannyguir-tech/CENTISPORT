@@ -1,0 +1,52 @@
+[
+ {
+  "tf": "5m",
+  "pairs": 12856,
+  "pSameAsPrev": 0.4973,
+  "se": 0.0044,
+  "upRate": 0.502,
+  "meanOpenPUpAfterUp": 0.4997,
+  "meanOpenPUpAfterDown": 0.4988,
+  "medianExecWaitSec": 57
+ },
+ {
+  "tf": "15m",
+  "pairs": 11452,
+  "pSameAsPrev": 0.4911,
+  "se": 0.0047,
+  "upRate": 0.4974,
+  "meanOpenPUpAfterUp": 0.4867,
+  "meanOpenPUpAfterDown": 0.509,
+  "medianExecWaitSec": 53
+ },
+ {
+  "tf": "1h",
+  "pairs": 8697,
+  "pSameAsPrev": 0.4771,
+  "se": 0.0054,
+  "upRate": 0.4999,
+  "meanOpenPUpAfterUp": 0.4811,
+  "meanOpenPUpAfterDown": 0.5193,
+  "medianExecWaitSec": 49
+ },
+ {
+  "tf": "4h",
+  "pairs": 2171,
+  "pSameAsPrev": 0.4634,
+  "se": 0.0107,
+  "upRate": 0.5021,
+  "meanOpenPUpAfterUp": 0.4983,
+  "meanOpenPUpAfterDown": 0.5115,
+  "medianExecWaitSec": 48
+ },
+ {
+  "tf": "1d",
+  "pairs": 515,
+  "pSameAsPrev": 0.5107,
+  "se": 0.022,
+  "upRate": 0.5146,
+  "meanOpenPUpAfterUp": 0.502,
+  "meanOpenPUpAfterDown": 0.5088,
+  "medianExecWaitSec": 49
+ }
+]
